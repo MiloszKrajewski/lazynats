@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Text;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 using Color = Terminal.Gui.Drawing.Color;
 
@@ -52,6 +53,66 @@ internal sealed class EditFrame: View
         Add(child);
 
         child.HasFocusChanged += (_, _) => SetNeedsDraw();
+
+        Initialized += (_, _) => WireInitialPasteFocusFix();
+    }
+
+    // WORKAROUND for a Terminal.Gui bug, source-verified against the actual Terminal.Gui source
+    // (both v2.4.10, which this project depends on, and current v2.4.17 - present, unfixed, in
+    // both):
+    //
+    //     Terminal.Gui/Views/Runnable/Runnable.cs, RaiseIsModalChangedEvent:
+    //         SetFocus ();
+    //         App?.Navigation?.SetFocused (Focused);
+    //
+    // SetFocus() correctly cascades HasFocus all the way down to the deepest focusable
+    // descendant (e.g. the TextField nested inside this EditFrame). But the very next line
+    // re-syncs Application.Navigation's own tracked "focused view" using `Focused` - which View
+    // itself defines as only *one level deep* ("the currently focused SubView... of this view")
+    // - instead of `MostFocused` (the actual deepest leaf). So right after a Dialog becomes
+    // modal, Application.Navigation.GetFocused() points at this EditFrame, not the field inside
+    // it the cursor is actually sitting in.
+    //
+    // That matters because bracketed paste - what a real terminal sends for a physical Ctrl+V -
+    // reads Application.Navigation.GetFocused() directly (ApplicationImpl.RaisePasteEvent), not
+    // the normal per-key HasFocus chain that ordinary typing walks. So this EditFrame (whose
+    // OnPaste is the base View no-op) silently swallows the very first paste after a dialog
+    // opens; typing, the cursor, and everything else are unaffected, since those all walk the
+    // (correctly-set) HasFocus chain instead of Application.Navigation's cached value. A real
+    // Tab/Shift-Tab "fixes" it permanently because AdvanceFocus re-syncs Application.Navigation
+    // through a different, correct code path (View.Navigation.cs's RaiseFocusChanging) that this
+    // bug doesn't touch.
+    //
+    // WireInitialPasteFocusFix re-triggers that same correct code path itself: once this
+    // EditFrame is attached to the tree (Initialized), it finds the nearest ancestor Runnable
+    // (the Dialog) and subscribes to its IsModalChanged - fired right after the buggy sync above
+    // - so it runs after, not before, Terminal.Gui's own clobbering. It then blurs and
+    // immediately re-focuses `_child`, forcing Application.Navigation to resolve to the field
+    // itself instead of this frame. The HasFocus guard makes this safe to embed unconditionally:
+    // in a dialog with several EditFrames, only the one whose child genuinely ended up focused
+    // (whether by default initial focus or a dialog explicitly redirecting it, e.g. the isEdit
+    // branches in CreateBucketDialog/CreateKeyDialog/...) will ever act; the rest are no-ops.
+    //
+    // DELETE THIS METHOD (and its Initialized subscription above) once fixed upstream - it's a
+    // one-word fix (`Focused` -> `MostFocused`) in RaiseIsModalChangedEvent. No upstream issue
+    // filed yet as of 2026-09-03 - confirmed by hand (PublishDialog's Subject field) against a
+    // real terminal paste, not just tmux's bracketed-paste injection.
+    private void WireInitialPasteFocusFix()
+    {
+        for (View? ancestor = SuperView; ancestor is not null; ancestor = ancestor.SuperView)
+        {
+            if (ancestor is not Runnable runnable) 
+                continue;
+
+            runnable.IsModalChanged += (_, e) => {
+                if (!e.Value || !_child.HasFocus) return;
+
+                _child.HasFocus = false;
+                _child.SetFocus();
+            };
+
+            return;
+        }
     }
 
     // Null means "inherit from SuperView" - since EditFrame itself never sets its own scheme,
@@ -59,19 +120,31 @@ internal sealed class EditFrame: View
     public Color? OuterBackground
     {
         get => _outerBackground;
-        set { _outerBackground = value; SetNeedsDraw(); }
+        set
+        {
+            _outerBackground = value;
+            SetNeedsDraw();
+        }
     }
 
     public Color InnerBackgroundNormal
     {
         get => _innerBackgroundNormal;
-        set { _innerBackgroundNormal = value; SetNeedsDraw(); }
+        set
+        {
+            _innerBackgroundNormal = value;
+            SetNeedsDraw();
+        }
     }
 
     public Color InnerBackgroundFocused
     {
         get => _innerBackgroundFocused;
-        set { _innerBackgroundFocused = value; SetNeedsDraw(); }
+        set
+        {
+            _innerBackgroundFocused = value;
+            SetNeedsDraw();
+        }
     }
 
     // A generic escape hatch, not an "invalid-state color": EditFrame has no concept of validity,
@@ -80,7 +153,11 @@ internal sealed class EditFrame: View
     public Color? InnerBackgroundOverride
     {
         get => _innerBackgroundOverride;
-        set { _innerBackgroundOverride = value; SetNeedsDraw(); }
+        set
+        {
+            _innerBackgroundOverride = value;
+            SetNeedsDraw();
+        }
     }
 
     // Null means "use the default white accent" - the left edge's outermost column (TL/LM/BL) is
@@ -89,7 +166,11 @@ internal sealed class EditFrame: View
     public Color? EdgeAccent
     {
         get => _edgeAccent;
-        set { _edgeAccent = value; SetNeedsDraw(); }
+        set
+        {
+            _edgeAccent = value;
+            SetNeedsDraw();
+        }
     }
 
     protected override bool OnDrawingContent(DrawContext? context)
@@ -118,7 +199,7 @@ internal sealed class EditFrame: View
         Move(0, bottom);
         AddRune(Qur);
 
-        if (contentHeight <= 0) 
+        if (contentHeight <= 0)
             return true;
 
         // LM: left margin, outer tick column, accent-colored.
