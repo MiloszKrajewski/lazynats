@@ -6,15 +6,15 @@ using NATS.Client.ObjectStore;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 // Two levels (bucket list / object list) sharing one screen region: rather than tearing down and
 // rebuilding views on every descend/ascend, both levels' EditFrame+list+details are built once
 // and kept alive, toggled via Visible (EditFrame wraps a fixed child, so it can't itself swap
-// between BucketListView/ObjectListView - see KvTab, which this deliberately mirrors).
+// between BucketListView/ObjectListView - see ValuesTab, which this deliberately mirrors).
 // _currentBucket is null at the bucket level, and holds the drilled-into bucket's name at the
 // object level.
-internal sealed class ObjTab: View
+internal sealed class ObjectsTab: View
 {
     private readonly INatsJSContext _jetStream;
     private readonly INatsObjContext _obj;
@@ -41,7 +41,7 @@ internal sealed class ObjTab: View
 
     public event Action<string>? StatusChanged;
 
-    public ObjTab(INatsJSContext jetStream, INatsObjContext obj)
+    public ObjectsTab(INatsJSContext jetStream, INatsObjContext obj)
     {
         CanFocus = true;
         _jetStream = jetStream;
@@ -74,12 +74,12 @@ internal sealed class ObjTab: View
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_bucketListFrame) + 1, Y = 0 };
         _details = new BucketDetails(_obj) { X = Pos.Right(_bucketListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
-        _details.Error += message => StatusChanged?.Invoke($"OBJ: {message}");
+        _details.Error += message => StatusChanged?.Invoke($"Objects: {message}");
 
         _objectDetails = new ObjectDetails(_obj) {
             X = Pos.Right(_bucketListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill(), Visible = false,
         };
-        _objectDetails.Error += message => StatusChanged?.Invoke($"OBJ: {message}");
+        _objectDetails.Error += message => StatusChanged?.Invoke($"Objects: {message}");
 
         Add(_listLabel, _bucketListFrame, _objectListFrame, _detailsLabel, _details, _objectDetails);
     }
@@ -171,7 +171,7 @@ internal sealed class ObjTab: View
 
     // Always runs on the UI thread - either directly from the Ctrl+N key command (already on the
     // UI thread) or via the App.Invoke below, reached from TryCreateBucketAsync's continuation
-    // after an await. Mirrors KvTab.OpenCreateBucketDialog exactly - see its comment for the full
+    // after an await. Mirrors ValuesTab.OpenCreateBucketDialog exactly - see its comment for the full
     // rationale.
     private void OpenCreateBucketDialog(NewBucketOptions? seed)
     {
@@ -237,7 +237,7 @@ internal sealed class ObjTab: View
 
     // Scoped by _listView.SelectedBucket alone - no _currentBucket check needed, since Ctrl+D is
     // only bound at the bucket level (see BucketListView) and this is unreachable from the object
-    // level. Mirrors KvTab.TryDeleteBucketAsync exactly.
+    // level. Mirrors ValuesTab.TryDeleteBucketAsync exactly.
     private async Task TryDeleteBucketAsync()
     {
         if (_listView.SelectedBucket is not { } stream) return;
@@ -273,12 +273,12 @@ internal sealed class ObjTab: View
             App?.Invoke(() => _listView.ReplaceItems(buckets, selectName));
         } catch (Exception ex) {
             // Keep whatever the list previously showed rather than clearing it on a transient
-            // error - matches KvTab's "poll or refresh error" handling.
-            App?.Invoke(() => StatusChanged?.Invoke($"OBJ: {ex.Message}"));
+            // error - matches ValuesTab's "poll or refresh error" handling.
+            App?.Invoke(() => StatusChanged?.Invoke($"Objects: {ex.Message}"));
         }
     }
 
-    // `selectName` mirrors KvTab.RefreshKeyListAsync's own parameter - highlights a specific
+    // `selectName` mirrors ValuesTab.RefreshKeyListAsync's own parameter - highlights a specific
     // object after the refresh (used right after an upload) instead of ReplaceItems' default
     // "keep whatever was highlighted before" fallback.
     private async Task RefreshObjectListAsync(string? selectName = null)
@@ -295,7 +295,7 @@ internal sealed class ObjTab: View
                 if (_currentBucket == bucket) _objectListView.ReplaceItems(names, selectName);
             });
         } catch (Exception ex) {
-            App?.Invoke(() => StatusChanged?.Invoke($"OBJ: {ex.Message}"));
+            App?.Invoke(() => StatusChanged?.Invoke($"Objects: {ex.Message}"));
         }
     }
 

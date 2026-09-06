@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using lazynats.Components;
 using NATS.Client.JetStream.Models;
 
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 internal sealed class BucketListView: DrillableListView<StreamInfo>
 {

@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using lazynats.Components;
 
-namespace lazynats.KVStore;
+namespace lazynats.Values;
 
 internal sealed class KeyListView: DrillableListView<string>
 {

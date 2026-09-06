@@ -1,7 +1,7 @@
 ﻿using lazynats.Components;
-using lazynats.KVStore;
+using lazynats.Values;
 using lazynats.LiveFeed;
-using lazynats.ObjStore;
+using lazynats.Objects;
 using lazynats.Publish;
 using lazynats.Streams;
 using lazynats.Subscriptions;
@@ -37,10 +37,10 @@ internal sealed class MainWindow: Runnable
 
         var subscribeTab = new SubscribeTab(registry) { Title = " 1:Subscribe ", Padding = { Thickness = new Thickness(1) } };
         var streamsTab = new StreamsTab(jetStream) { Title = " 2:Streams ", Padding = { Thickness = new Thickness(1) } };
-        var kvTab = new KvTab(kv) { Title = " 3:KV ", Padding = { Thickness = new Thickness(1) } };
-        var objTab = new ObjTab(jetStream, obj) { Title = " 4:OBJ ", Padding = { Thickness = new Thickness(1) } };
+        var valuesTab = new ValuesTab(kv) { Title = " 3:Values ", Padding = { Thickness = new Thickness(1) } };
+        var objectsTab = new ObjectsTab(jetStream, obj) { Title = " 4:Objects ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
-        tabs.Add(subscribeTab, streamsTab, kvTab, objTab);
+        tabs.Add(subscribeTab, streamsTab, valuesTab, objectsTab);
         tabs.Value = subscribeTab;
 
         var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -59,11 +59,11 @@ internal sealed class MainWindow: Runnable
         var streamsTabShortcut = new Shortcut { Text = "Streams", Key = Key.D2.WithAlt, BindKeyToApplication = true };
         streamsTabShortcut.Action = () => tabs.Value = streamsTab;
 
-        var kvTabShortcut = new Shortcut { Text = "KV", Key = Key.D3.WithAlt, BindKeyToApplication = true };
-        kvTabShortcut.Action = () => tabs.Value = kvTab;
+        var valuesTabShortcut = new Shortcut { Text = "Values", Key = Key.D3.WithAlt, BindKeyToApplication = true };
+        valuesTabShortcut.Action = () => tabs.Value = valuesTab;
 
-        var objTabShortcut = new Shortcut { Text = "OBJ", Key = Key.D4.WithAlt, BindKeyToApplication = true };
-        objTabShortcut.Action = () => tabs.Value = objTab;
+        var objectsTabShortcut = new Shortcut { Text = "Objects", Key = Key.D4.WithAlt, BindKeyToApplication = true };
+        objectsTabShortcut.Action = () => tabs.Value = objectsTab;
 
         var publishShortcut = new Shortcut { Text = "Publish", Key = Key.P.WithAlt, BindKeyToApplication = true };
         // Deferred via AddTimeout(Zero, ...) rather than calling App!.Run directly: this Action
@@ -84,21 +84,21 @@ internal sealed class MainWindow: Runnable
             streamsStatusShortcut.Visible = true;
         };
 
-        var kvStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
-        kvTab.StatusChanged += message => {
-            kvStatusShortcut.Text = message;
-            kvStatusShortcut.Visible = true;
+        var valuesStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
+        valuesTab.StatusChanged += message => {
+            valuesStatusShortcut.Text = message;
+            valuesStatusShortcut.Visible = true;
         };
 
-        var objStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
-        objTab.StatusChanged += message => {
-            objStatusShortcut.Text = message;
-            objStatusShortcut.Visible = true;
+        var objectsStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
+        objectsTab.StatusChanged += message => {
+            objectsStatusShortcut.Text = message;
+            objectsStatusShortcut.Visible = true;
         };
 
         _statusBar = new StatusBar([
-            quitShortcut, subscribeTabShortcut, streamsTabShortcut, kvTabShortcut, objTabShortcut, publishShortcut, clearShortcut,
-            streamsStatusShortcut, kvStatusShortcut, objStatusShortcut,
+            quitShortcut, subscribeTabShortcut, streamsTabShortcut, valuesTabShortcut, objectsTabShortcut, publishShortcut, clearShortcut,
+            streamsStatusShortcut, valuesStatusShortcut, objectsStatusShortcut,
         ]);
         _staticShortcutCount = _statusBar.SubViews.Count;
 

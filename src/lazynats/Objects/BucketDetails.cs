@@ -1,7 +1,7 @@
 using lazynats.Components;
 using NATS.Client.ObjectStore;
 
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 // Read-only readout of a single OBJ bucket's stats, per nats-obj's "Bucket Detail Panel"
 // requirement - never focusable, never edits anything. Mirrors Kv/BucketDetails deliberately
@@ -33,7 +33,7 @@ internal sealed class BucketDetails: PollingDetailsView<string, NatsObjStatus>
             ("Compressed", status.IsCompressed.ToString()),
             (string.Empty, string.Empty),
             // State.Messages counts stream messages, not necessarily distinct live objects - same
-            // caveat KV's "Entries" label carries, see Kv/BucketDetails.cs.
+            // caveat KV's "Entries" label carries, see Values/BucketDetails.cs.
             ("Objects", state.Messages.ToString()),
             ("Bytes", state.Bytes.ToString()),
             ("Replicas", config.NumReplicas.ToString()),

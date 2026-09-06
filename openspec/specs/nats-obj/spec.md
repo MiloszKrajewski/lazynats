@@ -10,11 +10,11 @@ currently present on the connected server.
 
 #### Scenario: Existing buckets are listed
 - **WHEN** one or more OBJ buckets exist on the server
-- **THEN** the OBJ tab's list shows each bucket's name
+- **THEN** the Objects tab's list shows each bucket's name
 
 #### Scenario: No buckets exist
 - **WHEN** no OBJ buckets exist on the server
-- **THEN** the OBJ tab shows a non-interactive hint in place of the list, rather than a blank list
+- **THEN** the Objects tab shows a non-interactive hint in place of the list, rather than a blank list
 
 ### Requirement: Bucket Detail Panel
 The system SHALL show, alongside the bucket list, a detail panel for the currently highlighted
@@ -40,17 +40,17 @@ count, and max age. Limit fields that carry a server "no limit" sentinel value S
 - **THEN** that row shows the configured value, unchanged from today's rendering
 
 ### Requirement: Periodic Bucket Detail Refresh
-The system SHALL refresh the highlighted bucket's detail panel periodically while the OBJ tab is
+The system SHALL refresh the highlighted bucket's detail panel periodically while the Objects tab is
 the selected tab and the bucket level is shown, independent of any selection change. This refresh
 SHALL apply only to the detail panel, not to the bucket list.
 
 #### Scenario: Detail panel reflects a change made outside the app
-- **WHEN** the OBJ tab is selected, a bucket is highlighted, and that bucket's object count changes
+- **WHEN** the Objects tab is selected, a bucket is highlighted, and that bucket's object count changes
   on the server without any selection change in the app
 - **THEN** the detail panel's shown object count updates within one refresh cycle
 
 #### Scenario: Refresh does not run while the tab is not selected
-- **WHEN** the OBJ tab is not the currently selected management tab
+- **WHEN** the Objects tab is not the currently selected management tab
 - **THEN** the system does not poll the server for bucket detail updates
 
 ### Requirement: Manual Bucket List Refresh
@@ -60,7 +60,7 @@ server. If the previously-highlighted bucket is still present in the refreshed l
 remain highlighted; otherwise the first item in the refreshed list SHALL become highlighted.
 
 #### Scenario: The list does not change on its own
-- **WHEN** the OBJ tab is selected and a bucket is created or deleted on the server via another
+- **WHEN** the Objects tab is selected and a bucket is created or deleted on the server via another
   client, without the user pressing Ctrl+R
 - **THEN** the bucket list shown in the app does not change
 
@@ -140,7 +140,7 @@ become highlighted.
 The system SHALL show, alongside the object list, a detail panel for the currently highlighted
 object, presenting its description, size, chunk count, digest, and modified time. The system SHALL
 NOT fetch, decode, or render the object's underlying content/bytes anywhere in this panel or
-elsewhere in the OBJ tab.
+elsewhere in the Objects tab.
 
 #### Scenario: Highlighting an object shows its metadata
 - **WHEN** the user moves the highlight to an object in the object list
@@ -155,7 +155,7 @@ elsewhere in the OBJ tab.
 - **WHEN** the user moves the highlight to an object in the object list
 - **THEN** the system fetches that object's current metadata right away, rather than waiting for
   the periodic detail refresh interval to elapse — matching the immediacy of the bucket detail
-  panel and the KV tab's key detail panel on their own highlight changes
+  panel and the Values tab's key detail panel on their own highlight changes
 
 #### Scenario: No object highlighted
 - **WHEN** the object list is empty and no object is highlighted
@@ -163,7 +163,7 @@ elsewhere in the OBJ tab.
 
 ### Requirement: Periodic Object Detail Refresh
 The system SHALL refresh the highlighted object's detail panel periodically while the object level
-is shown and the OBJ tab is the selected tab, independent of any selection change. This refresh
+is shown and the Objects tab is the selected tab, independent of any selection change. This refresh
 SHALL apply only to the detail panel, not to the object list.
 
 #### Scenario: Detail panel reflects a change made outside the app
@@ -176,7 +176,7 @@ SHALL apply only to the detail panel, not to the object list.
 - **THEN** the system does not poll the server for object detail updates
 
 #### Scenario: Refresh does not run while the tab is not selected
-- **WHEN** the OBJ tab is not the currently selected management tab
+- **WHEN** the Objects tab is not the currently selected management tab
 - **THEN** the system does not poll the server for object detail updates, even if the object level
   was the last one shown
 
@@ -342,7 +342,7 @@ list so the deleted object no longer appears.
 - **THEN** no object is deleted and the object list is unchanged
 
 #### Scenario: Delete at the object level is independent of bucket-level Delete
-- **WHEN** the OBJ tab is displayed at the object level (drilled into a bucket) and the user
+- **WHEN** the Objects tab is displayed at the object level (drilled into a bucket) and the user
   presses Ctrl+D
 - **THEN** the highlighted object is deleted per this requirement, not the drilled-into bucket
   (bucket deletion, per "Delete Bucket", is only reachable at the bucket level)
@@ -439,7 +439,7 @@ list so the deleted bucket no longer appears.
 - **THEN** no bucket is deleted and the bucket list is unchanged
 
 #### Scenario: Delete is only reachable at the bucket level
-- **WHEN** the OBJ tab is displayed at the object level (drilled into a bucket)
+- **WHEN** the Objects tab is displayed at the object level (drilled into a bucket)
 - **THEN** Ctrl+D has no effect on any bucket, since the bucket list is not displayed
 
 #### Scenario: Server-side delete failure is reported without losing list state

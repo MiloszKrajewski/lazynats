@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Unicode;
 
-namespace lazynats.KVStore;
+namespace lazynats.Values;
 
 // The printable-text guard behind Edit Key (see openspec/changes/add-kv-key-crud/design.md's
 // "Printable-text guard" decision): a value is editable as text only if it's valid UTF-8 and

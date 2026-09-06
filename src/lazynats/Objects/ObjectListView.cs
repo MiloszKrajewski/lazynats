@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using lazynats.Components;
 using Terminal.Gui.Input;
 
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 internal sealed class ObjectListView: DrillableListView<string>
 {

@@ -1,6 +1,6 @@
 using lazynats.Components;
 
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 internal sealed class ObjectNamePresenter: IValuePresenter<string>
 {

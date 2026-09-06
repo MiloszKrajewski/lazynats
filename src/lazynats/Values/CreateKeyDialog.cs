@@ -5,15 +5,15 @@ using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 
-namespace lazynats.KVStore;
+namespace lazynats.Values;
 
 // Multi-field modal for creating/editing a KV key - mirrors CreateBucketDialog's shape (Tab
 // between fields, Enter-on-a-field inert, Create/Save as a single explicit button, Cancel for
 // mouse users), except Value is a TextView rather than a TextField: see
 // openspec/changes/add-kv-key-crud/design.md's "Value field is a multi-line TextView" decision.
 // `initial` seeds every field, used both to open in edit mode (seeded with the key's current
-// decoded value - see KvTab.OpenEditKeyDialog) and to reopen pre-filled after a failed
-// PutAsync (see KvTab).
+// decoded value - see ValuesTab.OpenEditKeyDialog) and to reopen pre-filled after a failed
+// PutAsync (see ValuesTab).
 internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
 {
     private static readonly Attribute InvalidAttribute = new(ColorName16.Red, Theme.EditableBackground);

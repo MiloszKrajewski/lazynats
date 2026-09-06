@@ -1,6 +1,6 @@
 using NATS.Client.KeyValueStore;
 
-namespace lazynats.KVStore;
+namespace lazynats.Values;
 
 // CreateBucketDialog's own result type, kept separate from NatsKVConfig's wire representation -
 // see openspec/changes/add-kv-bucket-create/design.md's "NewBucketOptions" decision. Mirrors

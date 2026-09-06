@@ -1,7 +1,7 @@
 using lazynats.Components;
 using NATS.Client.KeyValueStore;
 
-namespace lazynats.KVStore;
+namespace lazynats.Values;
 
 // Read-only readout of a single KV bucket's stats, per nats-kv's "Bucket Detail Panel"
 // requirement - never focusable, never edits anything. Mirrors StreamDetails deliberately

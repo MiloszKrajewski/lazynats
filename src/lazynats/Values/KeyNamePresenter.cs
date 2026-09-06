@@ -1,6 +1,6 @@
 using lazynats.Components;
 
-namespace lazynats.KVStore;
+namespace lazynats.Values;
 
 internal sealed class KeyNamePresenter: IValuePresenter<string>
 {

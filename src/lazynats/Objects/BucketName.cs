@@ -1,6 +1,6 @@
 using NATS.Client.JetStream.Models;
 
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 // INatsObjContext has no bulk bucket-status listing call, so the bucket list is sourced from
 // JetStream's plain stream list instead (see design.md's "Bucket list" decision) - mirroring

@@ -1,7 +1,7 @@
 using lazynats.Components;
 using NATS.Client.JetStream.Models;
 
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 internal sealed class BucketNamePresenter: IValuePresenter<StreamInfo>
 {

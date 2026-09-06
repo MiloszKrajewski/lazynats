@@ -1,4 +1,4 @@
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 // ObjectFileDialog's own result type - mirrors NewKeyOptions' shape. Key is the object's name
 // (fixed to the highlighted object in download mode); Path is the local file path.

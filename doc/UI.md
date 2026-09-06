@@ -12,8 +12,8 @@ from anywhere in the app via Alt+N, where N is that position:
 |---|---|---|
 | Subscribe (live NATS monitoring) | `1:Subscribe` | Alt+1 |
 | Streams (durable streams, drill down into consumers) | `2:Streams` | Alt+2 |
-| KV stores (key/value stores) | `3:KV` | Alt+3 |
-| OBJ stores (object stores) | `4:OBJ` | Alt+4 |
+| Values (key/value stores) | `3:Values` | Alt+3 |
+| Objects (object stores) | `4:Objects` | Alt+4 |
 
 Tab shortcuts use Alt+digit rather than Alt+letter so they never collide with a tab's own
 mnemonic buttons, which Terminal.Gui also binds via Alt+letter. Publish isn't a tab: composing

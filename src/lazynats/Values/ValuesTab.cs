@@ -6,7 +6,7 @@ using NATS.Client.KeyValueStore;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
-namespace lazynats.KVStore;
+namespace lazynats.Values;
 
 // Two levels (bucket list / key list) sharing one screen region: rather than tearing down and
 // rebuilding views on every descend/ascend, both levels' EditFrame+list+details are built once
@@ -14,7 +14,7 @@ namespace lazynats.KVStore;
 // between BucketListView/KeyListView - see StreamsTab, which this deliberately mirrors).
 // _currentBucket is null at the bucket level, and holds the drilled-into bucket's name at the key
 // level.
-internal sealed class KvTab: View
+internal sealed class ValuesTab: View
 {
     private readonly INatsKVContext _kv;
 
@@ -40,7 +40,7 @@ internal sealed class KvTab: View
 
     public event Action<string>? StatusChanged;
 
-    public KvTab(INatsKVContext kv)
+    public ValuesTab(INatsKVContext kv)
     {
         CanFocus = true;
         _kv = kv;
@@ -72,12 +72,12 @@ internal sealed class KvTab: View
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_bucketListFrame) + 1, Y = 0 };
         _details = new BucketDetails(_kv) { X = Pos.Right(_bucketListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
-        _details.Error += message => StatusChanged?.Invoke($"KV: {message}");
+        _details.Error += message => StatusChanged?.Invoke($"Values: {message}");
 
         _keyDetails = new KeyDetails(_kv) {
             X = Pos.Right(_bucketListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill(), Visible = false,
         };
-        _keyDetails.Error += message => StatusChanged?.Invoke($"KV: {message}");
+        _keyDetails.Error += message => StatusChanged?.Invoke($"Values: {message}");
 
         Add(_listLabel, _bucketListFrame, _keyListFrame, _detailsLabel, _details, _keyDetails);
     }
@@ -248,7 +248,7 @@ internal sealed class KvTab: View
 
     // Merges onto `original` rather than calling `edited.ToNatsKVConfig()` - per design.md
     // Decision 2. Goes through the real KV-level `UpdateStoreAsync`, not a raw stream update
-    // (unlike ObjTab's OBJ-only workaround - see design.md's KV-vs-OBJ asymmetry risk note).
+    // (unlike ObjectsTab's OBJ-only workaround - see design.md's KV-vs-OBJ asymmetry risk note).
     private async Task TryEditBucketAsync(NatsKVStatus status, NatsKVConfig original, NewBucketOptions edited)
     {
         try {
@@ -306,7 +306,7 @@ internal sealed class KvTab: View
         } catch (Exception ex) {
             // Keep whatever the list previously showed rather than clearing it on a transient
             // error - matches StreamsTab's "poll or refresh error" handling.
-            App?.Invoke(() => StatusChanged?.Invoke($"KV: {ex.Message}"));
+            App?.Invoke(() => StatusChanged?.Invoke($"Values: {ex.Message}"));
         }
     }
 
@@ -327,7 +327,7 @@ internal sealed class KvTab: View
                 if (_currentBucket == bucket) _keyListView.ReplaceItems(keys, selectName);
             });
         } catch (Exception ex) {
-            App?.Invoke(() => StatusChanged?.Invoke($"KV: {ex.Message}"));
+            App?.Invoke(() => StatusChanged?.Invoke($"Values: {ex.Message}"));
         }
     }
 
@@ -374,18 +374,18 @@ internal sealed class KvTab: View
             var store = await _kv.GetStoreAsync(bucket);
             var result = await store.TryGetEntryAsync<byte[]>(key);
             if (!result.Success) {
-                App?.Invoke(() => StatusChanged?.Invoke($"KV: Key '{key}' no longer exists"));
+                App?.Invoke(() => StatusChanged?.Invoke($"Values: Key '{key}' no longer exists"));
                 return;
             }
 
             if (!ValueText.TryDecode(result.Value.Value ?? [], out var text)) {
-                App?.Invoke(() => StatusChanged?.Invoke($"KV: Cannot edit '{key}' — value is not printable text"));
+                App?.Invoke(() => StatusChanged?.Invoke($"Values: Cannot edit '{key}' — value is not printable text"));
                 return;
             }
 
             App?.Invoke(() => OpenEditKeyDialog(bucket, key, new NewKeyOptions(key, text)));
         } catch (Exception ex) {
-            App?.Invoke(() => StatusChanged?.Invoke($"KV: {ex.Message}"));
+            App?.Invoke(() => StatusChanged?.Invoke($"Values: {ex.Message}"));
         }
     }
 

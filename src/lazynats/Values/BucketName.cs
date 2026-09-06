@@ -1,6 +1,6 @@
 using NATS.Client.KeyValueStore;
 
-namespace lazynats.KVStore;
+namespace lazynats.Values;
 
 // NatsKVContext.GetStatusesAsync() (v2.8.2) returns every JetStream stream on the server, not
 // just KV-backed ones, and its NatsKVStatus.Bucket is just the raw, unstripped stream name -

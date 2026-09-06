@@ -2,7 +2,7 @@ using lazynats.Components;
 using NATS.Client.ObjectStore;
 using NATS.Client.ObjectStore.Models;
 
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 // Read-only readout of a single object's metadata, per nats-obj's "Object Detail Panel Shows
 // Metadata Only, Never Content" requirement - never focusable, never edits anything, no BuildBody

@@ -10,11 +10,11 @@ currently present on the connected server.
 
 #### Scenario: Existing buckets are listed
 - **WHEN** one or more KV buckets exist on the server
-- **THEN** the KV tab's list shows each bucket's name
+- **THEN** the Values tab's list shows each bucket's name
 
 #### Scenario: No buckets exist
 - **WHEN** no KV buckets exist on the server
-- **THEN** the KV tab shows a non-interactive hint in place of the list, rather than a blank list
+- **THEN** the Values tab shows a non-interactive hint in place of the list, rather than a blank list
 
 ### Requirement: Bucket Detail Panel
 The system SHALL show, alongside the bucket list, a detail panel for the currently highlighted
@@ -45,17 +45,17 @@ render as `(unlimited)` rather than their raw sentinel.
 - **THEN** that row shows the configured value, unchanged from today's rendering
 
 ### Requirement: Periodic Bucket Detail Refresh
-The system SHALL refresh the highlighted bucket's detail panel periodically while the KV tab is
+The system SHALL refresh the highlighted bucket's detail panel periodically while the Values tab is
 the selected tab and the bucket level is shown, independent of any selection change. This refresh
 SHALL apply only to the detail panel, not to the bucket list.
 
 #### Scenario: Detail panel reflects a change made outside the app
-- **WHEN** the KV tab is selected, a bucket is highlighted, and that bucket's entry count changes
+- **WHEN** the Values tab is selected, a bucket is highlighted, and that bucket's entry count changes
   on the server without any selection change in the app
 - **THEN** the detail panel's shown entry count updates within one refresh cycle
 
 #### Scenario: Refresh does not run while the tab is not selected
-- **WHEN** the KV tab is not the currently selected management tab
+- **WHEN** the Values tab is not the currently selected management tab
 - **THEN** the system does not poll the server for bucket detail updates
 
 ### Requirement: Manual Bucket List Refresh
@@ -65,7 +65,7 @@ server. If the previously-highlighted bucket is still present in the refreshed l
 remain highlighted; otherwise the first item in the refreshed list SHALL become highlighted.
 
 #### Scenario: The list does not change on its own
-- **WHEN** the KV tab is selected and a bucket is created or deleted on the server via another
+- **WHEN** the Values tab is selected and a bucket is created or deleted on the server via another
   client, without the user pressing Ctrl+R
 - **THEN** the bucket list shown in the app does not change
 
@@ -167,7 +167,7 @@ UTF-8 text filling the remainder of the panel's available space.
 
 ### Requirement: Periodic Key Detail Refresh
 The system SHALL refresh the highlighted key's detail panel periodically while the key level is
-shown and the KV tab is the selected tab, independent of any selection change. This refresh SHALL
+shown and the Values tab is the selected tab, independent of any selection change. This refresh SHALL
 apply only to the detail panel, not to the key list.
 
 #### Scenario: Detail panel reflects a change made outside the app
@@ -180,7 +180,7 @@ apply only to the detail panel, not to the key list.
 - **THEN** the system does not poll the server for key detail updates
 
 #### Scenario: Refresh does not run while the tab is not selected
-- **WHEN** the KV tab is not the currently selected management tab
+- **WHEN** the Values tab is not the currently selected management tab
 - **THEN** the system does not poll the server for key detail updates, even if the key level was
   the last one shown
 
@@ -333,7 +333,7 @@ history-purging one) and refresh the key list so the deleted key no longer appea
 - **THEN** no key is deleted and the key list is unchanged
 
 #### Scenario: Delete is only reachable at the key level
-- **WHEN** the KV tab is displayed at the bucket level
+- **WHEN** the Values tab is displayed at the bucket level
 - **THEN** Ctrl+D instead deletes the highlighted bucket, per "Delete Bucket" — no key-level
   delete is reachable since no key list is displayed
 
@@ -370,7 +370,7 @@ list so the deleted bucket no longer appears.
 - **THEN** no bucket is deleted and the bucket list is unchanged
 
 #### Scenario: Delete is only reachable at the bucket level
-- **WHEN** the KV tab is displayed at the key level (drilled into a bucket)
+- **WHEN** the Values tab is displayed at the key level (drilled into a bucket)
 - **THEN** Ctrl+D has no effect on any bucket, since the bucket list is not displayed
 
 #### Scenario: Server-side delete failure is reported

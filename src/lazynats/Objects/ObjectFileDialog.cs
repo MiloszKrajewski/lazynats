@@ -5,7 +5,7 @@ using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 
-namespace lazynats.ObjStore;
+namespace lazynats.Objects;
 
 // Single dialog type driving both Upload and Download (design.md Decision 3), analogous to
 // CreateKeyDialog's isEdit toggle: in upload mode Key is an editable TextField seeded empty and

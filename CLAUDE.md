@@ -59,13 +59,13 @@ exists today.
   and renders rows via `FeedRowFormatter`. `LiveLogDataSource` intentionally reports
   `MaxItemLength = 0` to avoid an O(n²) rescan on append — see the comment in that file before
   "fixing" it.
-- `MainWindow` hosts `ManagementTabs` (`SubscribeTab`, `PublishTab`, `StreamsTab`, `KvTab`,
-  `ObjTab` — the full list in `doc/UI.md`) over the live feed, plus a `StatusBar`. Each tab's
+- `MainWindow` hosts `ManagementTabs` (`SubscribeTab`, `PublishTab`, `StreamsTab`, `ValuesTab`,
+  `ObjectsTab` — the full list in `doc/UI.md`) over the live feed, plus a `StatusBar`. Each tab's
   content is a self-contained component (one per top-level folder: `Subscriptions/`, `Publish/`,
-  `Streams/`, `KVStore/`, `ObjStore/`) that owns its own internal layout (labels, `EditFrame`
+  `Streams/`, `Values/`, `Objects/`) that owns its own internal layout (labels, `EditFrame`
   wrapping, sub-bands); `MainWindow` only resolves dependencies, constructs the tab, and
   registers it with `ManagementTabs` — see `openspec/specs/tab-content-structure/spec.md`.
-- `StreamsTab`/`KvTab`/`ObjTab` share the same LHS-list/RHS-details, drill-down shape (e.g.
+- `StreamsTab`/`ValuesTab`/`ObjectsTab` share the same LHS-list/RHS-details, drill-down shape (e.g.
   stream → its consumers, KV bucket → its keys), built on two more `Components/` base classes:
   `DrillableListView<T>` (list wiring, empty-hint, identity-preserving `ReplaceItems`, Ctrl+R
   refresh — level-specific navigation like Enter-to-descend/Esc-to-ascend is left to each
