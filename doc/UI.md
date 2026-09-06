@@ -13,16 +13,36 @@ today; the rest are reserved for when their tabs are built):
 |---|---|---|
 | Subscribe (live NATS monitoring) | `1:Subscribe` | Alt+1 |
 | Publish | `2:Publish` | Alt+2 |
-| Streams (durable streams) | `3:Streams` | Alt+3 |
-| Consumers (durable consumers on streams) | `4:Consumers` | Alt+4 |
-| KV stores (key/value stores) | `5:KV` | Alt+5 |
-| OBJ stores (object stores) | `6:OBJ` | Alt+6 |
+| Streams (durable streams, drill down into consumers) | `3:Streams` | Alt+3 |
+| KV stores (key/value stores) | `4:KV` | Alt+4 |
+| OBJ stores (object stores) | `5:OBJ` | Alt+5 |
 
 "Subscribe"/"Publish" are a matched verb pair (NATS's own `nats sub`/`nats pub` vocabulary).
 Tab shortcuts use Alt+digit rather than Alt+letter so they never collide with a tab's own
 mnemonic buttons (e.g. Publish's `_Send`), which Terminal.Gui also binds via Alt+letter.
 
-Not decided: do consumers have their own tab or are part os streams tab
+Consumers don't get their own tab. JetStream itself never addresses a consumer without its
+parent stream (`consumer info`/`consumer ls` both require a stream), so the UI mirrors that:
+there's no flat, cross-stream consumer list to show.
+
+## Streams tab
+
+Layout is the familiar LHS list / RHS info split. LHS starts as a list of streams; RHS shows
+info for the highlighted stream. Pressing Enter on a stream drills LHS down into that stream's
+consumers, and RHS switches to tracking the highlighted consumer instead. Esc/Backspace goes
+back up a level to the stream list. The tab title or a breadcrumb should make the current level
+obvious (e.g. which stream's consumers you're looking at), since the LHS list looks the same
+shape at both levels.
+
+RHS info (whether stream- or consumer-level) refreshes periodically while displayed, not just
+on selection change, so it reflects live state (message counts, pending/ack counts, etc.)
+without the user having to re-select. Not aggressively, though — this is a poll, not a
+subscription, so pick an interval that stays cheap against the server (a few seconds, exact
+value TBD) rather than refreshing on every tick.
+
+Baseline operations needed on both levels: info (the RHS panel itself) and delete. Anything
+beyond that (create/edit, purge, seal, etc.) is open — `nats stream --help` / `nats consumer
+--help` lists the fuller vocabulary if we want to grow into it later.
 
 # Feed part
 
