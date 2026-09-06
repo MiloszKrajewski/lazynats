@@ -20,6 +20,7 @@ await connection.ConnectAsync();
 var feed = Subject.Synchronize(new Subject<FeedEnvelope>());
 var registry = new SubscriptionRegistry(connection, feed);
 var jetStream = connection.CreateJetStreamContext();
+var kv = jetStream.CreateKeyValueStoreContext();
 
 // Application.Create() must run before Services.Configure() - ShortcutTracker needs a live
 // IApplication at construction time (to subscribe to Navigation.FocusedChanged), and unlike every
@@ -32,6 +33,7 @@ var services = new ServiceCollection();
 services.AddSingleton(connection);
 services.AddSingleton(registry);
 services.AddSingleton(jetStream);
+services.AddSingleton(kv);
 services.AddSingleton<IObserver<FeedEnvelope>>(feed);
 services.AddSingleton<IObservable<FeedEnvelope>>(feed);
 services.AddSingleton(new MessageDeduplicator(TimeSpan.FromMilliseconds(50)));

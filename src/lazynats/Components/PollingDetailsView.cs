@@ -23,6 +23,7 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
     private static readonly Color ValueColor = new(255, 255, 255);
 
     private (string Label, string Value)[] _rows = [];
+    private string? _body;
     private TTarget _target = default!;
     private bool _hasTarget;
     private bool _active;
@@ -41,11 +42,17 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
     protected abstract Task<TInfo?> FetchAsync(TTarget target);
     protected abstract (string Label, string Value)[] BuildRows(TInfo info);
 
+    // Optional large body rendered below the header rows, filling the rest of the pane - e.g. a
+    // KV key's decoded value. Default is no body at all, so subclasses that don't override this
+    // (StreamDetails, ConsumerDetails) render exactly as before.
+    protected virtual string? BuildBody(TInfo info) => null;
+
     // Null (nothing highlighted, e.g. an empty list) clears the panel rather than leaving stale
     // content - per "Show and Clear".
     public void Show(TInfo? info)
     {
         _rows = info is null ? [] : BuildRows(info);
+        _body = info is null ? null : BuildBody(info);
         SetNeedsDraw();
     }
 
@@ -62,6 +69,25 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
     {
         _target = default!;
         _hasTarget = false;
+    }
+
+    // Fetches the current target immediately, bypassing both the active gate and the poll
+    // interval - for a subclass whose paired list has nothing to Show() instantly on a highlight
+    // change (e.g. KeyDetails - the key list only carries bare names, unlike Stream/Consumer/
+    // Bucket, which already have full info cached in their list item). No-op with no target set.
+    public void RefreshNow()
+    {
+        if (_hasTarget) _ = FetchAndShowAsync(_target);
+    }
+
+    private async Task FetchAndShowAsync(TTarget target)
+    {
+        if (await FetchInternalAsync(target) is not { } info) return;
+
+        // The target may have moved on while this was in flight (e.g. rapid highlight changes) -
+        // only apply a result that's still current, same staleness guard KvTab's list refreshes
+        // use.
+        if (_hasTarget && EqualityComparer<TTarget>.Default.Equals(_target, target)) Show(info);
     }
 
     // Gates the poll pipeline's Where(...) - false means every tick is a genuine no-op (no fetch
@@ -103,21 +129,38 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
 
     protected override bool OnDrawingContent(DrawContext? context)
     {
-        if (_rows.Length == 0) return true;
+        if (_rows.Length == 0 && _body is null) return true;
 
-        var labelWidth = _rows.Where(row => row.Label.Length > 0).Max(row => row.Label.Length);
         var labelAttribute = GetAttributeForRole(VisualRole.Normal);
         var valueAttribute = new Attribute(ValueColor, labelAttribute.Background);
 
-        for (var row = 0; row < _rows.Length; row++) {
-            var (label, value) = _rows[row];
-            if (label.Length == 0) continue;
+        if (_rows.Length > 0) {
+            var labelWidth = _rows.Where(row => row.Label.Length > 0).Max(row => row.Label.Length);
 
-            Move(0, row);
-            SetAttribute(labelAttribute);
-            AddStr($"{label.PadLeft(labelWidth)}: ");
+            for (var row = 0; row < _rows.Length; row++) {
+                var (label, value) = _rows[row];
+                if (label.Length == 0) continue;
+
+                Move(0, row);
+                SetAttribute(labelAttribute);
+                AddStr($"{label.PadLeft(labelWidth)}: ");
+                SetAttribute(valueAttribute);
+                AddStr(value);
+            }
+        }
+
+        // Body starts one row below the header rows (blank separator), or at row 0 if there are
+        // no header rows at all - clipped to whatever height remains, never scrolled.
+        if (_body is not null) {
+            var bodyStartRow = _rows.Length == 0 ? 0 : _rows.Length + 1;
             SetAttribute(valueAttribute);
-            AddStr(value);
+            var lines = _body.Split('\n');
+            for (var i = 0; i < lines.Length; i++) {
+                var row = bodyStartRow + i;
+                if (row >= Viewport.Height) break;
+                Move(0, row);
+                AddStr(lines[i].TrimEnd('\r'));
+            }
         }
 
         return true;
