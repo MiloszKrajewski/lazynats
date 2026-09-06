@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using lazynats.Components;
+using lazynats.Payloads;
 using lazynats.Publish;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
@@ -42,11 +43,13 @@ internal sealed class TemplateDialog: Dialog<Template>
             TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
         };
         _nameField.ValueChanged += (_, _) => UpdateValidity();
+        _nameField.FixPasteRedraw();
         var nameFrame = WrapField(_nameField, 1, 3);
 
         var subjectLabel = new Label { Text = "Subject", X = 0, Y = 4 };
         _subjectField = new TextField { Text = initial?.Subject ?? string.Empty };
         _subjectField.ValueChanged += (_, _) => UpdateValidity();
+        _subjectField.FixPasteRedraw();
         var subjectFrame = WrapField(_subjectField, 5, 3);
 
         var headersLabel = new Label { Text = "Headers", X = 0, Y = 8 };
@@ -71,6 +74,7 @@ internal sealed class TemplateDialog: Dialog<Template>
         _payloadView = new TextView { Text = initial?.Payload ?? string.Empty, TabKeyAddsTab = false };
 #pragma warning restore CS0618
         _payloadView.ContentsChanged += (_, _) => UpdateValidity();
+        _payloadView.FixPasteRedraw();
         var payloadFrame = WrapField(_payloadView, 22, 11);
 
         Add(

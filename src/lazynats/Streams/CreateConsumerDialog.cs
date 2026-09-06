@@ -64,12 +64,14 @@ internal sealed class CreateConsumerDialog: Dialog<NewConsumerOptions>
             TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
         };
         _nameField.ValueChanged += (_, _) => UpdateValidity();
+        _nameField.FixPasteRedraw();
         var nameFrame = WrapField(_nameField, 1);
 
         var filterSubjectsLabel = new Label { Text = "Filter Subjects", X = 0, Y = 4 };
         _filterSubjectsField = new TextField {
             Text = initial is null ? string.Empty : string.Join(", ", initial.FilterSubjects),
         };
+        _filterSubjectsField.FixPasteRedraw();
         var filterSubjectsFrame = WrapField(_filterSubjectsField, 5);
 
         var ackPolicyLabel = new Label { Text = "Ack Policy", X = 0, Y = 8 };

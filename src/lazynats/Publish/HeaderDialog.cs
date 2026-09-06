@@ -25,6 +25,7 @@ internal sealed class HeaderDialog: Dialog<string>
         var headerLabel = new Label { Text = "Header (key: value)", X = 0, Y = 0 };
         _headerField = new TextField { Text = initialText };
         _headerField.ValueChanged += (_, _) => UpdateValidity();
+        _headerField.FixPasteRedraw();
         _headerField.Accepting += (_, e) => {
             e.Handled = true;
             if (_headerField.Text.Trim().Length == 0) return;

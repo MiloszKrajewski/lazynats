@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Text.Json;
 using lazynats.Components;
 using lazynats.Core;
+using lazynats.Payloads;
 using NATS.Client.KeyValueStore;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -28,6 +29,16 @@ internal sealed class TemplatesTab: View, IShortcutSource
     private readonly FilterBox _filterBox;
     private readonly EditFrame _listFrame;
     private readonly TemplateDetails _details;
+
+    // Import/Export act on the whole bucket, not the highlighted template, so - unlike Create/
+    // Edit/Delete/Refresh (dispatched through _listView.TabOperations) - they're a small fixed
+    // table owned directly by this tab, appended to _listView.TabOperations rather than replacing
+    // it. See design.md's "Keyboard: Ctrl+O / Ctrl+X" decision. Import uses Ctrl+O ("Open"), not
+    // Ctrl+I as originally proposed - Ctrl+I is the ASCII Tab character (Ctrl+<letter> is that
+    // letter's code with the top 3 bits masked off; 'I' masks to 0x09, the same byte Tab itself
+    // sends), so no terminal can ever deliver it as a distinct keystroke; discovered and revised
+    // during implementation.
+    private readonly ShortcutHint[] _extraOperations;
 
     // Guards the one-time initial fetch - the list is otherwise load-once + Ctrl+R only, per
     // nats-templates' "Manual Template List Refresh" requirement.
@@ -57,6 +68,11 @@ internal sealed class TemplatesTab: View, IShortcutSource
         var detailsLabel = new Label { Text = "Details", X = Pos.Right(_listFrame) + 1, Y = 0 };
         _details = new TemplateDetails { X = Pos.Right(_listFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
 
+        _extraOperations = [
+            new ShortcutHint(Key.X.WithCtrl, "Export", Export),
+            new ShortcutHint(Key.O.WithCtrl, "Import", Import),
+        ];
+
         // Add()-order matches spatial top-down layout so Tab/Shift+Tab cycles in reading order -
         // same convention as StreamsTab/ValuesTab/ObjectsTab.
         Add(listLabel, _filterBox, _listFrame, detailsLabel, _details);
@@ -65,12 +81,12 @@ internal sealed class TemplatesTab: View, IShortcutSource
     // No KeyBindings/AddCommand for specific keys here - that would hardcode which keys this tab
     // forwards. Instead this fires once Terminal.Gui has already tried the focused view (and its
     // own ancestors) and found no handler, at which point it's this tab's turn; whatever key
-    // _listView's own TabOperations happens to expose is what gets dispatched - see SubscribeTab's
-    // identical single-list dispatch (Templates has one list, like Subscribe, not two like
-    // Streams/Values/Objects).
+    // _listView's own TabOperations (plus this tab's own _extraOperations - Import/Export) happens
+    // to expose is what gets dispatched - see SubscribeTab's identical single-list dispatch
+    // (Templates has one list, like Subscribe, not two like Streams/Values/Objects).
     protected override bool OnKeyDownNotHandled(Key key)
     {
-        if (_listView.TabOperations.FirstOrDefault(h => h.Key == key) is { Action: { } action }) {
+        if (_listView.TabOperations.Concat(_extraOperations).FirstOrDefault(h => h.Key == key) is { Action: { } action }) {
             action();
             return true;
         }
@@ -78,7 +94,7 @@ internal sealed class TemplatesTab: View, IShortcutSource
         return base.OnKeyDownNotHandled(key);
     }
 
-    public IEnumerable<ShortcutHint> Shortcuts => _listView.TabOperations;
+    public IEnumerable<ShortcutHint> Shortcuts => _listView.TabOperations.Concat(_extraOperations);
 
     // "Selected tab" in this app is focus-driven (doc/terminal-gui-howto.md) - so this fires
     // exactly on tab entry/exit, which is what gates the one-time initial load per
@@ -128,7 +144,8 @@ internal sealed class TemplatesTab: View, IShortcutSource
         try {
             var store = await _kv.CreateStoreAsync(BucketConfig);
             var document = new TemplateDocument(
-                template.Subject, new Dictionary<string, string>(template.Headers), template.PayloadType, template.Payload);
+                template.Subject, new Dictionary<string, string>(template.Headers), template.PayloadType,
+                TemplatePayloadCodec.ToNode(template.PayloadType, template.Payload));
             var bytes = JsonSerializer.SerializeToUtf8Bytes(document, TemplateJsonContext.Default.TemplateDocument);
             await store.PutAsync(template.Name, bytes);
 
@@ -164,6 +181,98 @@ internal sealed class TemplatesTab: View, IShortcutSource
         }
     }
 
+    // Ctrl+X. Whole-bucket, not scoped to the highlighted template - no confirmation prompt for an
+    // overwritten destination (SaveDialog is expected to prompt for that itself). See design.md's
+    // "Export" decision.
+    private void Export()
+    {
+        var picker = new SaveDialog { Title = " Export Templates ", AllowedTypes = [new AllowedType("JSON", ".json")] };
+        App!.Run(picker);
+        if (picker.Canceled) return;
+
+        _ = ExportAsync(picker.Path);
+    }
+
+    private async Task ExportAsync(string path)
+    {
+        try {
+            var templates = await FetchTemplatesAsync();
+            var documents = templates.ToDictionary(
+                template => template.Name,
+                template => new TemplateDocument(
+                    template.Subject, new Dictionary<string, string>(template.Headers), template.PayloadType,
+                    TemplatePayloadCodec.ToNode(template.PayloadType, template.Payload)));
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(documents, typeof(Dictionary<string, TemplateDocument>), TemplateJsonContext.Default);
+            await File.WriteAllBytesAsync(path, bytes);
+        } catch (Exception ex) {
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, " Export Templates Failed ", ex.Message.Pad(), "_Ok"));
+        }
+    }
+
+    // Ctrl+O. Validate-then-write: every entry in the file is checked before any write happens, so
+    // a failing entry leaves the bucket untouched - see design.md's "Import" decision.
+    private void Import()
+    {
+        var picker = new OpenDialog {
+            Title = " Import Templates ", OpenMode = OpenMode.File, MustExist = true,
+            AllowedTypes = [new AllowedType("JSON", ".json")],
+        };
+        App!.Run(picker);
+        if (picker.Canceled) return;
+
+        _ = ImportAsync(picker.Path);
+    }
+
+    private async Task ImportAsync(string path)
+    {
+        Dictionary<string, TemplateDocument>? documents;
+        try {
+            var bytes = await File.ReadAllBytesAsync(path);
+            documents = JsonSerializer.Deserialize(bytes, typeof(Dictionary<string, TemplateDocument>), TemplateJsonContext.Default)
+                as Dictionary<string, TemplateDocument>;
+            if (documents is null) throw new JsonException("The file does not contain a template object.");
+        } catch (Exception ex) {
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, " Import Templates Failed ", ex.Message.Pad(), "_Ok"));
+            return;
+        }
+
+        foreach (var (name, document) in documents) {
+            var failure = ValidateImportEntry(name, document);
+            if (failure is null) continue;
+
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, " Import Templates Failed ", failure.Pad(), "_Ok"));
+            return;
+        }
+
+        try {
+            var store = await _kv.CreateStoreAsync(BucketConfig);
+            foreach (var (name, document) in documents) {
+                var bytes = JsonSerializer.SerializeToUtf8Bytes(document, TemplateJsonContext.Default.TemplateDocument);
+                await store.PutAsync(name, bytes);
+            }
+
+            _ = RefreshListAsync();
+        } catch (Exception ex) {
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, " Import Templates Failed ", ex.Message.Pad(), "_Ok"));
+        }
+    }
+
+    // Same three checks "Create Template Field Validation" enforces per entry (non-empty name,
+    // non-empty Subject, payload valid for its Payload Type), applied here to a whole imported
+    // entry before any write happens.
+    private static string? ValidateImportEntry(string name, TemplateDocument document)
+    {
+        var label = name.Trim().Length == 0 ? "(unnamed entry)" : name;
+
+        if (name.Trim().Length == 0) return $"Entry '{label}' has an empty name.";
+        if (document.Subject.Trim().Length == 0) return $"Entry '{label}' has an empty Subject.";
+
+        var payload = TemplatePayloadCodec.ToText(document.PayloadType, document.Payload);
+        if (!PayloadValidation.IsValid(document.PayloadType, payload)) return $"Entry '{label}' has an invalid Payload.";
+
+        return null;
+    }
+
     // Wrapped in one try/catch that yields an empty result on any failure - including the
     // overwhelmingly common case of the bucket not existing yet, before the first template is
     // ever saved. Deliberately does not distinguish "bucket missing" from any other failure (e.g.
@@ -181,7 +290,8 @@ internal sealed class TemplatesTab: View, IShortcutSource
                 var document = JsonSerializer.Deserialize(entry.Value.Value ?? [], TemplateJsonContext.Default.TemplateDocument);
                 if (document is null) continue;
 
-                templates.Add(new Template(key, document.Subject, document.Headers, document.PayloadType, document.Payload));
+                var payload = TemplatePayloadCodec.ToText(document.PayloadType, document.Payload);
+                templates.Add(new Template(key, document.Subject, document.Headers, document.PayloadType, payload));
             }
 
             return templates;

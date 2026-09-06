@@ -83,6 +83,10 @@ exists today.
   New/Edit/Delete, generalizing the shape shared by `SubscriptionsView` and `PublishTab`'s header
   editor; row creation/edit is delegated to abstract callbacks, row formatting to an injected
   `IValuePresenter<T>`).
+- `src/lazynats/Payloads/` holds the payload-type concept shared across features (`PayloadType`,
+  `PayloadValidation`, `PayloadEncoding`), reused by both Templates (`TemplateDialog`) and Publish
+  (`PublishDialog`) rather than owned by either — mirrors `Components/`'s role for cross-tab UI
+  pieces, but for this non-UI concept.
 - Status-bar shortcuts are discovered, not hardcoded: a view opts in via `IShortcutSource`,
   `ShortcutAggregator` walks the focused-view ancestor chain collecting hints, and
   `ShortcutTracker` (`ShortcutAggregator.cs`) recomputes them on every focus change (or on

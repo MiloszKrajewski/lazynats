@@ -35,12 +35,14 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
             TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
         };
         _nameField.ValueChanged += (_, _) => UpdateValidity();
+        _nameField.FixPasteRedraw();
         var nameFrame = WrapField(_nameField, 1, 3);
 
         var valueLabel = new Label { Text = "Value", X = 0, Y = 4 };
 #pragma warning disable CS0618
         _valueView = new TextView { Text = initial?.Value ?? string.Empty, TabKeyAddsTab = false };
 #pragma warning restore CS0618
+        _valueView.FixPasteRedraw();
         var valueFrame = WrapField(_valueView, 5, 10);
 
         Add(nameLabel, nameFrame, valueLabel, valueFrame);

@@ -36,6 +36,7 @@ internal sealed class CreateBucketDialog: Dialog<NewBucketOptions>
             TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
         };
         _nameField.ValueChanged += (_, _) => UpdateValidity();
+        _nameField.FixPasteRedraw();
         var nameFrame = WrapField(_nameField, 1);
 
         var storageLabel = new Label { Text = "Storage", X = 0, Y = 4 };
@@ -49,16 +50,19 @@ internal sealed class CreateBucketDialog: Dialog<NewBucketOptions>
         var historyLabel = new Label { Text = "History", X = 0, Y = 8 };
         _historyField = new TextField { Text = initial?.History?.ToString() ?? string.Empty };
         _historyField.ValueChanged += (_, _) => UpdateValidity();
+        _historyField.FixPasteRedraw();
         var historyFrame = WrapField(_historyField, 9);
 
         var maxAgeLabel = new Label { Text = "Max Age", X = 0, Y = 12 };
         _maxAgeField = new TextField { Text = initial?.MaxAge?.ToString() ?? string.Empty };
         _maxAgeField.ValueChanged += (_, _) => UpdateValidity();
+        _maxAgeField.FixPasteRedraw();
         var maxAgeFrame = WrapField(_maxAgeField, 13);
 
         var limitMarkerTtlLabel = new Label { Text = "Limit Marker TTL", X = 0, Y = 16 };
         _limitMarkerTtlField = new TextField { Text = initial?.LimitMarkerTTL?.ToString() ?? string.Empty };
         _limitMarkerTtlField.ValueChanged += (_, _) => UpdateValidity();
+        _limitMarkerTtlField.FixPasteRedraw();
         var limitMarkerTtlFrame = WrapField(_limitMarkerTtlField, 17);
 
         Add(

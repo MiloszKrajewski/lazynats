@@ -34,11 +34,13 @@ internal sealed class CreateBucketDialog: Dialog<NewBucketOptions>
             TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
         };
         _nameField.ValueChanged += (_, _) => UpdateValidity();
+        _nameField.FixPasteRedraw();
         var nameFrame = WrapField(_nameField, 1);
 
         var maxAgeLabel = new Label { Text = "Max Age", X = 0, Y = 4 };
         _maxAgeField = new TextField { Text = initial?.MaxAge?.ToString() ?? string.Empty };
         _maxAgeField.ValueChanged += (_, _) => UpdateValidity();
+        _maxAgeField.FixPasteRedraw();
         var maxAgeFrame = WrapField(_maxAgeField, 5);
 
         Add(nameLabel, nameFrame, maxAgeLabel, maxAgeFrame);

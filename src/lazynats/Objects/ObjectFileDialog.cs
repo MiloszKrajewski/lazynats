@@ -50,11 +50,13 @@ internal sealed class ObjectFileDialog: Dialog<ObjectFileTransfer>
             TabStop = isUpload ? TabBehavior.TabStop : TabBehavior.NoStop,
         };
         _keyField.ValueChanged += (_, _) => UpdateValidity();
+        _keyField.FixPasteRedraw();
         var keyFrame = WrapField(_keyField, 1);
 
         var pathLabel = new Label { Text = "Path", X = 0, Y = 4 };
         _pathField = new TextField { Text = initial?.Path ?? string.Empty };
         _pathField.ValueChanged += (_, _) => UpdateValidity();
+        _pathField.FixPasteRedraw();
         var pathFrame = WrapField(_pathField, 5);
 
         Add(keyLabel, keyFrame, pathLabel, pathFrame);

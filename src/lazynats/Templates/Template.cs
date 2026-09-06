@@ -1,3 +1,5 @@
+using lazynats.Payloads;
+
 namespace lazynats.Templates;
 
 // The value TemplateListView (a DrillableListView<Template>) holds per row - Name is the

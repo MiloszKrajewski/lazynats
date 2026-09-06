@@ -36,6 +36,7 @@ internal sealed class PatternDialog: Dialog<string>
         var patternLabel = new Label { Text = "Pattern", X = 0, Y = 0 };
         _patternField = new TextField { Text = initialPattern };
         _patternField.ValueChanged += (_, _) => UpdateValidity();
+        _patternField.FixPasteRedraw();
         _patternField.Accepting += (_, e) => {
             e.Handled = true;
             if (!IsValid()) return;

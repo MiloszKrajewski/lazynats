@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using lazynats.Components;
+using lazynats.Payloads;
 using NATS.Client.Core;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
@@ -18,11 +19,12 @@ namespace lazynats.Publish;
 // leaves it open with the error in the status label so the message can be fixed and resent.
 internal sealed class PublishDialog: Dialog
 {
-    private static readonly Attribute InvalidSubject = new(ColorName16.Red, Theme.EditableBackground);
+    private static readonly Attribute InvalidAttribute = new(ColorName16.Red, Theme.EditableBackground);
 
     private readonly NatsConnection _connection;
     private readonly ObservableCollection<HeaderPair> _headers = [];
     private readonly TextField _subjectField;
+    private readonly DropDownList<PayloadType> _payloadTypeDropDown;
 #pragma warning disable CS0618 // TextView is obsolete in favor of Terminal.Gui.Editor - see PublishTab's identical (now removed) suppression.
     private readonly TextView _payloadView;
 #pragma warning restore CS0618
@@ -38,6 +40,7 @@ internal sealed class PublishDialog: Dialog
         var subjectLabel = new Label { Text = "Subject", X = 0, Y = 0 };
         _subjectField = new TextField();
         _subjectField.ValueChanged += (_, _) => UpdateValidity();
+        _subjectField.FixPasteRedraw();
         var subjectFrame = WrapField(_subjectField, 1, 3);
 
         var headersLabel = new Label { Text = "Headers", X = 0, Y = 4 };
@@ -49,21 +52,29 @@ internal sealed class PublishDialog: Dialog
         var headerEditor = new HeaderEditorView(_headers) { Background = subjectBackground };
         var headerFrame = WrapField(headerEditor, 5, 8);
 
-        var payloadLabel = new Label { Text = "Payload", X = 0, Y = 13 };
+        var payloadTypeLabel = new Label { Text = "Payload Type", X = 0, Y = 13 };
+        _payloadTypeDropDown = new DropDownList<PayloadType> { Value = PayloadType.Text };
+        Theme.ApplyEditableScheme(_payloadTypeDropDown);
+        _payloadTypeDropDown.ValueChanged += (_, _) => UpdateValidity();
+        var payloadTypeFrame = WrapField(_payloadTypeDropDown, 14, 3);
+
+        var payloadLabel = new Label { Text = "Payload", X = 0, Y = 17 };
         // TabKeyAddsTab = false stops TextView from consuming Tab at all (mirroring
         // CreateKeyDialog's Value field), so Tab reaches normal focus-advance handling with no
         // Navigate/Edit mode needed - see design.md's "Payload uses TabKeyAddsTab = false" decision.
 #pragma warning disable CS0618
         _payloadView = new TextView { TabKeyAddsTab = false };
+        _payloadView.ContentsChanged += (_, _) => UpdateValidity();
+        _payloadView.FixPasteRedraw();
 #pragma warning restore CS0618
         // Height 11 -> 9 visible rows, room for a multi-line JSON/text payload.
-        var payloadFrame = WrapField(_payloadView, 14, 11);
+        var payloadFrame = WrapField(_payloadView, 18, 11);
 
-        _statusLabel = new Label { Text = string.Empty, X = 0, Y = 25 };
+        _statusLabel = new Label { Text = string.Empty, X = 0, Y = 29 };
 
         Add(
-            subjectLabel, subjectFrame, headersLabel, headerFrame, payloadLabel, payloadFrame,
-            _statusLabel);
+            subjectLabel, subjectFrame, headersLabel, headerFrame, payloadTypeLabel, payloadTypeFrame,
+            payloadLabel, payloadFrame, _statusLabel);
 
         // Result is left unset, matching Esc's own cancellation convention - added before Send so
         // Send, not Cancel, stays the last-added, Enter-activated default button.
@@ -108,19 +119,25 @@ internal sealed class PublishDialog: Dialog
 
     private void UpdateValidity()
     {
-        var valid = _subjectField.Text.Trim().Length > 0;
-        _sendButton.Enabled = valid;
+        var subjectValid = _subjectField.Text.Trim().Length > 0;
+        var payloadType = _payloadTypeDropDown.Value ?? PayloadType.Text;
+        var payloadValid = PayloadValidation.IsValid(payloadType, _payloadView.Text);
+
+        _sendButton.Enabled = subjectValid && payloadValid;
         // new Scheme(Attribute)'s single-value constructor derives Editable independently and
         // silently drops our background (defaults it to Black) - re-set Editable explicitly so
         // invalid state only changes the foreground, never the background (EditFrame's own
         // background is never touched here either, for the same reason).
-        _subjectField.SetScheme(valid ? null : new Scheme(InvalidSubject) { Editable = InvalidSubject });
+        _subjectField.SetScheme(subjectValid ? null : new Scheme(InvalidAttribute) { Editable = InvalidAttribute });
+        _payloadView.SetScheme(payloadValid ? null : new Scheme(InvalidAttribute) { Editable = InvalidAttribute });
     }
 
     private void Send()
     {
         var subject = _subjectField.Text.Trim();
-        if (subject.Length == 0) return;
+        var payloadType = _payloadTypeDropDown.Value ?? PayloadType.Text;
+        var payload = _payloadView.Text;
+        if (subject.Length == 0 || !PayloadValidation.IsValid(payloadType, payload)) return;
 
         NatsHeaders? headers = null;
         if (_headers.Count > 0) {
@@ -128,13 +145,14 @@ internal sealed class PublishDialog: Dialog
             foreach (var pair in _headers) headers.Add(pair.Key, pair.Value);
         }
 
-        _ = PublishAsync(subject, headers, _payloadView.Text);
+        _ = PublishAsync(subject, headers, payloadType, payload);
     }
 
-    private async Task PublishAsync(string subject, NatsHeaders? headers, string payload)
+    private async Task PublishAsync(string subject, NatsHeaders? headers, PayloadType payloadType, string payload)
     {
         try {
-            await _connection.PublishAsync(subject, payload, headers: headers);
+            var bytes = PayloadEncoding.ToBytes(payloadType, payload);
+            await _connection.PublishAsync(subject, bytes, headers: headers);
             App?.Invoke(RequestStop);
         } catch (Exception ex) {
             App?.Invoke(() => _statusLabel.Text = $"Publish failed: {ex.Message}");

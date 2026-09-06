@@ -37,11 +37,13 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
             TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
         };
         _nameField.ValueChanged += (_, _) => UpdateValidity();
+        _nameField.FixPasteRedraw();
         var nameFrame = WrapField(_nameField, 1);
 
         var subjectsLabel = new Label { Text = "Subjects", X = 0, Y = 4 };
         _subjectsField = new TextField { Text = initial is null ? string.Empty : string.Join(", ", initial.Subjects) };
         _subjectsField.ValueChanged += (_, _) => UpdateValidity();
+        _subjectsField.FixPasteRedraw();
         var subjectsFrame = WrapField(_subjectsField, 5);
 
         var retentionLabel = new Label { Text = "Retention", X = 0, Y = 8 };
@@ -55,6 +57,7 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
         var maxAgeLabel = new Label { Text = "Max Age", X = 0, Y = 12 };
         _maxAgeField = new TextField { Text = initial?.MaxAge?.ToString() ?? string.Empty };
         _maxAgeField.ValueChanged += (_, _) => UpdateValidity();
+        _maxAgeField.FixPasteRedraw();
         var maxAgeFrame = WrapField(_maxAgeField, 13);
 
         Add(nameLabel, nameFrame, subjectsLabel, subjectsFrame, retentionLabel, retentionFrame, maxAgeLabel, maxAgeFrame);

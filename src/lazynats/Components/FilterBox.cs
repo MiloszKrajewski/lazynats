@@ -42,6 +42,7 @@ internal sealed class FilterBox: View
         Height = 3;
 
         _field = new TextField();
+        _field.FixPasteRedraw();
         var frame = new EditFrame(_field) {
             X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
             InnerBackgroundNormal = Theme.EditableBackground, InnerBackgroundFocused = Theme.EditableBackground,
