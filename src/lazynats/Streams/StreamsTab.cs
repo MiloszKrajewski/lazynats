@@ -63,6 +63,7 @@ internal sealed class StreamsTab: View
         _consumerListView.RefreshRequested += () => _ = RefreshConsumerListAsync();
         _consumerListView.HighlightChanged += OnConsumerHighlightChanged;
         _consumerListView.AscendRequested += Ascend;
+        _consumerListView.CreateRequested += () => OpenCreateConsumerDialog(null);
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_streamListFrame) + 1, Y = 0 };
         _details = new StreamDetails(_jetStream) { X = Pos.Right(_streamListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -179,6 +180,30 @@ internal sealed class StreamsTab: View
         }
     }
 
+    // Scoped to _currentStream at call time - the consumer-level list is only reachable once
+    // Descend() has set it, so no extra state is needed here (mirrors OpenCreateStreamDialog).
+    private void OpenCreateConsumerDialog(NewConsumerOptions? seed)
+    {
+        if (_currentStream is not { } stream) return;
+
+        var dialog = new CreateConsumerDialog(seed);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryCreateConsumerAsync(stream, options);
+    }
+
+    private async Task TryCreateConsumerAsync(string stream, NewConsumerOptions options)
+    {
+        try {
+            await _jetStream.CreateConsumerAsync(stream, options.ToConsumerConfig());
+            _ = RefreshConsumerListAsync(options.Name);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, "Create Consumer Failed", ex.Message, "_Ok");
+                OpenCreateConsumerDialog(options);
+            });
+        }
+    }
+
     private async Task TryDeleteStreamAsync()
     {
         if (_listView.SelectedStream?.Config.Name is not { } name) return;
@@ -230,7 +255,10 @@ internal sealed class StreamsTab: View
         }
     }
 
-    private async Task RefreshConsumerListAsync()
+    // `selectName` highlights a specific consumer after the refresh (used right after a create,
+    // so the new consumer is selected instead of ReplaceItems' default "keep whatever was
+    // highlighted before" fallback) - null for a plain Ctrl+R/descend refresh.
+    private async Task RefreshConsumerListAsync(string? selectName = null)
     {
         if (_currentStream is not { } stream) return;
 
@@ -240,7 +268,7 @@ internal sealed class StreamsTab: View
             App?.Invoke(() => {
                 // The user may have ascended back out while this was in flight - only apply a
                 // result that's still for the currently-drilled-into stream.
-                if (_currentStream == stream) _consumerListView.ReplaceItems(consumers);
+                if (_currentStream == stream) _consumerListView.ReplaceItems(consumers, selectName);
             });
         } catch (Exception ex) {
             App?.Invoke(() => StatusChanged?.Invoke($"Streams: {ex.Message}"));
