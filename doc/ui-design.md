@@ -199,6 +199,27 @@ under arbitrary category names (e.g. `invoicing`, `bookings`):
 No design work has started on where templates live in the UI (a picker inside Publish? a
 separate tab?) or how loading interacts with the existing Subject/Headers/Payload fields.
 
+## Padded edit-field framing (idea, unbuilt)
+
+Wrap edit components (text fields, text areas) in a thin flat frame — not a full bordered box —
+colored the same as the edit control's own background, so it reads as breathing-room padding
+around the field rather than a separate bordered container competing with the app's real
+bordered panels (`Window`/`FrameView`/`Dialog`, which use the sharper full box-drawing style, see
+"UI conventions" in `CLAUDE.md`):
+
+```
+╷▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+┃
+╵▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+```
+
+Top rule uses lower-half-block glyphs (`▄`), bottom rule uses upper-half-block glyphs (`▀`) — each
+renders as a thin sliver hugging the content row rather than a full blank padding row, so the
+"frame" adds only a hairline of separation instead of a full extra row of chrome. No design work
+has started on which components adopt this (just `PublishView`'s Subject/Payload fields? every
+`TextField`/`TextView` app-wide?) or how it interacts with focus/invalid styling (e.g. Publish's
+red-on-dark-gray invalid Subject field).
+
 ## Streams / Consumers / KV / OBJ
 
 Reserved tabs (see table above); no design has started beyond the tab shortcuts being carved out

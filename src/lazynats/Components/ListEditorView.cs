@@ -58,6 +58,24 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
     // something useful instead of nothing.
     protected virtual string EmptyHint => "No items — Ctrl+N to add one";
 
+    private Terminal.Gui.Drawing.Color? _background;
+
+    // Independent of any implicitly inherited scheme, so callers (e.g. EditFrame) can pair this
+    // list visually with other edit controls. Unset (null) leaves prior inherited-scheme behavior
+    // untouched.
+    public Terminal.Gui.Drawing.Color? Background
+    {
+        get => _background;
+        set
+        {
+            _background = value;
+            _listView.SetScheme(value is { } background
+                ? new Terminal.Gui.Drawing.Scheme(new Terminal.Gui.Drawing.Attribute(
+                    _listView.GetAttributeForRole(Terminal.Gui.Drawing.VisualRole.Normal).Foreground, background))
+                : null);
+        }
+    }
+
     private void OnItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         UpdateEmptyHintVisibility();

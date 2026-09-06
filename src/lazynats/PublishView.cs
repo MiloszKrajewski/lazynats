@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using lazynats.Components;
 using NATS.Client.Core;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
@@ -14,6 +15,7 @@ internal sealed class PublishView: View
     private readonly NatsConnection _connection;
     private readonly ObservableCollection<HeaderPair> _headers = [];
     private readonly TextField _subjectField;
+    private readonly EditFrame _subjectFrame;
     // TextView is obsolete in favor of Terminal.Gui.Editor's Editor view (confirmed AOT-clean by
     // AotProbe.EditorProbe), but the payload box is just a quick-and-dirty text/JSON field - none
     // of Editor's multi-caret/folding/highlighting is needed here. Revisit if that changes.
@@ -29,23 +31,40 @@ internal sealed class PublishView: View
         CanFocus = true;
         _connection = connection;
 
-        var subjectBand = new View { X = 0, Y = 0, Width = Dim.Fill(), Height = 2, CanFocus = true };
+        var subjectBand = new View { X = 0, Y = 0, Width = Dim.Fill(), Height = 4, CanFocus = true };
         var subjectLabel = new Label { Text = "Subject", X = 0, Y = 0 };
-        _subjectField = new TextField { X = 0, Y = 1, Width = Dim.Fill() };
+        _subjectField = new TextField();
         _subjectField.ValueChanged += (_, _) => UpdateValidity();
-        subjectBand.Add(subjectLabel, _subjectField);
+        // TextField/TextView both paint their fill via VisualRole.Editable, not Normal/Focus (see
+        // openspec/changes/add-edit-frame/design.md) - reading it here mirrors whatever the field
+        // actually renders, rather than a color guessed independently of it.
+        var subjectBackground = _subjectField.GetAttributeForRole(VisualRole.Editable).Background;
+        _subjectFrame = new EditFrame(_subjectField) {
+            X = 0, Y = 1, Width = Dim.Fill(), Height = 3,
+            InnerBackgroundNormal = subjectBackground, InnerBackgroundFocused = subjectBackground,
+        };
+        subjectBand.Add(subjectLabel, _subjectFrame);
 
-        var headersBand = new View { X = 0, Y = Pos.Bottom(subjectBand), Width = Dim.Fill(), Height = 8, CanFocus = true };
+        var headersBand = new View { X = 0, Y = Pos.Bottom(subjectBand), Width = Dim.Fill(), Height = 5, CanFocus = true };
         var headersLabel = new Label { Text = "Headers", X = 0, Y = 0 };
-        var headerEditor = new HeaderEditorView(_headers) { X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill() };
-        headersBand.Add(headersLabel, headerEditor);
+        var headerEditor = new HeaderEditorView(_headers) { Background = subjectBackground };
+        var headerFrame = new EditFrame(headerEditor) {
+            X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill(),
+            InnerBackgroundNormal = subjectBackground, InnerBackgroundFocused = subjectBackground,
+        };
+        headersBand.Add(headersLabel, headerFrame);
 
         var payloadBand = new View { X = 0, Y = Pos.Bottom(headersBand), Width = Dim.Fill(), Height = Dim.Fill(1), CanFocus = true };
         var payloadLabel = new Label { Text = "Payload", X = 0, Y = 0 };
 #pragma warning disable CS0618
-        _payloadView = new TextView { X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill() };
+        _payloadView = new TextView();
 #pragma warning restore CS0618
-        payloadBand.Add(payloadLabel, _payloadView);
+        var payloadBackground = _payloadView.GetAttributeForRole(VisualRole.Editable).Background;
+        var payloadFrame = new EditFrame(_payloadView) {
+            X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill(),
+            InnerBackgroundNormal = payloadBackground, InnerBackgroundFocused = payloadBackground,
+        };
+        payloadBand.Add(payloadLabel, payloadFrame);
 
         _sendButton = new Button { Text = "_Send", X = Pos.AnchorEnd(10), Y = Pos.AnchorEnd(1) };
         _sendButton.Accepting += (_, _) => Send();
@@ -60,6 +79,7 @@ internal sealed class PublishView: View
         var valid = _subjectField.Text.Trim().Length > 0;
         _sendButton.Enabled = valid;
         _subjectField.SetScheme(valid ? null : new Scheme(InvalidSubject));
+        _subjectFrame.InnerBackgroundOverride = valid ? null : InvalidSubject.Background;
     }
 
     private void Send()
