@@ -19,7 +19,12 @@ internal sealed class PublishView: View
     private readonly TextField _headerKeyField;
     private readonly TextField _headerValueField;
     private readonly ListView _headerListView;
+    // TextView is obsolete in favor of Terminal.Gui.Editor's Editor view (confirmed AOT-clean by
+    // AotProbe.EditorProbe), but the payload box is just a quick-and-dirty text/JSON field - none
+    // of Editor's multi-caret/folding/highlighting is needed here. Revisit if that changes.
+#pragma warning disable CS0618
     private readonly TextView _payloadView;
+#pragma warning restore CS0618
     private readonly Button _sendButton;
     private int? _editingIndex;
 
@@ -53,7 +58,9 @@ internal sealed class PublishView: View
         var payloadBand = new View { X = 0, Y = Pos.Bottom(headersBand), Width = Dim.Fill(), Height = Dim.Fill(1), CanFocus = true };
         payloadBand.SetScheme(new Scheme(new Attribute(ColorName16.White, ColorName16.DarkGray)));
         var payloadLabel = new Label { Text = "Payload", X = 0, Y = 0 };
+#pragma warning disable CS0618
         _payloadView = new TextView { X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill() };
+#pragma warning restore CS0618
         payloadBand.Add(payloadLabel, _payloadView);
 
         _sendButton = new Button { Text = "_Send", X = Pos.AnchorEnd(10), Y = Pos.AnchorEnd(1) };

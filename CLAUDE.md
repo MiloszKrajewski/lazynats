@@ -20,6 +20,14 @@ exists today.
 - `Microsoft.Extensions.DependencyInjection` via the static `Services` provider in
   `Services.cs` (`Services.Root.GetRequiredService<T>()`), not constructor-injected app-wide.
 
+## UI conventions
+
+- Bordered containers (`Window`, `FrameView`, `Dialog`) get horizontal breathing room: set
+  `Padding.Thickness` rather than letting content butt against the border (e.g.
+  `SubscriptionsView`/`PublishView` in `MainWindow.cs`, `PatternDialog`).
+- Titles on bordered containers get a leading and trailing space (e.g. `" Live Feed "` in
+  `MainWindow.cs`) so the border corners don't crowd the text.
+
 ## Architecture
 
 - `Program.cs` wires everything up: opens the `NatsConnection`, creates an unbounded

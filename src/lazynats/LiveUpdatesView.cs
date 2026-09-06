@@ -19,16 +19,13 @@ internal sealed class LiveUpdatesView: View
     {
         CanFocus = true;
 
-        var divider = new Line { X = 0, Y = 0, Width = Dim.Fill(), Height = 1 };
-        var heading = new Label { Text = "Live Updates", X = 0, Y = 1 };
-
         _dataSource = new LiveLogDataSource(_events);
-        _listView = new ListView { X = 0, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
+        _listView = new ListView { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         _listView.KeystrokeNavigator = null;
         _listView.Source = _dataSource;
         _listView.Accepted += OnAccepted;
 
-        Add(divider, heading, _listView);
+        Add(_listView);
 
         AddCommand(Command.DeleteAll, () => { Clear(); return true; });
         KeyBindings.Add(Key.C, Command.DeleteAll);

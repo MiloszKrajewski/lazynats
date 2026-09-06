@@ -48,3 +48,13 @@ The system SHALL compute a dedup key as `hash(subject + headers + payload)` from
 #### Scenario: Distinct messages outside the window are not collapsed
 - **WHEN** two messages with identical subject, headers, and payload are received with a gap larger than the trailing dedup window
 - **THEN** both appear as separate rows in the feed
+
+### Requirement: No In-View Header
+The live feed view SHALL NOT render its own heading text or divider line; it SHALL rely on its
+host container's own title and border for framing, so that the view never duplicates a title
+already shown by whatever it is hosted in.
+
+#### Scenario: Feed view renders without a redundant heading
+- **WHEN** the live feed view is displayed inside its host frame (titled "Live Feed")
+- **THEN** the view shows no additional heading text or divider line of its own, and its message
+  list starts at the top row of the view's content area

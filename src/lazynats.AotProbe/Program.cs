@@ -4,6 +4,7 @@ var probes = new (string Name, Func<Task> Run)[] {
     ("Nats", NatsProbe.Run),
     ("Rx", RxProbe.Run),
     ("Di", DiProbe.Run),
+    ("Editor", EditorProbe.Run),
 };
 
 var passed = 0;

@@ -18,8 +18,8 @@ internal sealed class MainWindow: Runnable
         var feedReader = Services.Root.GetRequiredService<ChannelReader<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
 
-        var subscriptionsView = new SubscriptionsView(registry) { Title = "Subscribe", Padding = { Thickness = new Thickness(1) } };
-        var publishView = new PublishView(connection) { Title = "Publish", Padding = { Thickness = new Thickness(1) } };
+        var subscriptionsView = new SubscriptionsView(registry) { Title = " Subscribe ", Padding = { Thickness = new Thickness(1) } };
+        var publishView = new PublishView(connection) { Title = " Publish ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
         tabs.Add(subscriptionsView, publishView);
         tabs.Value = subscriptionsView;
