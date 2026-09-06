@@ -8,7 +8,7 @@ using Attribute = Terminal.Gui.Drawing.Attribute;
 
 namespace lazynats;
 
-internal sealed class PublishView: View
+internal sealed class PublishTab: View
 {
     private static readonly Attribute InvalidSubject = new(ColorName16.Red, Theme.EditableBackground);
 
@@ -26,7 +26,7 @@ internal sealed class PublishView: View
 
     public event Action<string>? StatusChanged;
 
-    public PublishView(NatsConnection connection)
+    public PublishTab(NatsConnection connection)
     {
         CanFocus = true;
         _connection = connection;

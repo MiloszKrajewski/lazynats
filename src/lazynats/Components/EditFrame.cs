@@ -39,7 +39,7 @@ internal sealed class EditFrame: View
         // Terminal.Gui requires CanFocus=true on every ancestor for a descendant to be focusable
         // at all - CanFocus=false here would block the child from ever receiving focus, not make
         // the frame transparent to it. Pass-through instead relies on normal focus drill-down (as
-        // already used by PublishView's own subjectBand/headersBand/payloadBand wrappers): with no
+        // already used by PublishTab's own subjectBand/headersBand/payloadBand wrappers): with no
         // focusable content of its own, EditFrame is never where focus actually lands.
         CanFocus = true;
         _child = child;

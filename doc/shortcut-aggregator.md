@@ -30,7 +30,7 @@ clearShortcut.Action = liveUpdates.Clear;
 liveUpdates.HasFocusChanged += (_, _) => clearShortcut.Visible = liveUpdates.HasFocus;
 
 var publishStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
-publishView.StatusChanged += message => { publishStatusShortcut.Text = message; publishStatusShortcut.Visible = true; };
+publishTab.StatusChanged += message => { publishStatusShortcut.Text = message; publishStatusShortcut.Visible = true; };
 ```
 
 `ShortcutTracker` was explicitly built to replace this pattern generically, but wiring it in was scoped
@@ -52,17 +52,17 @@ messages, not key hints) and should stay as-is regardless.
    replaced by having `LiveUpdatesView` implement `IShortcutSource` instead — but that's an
    `LiveUpdatesView.cs` change, out of scope for both prior changes; do it deliberately, not as a
    drive-by.
-4. Migrating `PublishView`'s header editor (`_headerKeyField`/`_headerValueField`/`_headerListView`/
+4. Migrating `PublishTab`'s header editor (`_headerKeyField`/`_headerValueField`/`_headerListView`/
    `HeaderListDataSource`/`ClearHeaderInput`/`LoadSelectedForEditing`/`CommitHeaderInput`/
    `RemoveSelectedHeader`) onto `ListEditorView<HeaderPair>` is a related but separate piece of work —
    `HeaderColonPresenter` (`src/lazynats/HeaderColonPresenter.cs`, `"key: value"` parsing) already exists
    as the presenter for it, built and proven in isolation but not wired in, same as this. Doing that
-   migration would make `PublishView` a second real `IShortcutSource` consumer, which is useful signal
+   migration would make `PublishTab` a second real `IShortcutSource` consumer, which is useful signal
    before finalizing the `StatusBar` rendering shape in step 2 (a design meant for exactly one consumer
    risks being wrong for the second).
 
 ## Suggested order
 
-Steps 4 then 1-3: getting `PublishView` onto `ListEditorView<T>` first gives two real `IShortcutSource`
+Steps 4 then 1-3: getting `PublishTab` onto `ListEditorView<T>` first gives two real `IShortcutSource`
 views to design the `StatusBar` rendering against, rather than guessing the right shape from
 `SubscriptionsView` alone.

@@ -6,7 +6,7 @@ using Terminal.Gui.ViewBase;
 namespace lazynats.Components;
 
 // Generalizes the "presenter-formatted list with New/Edit/Delete" shape duplicated between
-// SubscriptionsView and PublishView's header editor. Row formatting is delegated to an injected
+// SubscriptionsView and PublishTab's header editor. Row formatting is delegated to an injected
 // presenter; New/Edit are delegated to abstract TryCreate/TryEdit callbacks so a subclass can run
 // whatever modal its item type needs (a single field today, potentially several later) without
 // this base class needing to know what that modal looks like. Obtaining a value (TryCreate/TryEdit)
@@ -39,7 +39,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         _emptyHintLabel.SetScheme(new Terminal.Gui.Drawing.Scheme(GetScheme().Disabled));
 
         // Bound here (on the whole component), not on the list, so Ctrl+N/E/D work no matter
-        // which child currently has focus - same rationale as PublishView.
+        // which child currently has focus - same rationale as PublishTab.
         AddCommand(Command.New, () => { TryCreateItem(); return true; });
         AddCommand(Command.Edit, () => { if (SelectedIndex is { } index) TryEditItem(index); return true; });
         AddCommand(Command.DeleteAll, () => { if (SelectedIndex is { } index) Delete(index); return true; });

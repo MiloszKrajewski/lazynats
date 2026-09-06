@@ -24,7 +24,8 @@ much of it exists today.
 
 - Bordered containers (`Window`, `FrameView`, `Dialog`) get horizontal breathing room: set
   `Padding.Thickness` rather than letting content butt against the border (e.g.
-  `SubscriptionsView`/`PublishView` in `MainWindow.cs`, `PatternDialog`).
+  `SubscribeTab`/`PublishTab`, set where they're constructed in `MainWindow.cs`, and
+  `PatternDialog`).
 - Titles on bordered containers get a leading and trailing space (e.g. `" Live Feed "` in
   `MainWindow.cs`) so the border corners don't crowd the text.
 

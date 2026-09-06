@@ -43,6 +43,17 @@ to renumber anything already shipped.
 **Open question:** do Consumers get their own tab, or live inside the Streams tab (e.g. as a
 drill-down from a selected stream)?
 
+### Tab content structure (`tab-content-structure` spec)
+
+Each tab's content is a single, self-contained component (`SubscribeTab`, `PublishTab`, and
+their future Streams/Consumers/KV/OBJ counterparts) that owns its complete internal layout —
+labels, `EditFrame` wrapping, sub-band composition, all of it. `MainWindow` only resolves each
+tab's dependencies, constructs its component, and registers it with `ManagementTabs`; it performs
+no band/frame/label assembly of its own. A component directly registered with `ManagementTabs`
+this way is named with a `Tab` suffix; a component used only as a piece inside one (e.g.
+`HeaderEditorView` inside `PublishTab`, the bare list inside `SubscribeTab`) is not — the suffix
+exists to mark the outermost, directly-registered component unambiguously.
+
 ### Tab keyboard model
 
 Tab content and each tab's own header are separate focus targets (`tab-navigation` spec):
@@ -107,7 +118,7 @@ Compose and send one NATS message — subject, headers, payload — entirely by 
     fire regardless of which of the three currently has focus.
 - **Payload** — a multi-line text area (`TextView`; `Editor`'s multi-caret/folding/highlighting
   isn't needed for a "just text or JSON" box, so the simpler, obsolete-but-AOT-clean control is
-  used deliberately — see `PublishView.cs`).
+  used deliberately — see `PublishTab.cs`).
 - **Send** publishes via the connected `NatsConnection`, UTF-8-encoding the payload text, and
   reports success/failure through the status bar without clearing the form — so the same message
   can be tweaked and resent.
@@ -151,7 +162,7 @@ selectable list with New/Edit/Delete — so that shape lives once, in
 - All three bindings are attached to the editor as a whole, so they fire regardless of which
   child view currently has focus.
 
-`PublishView`'s header editor predates this extraction and still hand-rolls the same New/Edit/
+`PublishTab`'s header editor predates this extraction and still hand-rolls the same New/Edit/
 Delete mechanics inline rather than going through `ListEditorView<T>` — worth revisiting if the
 duplication becomes a maintenance cost.
 
@@ -216,7 +227,7 @@ bordered panels (`Window`/`FrameView`/`Dialog`, which use the sharper full box-d
 Top rule uses lower-half-block glyphs (`▄`), bottom rule uses upper-half-block glyphs (`▀`) — each
 renders as a thin sliver hugging the content row rather than a full blank padding row, so the
 "frame" adds only a hairline of separation instead of a full extra row of chrome. No design work
-has started on which components adopt this (just `PublishView`'s Subject/Payload fields? every
+has started on which components adopt this (just `PublishTab`'s Subject/Payload fields? every
 `TextField`/`TextView` app-wide?) or how it interacts with focus/invalid styling (e.g. Publish's
 red-on-dark-gray invalid Subject field).
 

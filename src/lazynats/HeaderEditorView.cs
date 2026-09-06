@@ -5,10 +5,10 @@ namespace lazynats;
 
 internal readonly record struct HeaderPair(string Key, string Value);
 
-// PublishView's header list, edited via the shared ListEditorView<T> pattern (mirroring
+// PublishTab's header list, edited via the shared ListEditorView<T> pattern (mirroring
 // SubscriptionsView) instead of the always-visible key/value input row it used to be. Add/Replace/
 // Delete stay the base class defaults - unlike subscriptions, headers have no external registry to
-// keep in sync with, PublishView only reads the collection at Send time.
+// keep in sync with, PublishTab only reads the collection at Send time.
 internal sealed class HeaderEditorView: ListEditorView<HeaderPair>
 {
     private static readonly HeaderColonPresenter Presenter = new();
