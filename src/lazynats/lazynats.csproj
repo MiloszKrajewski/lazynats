@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ConsoleAppFramework" Version="5.7.13" />
     <PackageReference Include="NATS.Client.JetStream" Version="2.8.2" />
     <PackageReference Include="NATS.Client.KeyValueStore" Version="2.8.2" />
     <PackageReference Include="NATS.Client.ObjectStore" Version="2.8.2" />

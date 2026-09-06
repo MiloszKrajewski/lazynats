@@ -1,4 +1,5 @@
-﻿using System.Reactive.Subjects;
+﻿using ConsoleAppFramework;
+using System.Reactive.Subjects;
 using lazynats;
 using lazynats.LiveFeed;
 using lazynats.Subscriptions;
@@ -12,7 +13,12 @@ using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 
-var connection = new NatsConnection(new NatsOpts { Url = "nats://localhost:4222" });
+await ConsoleApp.RunAsync(args, RunAppAsync);
+
+/// <param name="server">-s, NATS server URL.</param>
+static async Task RunAppAsync(string? server = null)
+{
+var connection = new NatsConnection(new NatsOpts { Url = ResolveServerUrl(server) });
 await connection.ConnectAsync();
 
 // Synchronize() is load-bearing: SubscriptionRegistry runs one task per active subscription, all
@@ -66,6 +72,10 @@ services.AddSingleton(app);
 Services.Configure(services);
 
 app.Run<MainWindow>().Dispose();
+}
+
+static string ResolveServerUrl(string? server) =>
+    server ?? Environment.GetEnvironmentVariable("NATS_URL") ?? "nats://localhost:4222";
 
 // Overrides Terminal.Gui's stock "Base"/"Dialog" schemes with the app's own dark palette (see
 // openspec/changes/add-dark-theme). Must run after Application.Create(), which is what
