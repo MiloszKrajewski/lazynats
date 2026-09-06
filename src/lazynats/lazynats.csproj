@@ -15,7 +15,7 @@
     <PackageReference Include="NATS.Client.KeyValueStore" Version="3.2.0" />
     <PackageReference Include="NATS.Client.ObjectStore" Version="3.2.0" />
     <PackageReference Include="System.IO.Hashing" Version="10.0.11" />
-    <PackageReference Include="System.Reactive" Version="6.1.0" />
+    <PackageReference Include="System.Reactive" Version="7.0.0" />
     <PackageReference Include="Terminal.Gui" Version="2.4.17" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
   </ItemGroup>
