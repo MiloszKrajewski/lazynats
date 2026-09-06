@@ -78,6 +78,15 @@ class Program: NukeBuild
 		where predicate is null || predicate(p)
 		select p;
 
+	static void RemoveDebugSymbols(AbsolutePath publishDirectory) =>
+		publishDirectory.GlobFiles("*.pdb", "*.dbg").ForEach(f => File.Delete(f));
+
+	static void CompressToFresh(AbsolutePath sourceDirectory, AbsolutePath zipFile)
+	{
+		if (File.Exists(zipFile)) File.Delete(zipFile);
+		sourceDirectory.CompressTo(zipFile);
+	}
+
     static void RestoreSecretFile(string secretFile, string exampleFile)
 	{
 		if (File.Exists(RootDirectory / secretFile))
@@ -159,9 +168,10 @@ class Program: NukeBuild
 					.SetConfiguration(Configuration.Release)
 					.SetOutput(OutputDirectory / a.Name)
 				);
+				RemoveDebugSymbols(OutputDirectory / a.Name);
 				var zipName = $"{a.Name}-{PackageVersion}.zip";
 				Log.Information("Compressing {Application}...", zipName);
-				(OutputDirectory / a.Name).CompressTo(OutputDirectory / zipName);
+				CompressToFresh(OutputDirectory / a.Name, OutputDirectory / zipName);
 			}
 		});
 	
@@ -191,6 +201,93 @@ class Program: NukeBuild
 			}
 		});
 
+	Target ReleaseWindowsX64 => _ => _
+		.DependsOn(Restore)
+		.Executes(() =>
+		{
+			if (!OperatingSystem.IsWindows())
+				throw new PlatformNotSupportedException(
+					"release-windows-x64 requires a Windows host: Native AOT for win-x64 has no " +
+					"cross-compilation story from Linux or macOS.");
+
+			var project = Projects(IsApplication).Single();
+			var publishDirectory = OutputDirectory / $"{project.Name}-win-x64";
+
+			DotNetPublish(s => s
+				.SetProject(project.Path)
+				.SetConfiguration(Configuration.Release)
+				.SetRuntime("win-x64")
+				.EnableSelfContained()
+				.SetProperty("PublishAot", true)
+				.SetOutput(publishDirectory));
+			RemoveDebugSymbols(publishDirectory);
+
+			var zipName = $"{project.Name}-{PackageVersion}-windows-x64.zip";
+			Log.Information("Compressing {ZipName}...", zipName);
+			CompressToFresh(publishDirectory, OutputDirectory / zipName);
+		});
+
+	Target ReleaseLinuxX64 => _ => _
+		.DependsOn(Restore)
+		.Executes(() =>
+		{
+			var project = Projects(IsApplication).Single();
+			var builderImage = "lazynats-release-linux-x64-builder";
+			var publishDirectory = OutputDirectory / $"{project.Name}-linux-x64";
+			publishDirectory.CreateOrCleanDirectory();
+
+			DockerBuild(s => s
+				.SetProcessWorkingDirectory(RootDirectory)
+				.SetPath(RootDirectory)
+				.SetFile(DockerDirectory / "release-linux-x64.dockerfile")
+				.AddTag(builderImage)
+				.EnableQuiet());
+
+			var projectPath = RootDirectory.GetUnixRelativePathTo(project.Path);
+			DockerRun(s => s
+				.SetProcessWorkingDirectory(RootDirectory)
+				.SetImage(builderImage)
+				.EnableRm()
+				.SetVolume($"{RootDirectory}:/repo", $"{publishDirectory}:/out")
+				.SetWorkdir("/repo")
+				.SetCommand("dotnet")
+				.SetArgs(
+					"publish", $"/repo/{projectPath}",
+					"--configuration", Configuration.Release,
+					"--runtime", "linux-x64",
+					"--self-contained",
+					"-p:PublishAot=true",
+					"--output", "/out"));
+			RemoveDebugSymbols(publishDirectory);
+
+			var zipName = $"{project.Name}-{PackageVersion}-linux-x64.zip";
+			Log.Information("Compressing {ZipName}...", zipName);
+			CompressToFresh(publishDirectory, OutputDirectory / zipName);
+		});
+
+	Target ReleaseLinuxArm64 => _ => _
+		.Executes(() =>
+		{
+			// Two possible future implementations, neither wired up yet:
+			// (1) a QEMU-emulated `docker run --platform linux/arm64` container, mirroring
+			//     release-linux-x64 but under emulation; or
+			// (2) a portable clang/binutils-aarch64/sysroot cross-toolchain run natively.
+			throw new NotSupportedException(
+				"release-linux-arm64 is not implemented yet: it needs either a QEMU-emulated " +
+				"linux/arm64 build container or a clang/binutils-aarch64/sysroot cross-toolchain, " +
+				"neither of which exists in this pipeline yet.");
+		});
+
+	Target ReleaseMacosArm64 => _ => _
+		.Executes(() =>
+		{
+			// Native AOT for macOS can only be produced on macOS hardware - there is no
+			// cross-compile or container-based path from Windows/Linux.
+			throw new NotSupportedException(
+				"release-macos-arm64 is not implemented: a macOS Native AOT build requires an " +
+				"actual macOS build host, which is not available to this pipeline.");
+		});
+
 	Target VerifyArtifacts => _ => _
 		.After(Release)
 		.Executes(() =>
@@ -215,6 +312,10 @@ class Program: NukeBuild
 
 	Target PublishToGitHub => _ => _
 		.After(Release)
+		.After(ReleaseWindowsX64)
+		.After(ReleaseLinuxX64)
+		.After(ReleaseLinuxArm64)
+		.After(ReleaseMacosArm64)
 		.DependsOn(VerifyArtifacts)
 		.Executes(async () =>
 		{

@@ -31,6 +31,10 @@
         "Rebuild",
         "Release",
         "ReleaseDocker",
+        "ReleaseLinuxArm64",
+        "ReleaseLinuxX64",
+        "ReleaseMacosArm64",
+        "ReleaseWindowsX64",
         "Restore",
         "Test",
         "VerifyArtifacts"
