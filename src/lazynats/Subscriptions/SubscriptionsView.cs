@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
+using lazynats.Components;
 
-namespace lazynats;
+namespace lazynats.Subscriptions;
 
 internal sealed class SubscriptionsView: ListEditorView<SubscriptionInfo>
 {
@@ -9,11 +10,13 @@ internal sealed class SubscriptionsView: ListEditorView<SubscriptionInfo>
     private readonly SubscriptionRegistry _registry;
     private readonly ObservableCollection<SubscriptionInfo> _items;
 
-    public SubscriptionsView(SubscriptionRegistry registry)
-        : this(registry, new ObservableCollection<SubscriptionInfo>(registry.Active)) { }
+    public SubscriptionsView(SubscriptionRegistry registry): 
+        this(registry, new ObservableCollection<SubscriptionInfo>(registry.Active)) { }
 
-    private SubscriptionsView(SubscriptionRegistry registry, ObservableCollection<SubscriptionInfo> items)
-        : base(items, Presenter)
+    private SubscriptionsView(
+        SubscriptionRegistry registry, 
+        ObservableCollection<SubscriptionInfo> items): 
+        base(items, Presenter)
     {
         _registry = registry;
         _items = items;

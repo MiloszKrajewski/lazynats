@@ -1,5 +1,6 @@
 ﻿using System.Threading.Channels;
 using lazynats;
+using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
 using Terminal.Gui.App;
@@ -17,5 +18,5 @@ services.AddSingleton(channel.Reader);
 services.AddSingleton(new MessageDeduplicator(TimeSpan.FromMilliseconds(50)));
 Services.Configure(services);
 
-Application.MaximumIterationsPerSecond = 120;
+Application.MaximumIterationsPerSecond = 60;
 Application.Create().Run<MainWindow>().Dispose();

@@ -5,21 +5,25 @@ using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 
-namespace lazynats;
+namespace lazynats.Components;
+
+internal abstract class ListEditorView: View
+{
+    protected static readonly Attribute InvalidInputAttribute = 
+        new(ColorName16.Red, ColorName16.DarkGray);
+}
 
 // Generalizes the "text input + editable list" shape duplicated between SubscriptionsView and
 // PublishView's header editor. Text<->T conversion is delegated to an injected presenter; Append/
 // Edit/Delete/ClearInput are separately overridable so a subclass can change what an action does
 // without needing to change how T is parsed/formatted.
-internal class ListEditorView<T>: View, IShortcutSource
+internal class ListEditorView<T>: ListEditorView, IShortcutSource
 {
-    private static readonly Attribute InvalidInputAttribute = new(ColorName16.Red, ColorName16.DarkGray);
-
     private readonly ObservableCollection<T> _items;
     private readonly IValuePresenter<T> _presenter;
     private readonly PresenterListDataSource<T> _dataSource;
     private readonly TextField _inputField;
-    private readonly ListView _listView;
+    private readonly Terminal.Gui.Views.ListView _listView;
     private int? _editingIndex;
 
     public ListEditorView(ObservableCollection<T> items, IValuePresenter<T> presenter)
@@ -33,7 +37,7 @@ internal class ListEditorView<T>: View, IShortcutSource
         _inputField.Accepted += (_, _) => Append(_inputField.Text);
 
         _dataSource = new PresenterListDataSource<T>(_items, _presenter);
-        _listView = new ListView { X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill() };
+        _listView = new Terminal.Gui.Views.ListView { X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill() };
         _listView.KeystrokeNavigator = null;
         _listView.Source = _dataSource;
 
@@ -45,6 +49,16 @@ internal class ListEditorView<T>: View, IShortcutSource
         KeyBindings.Add(Key.N.WithCtrl, Command.New);
         KeyBindings.Add(Key.E.WithCtrl, Command.Edit);
         KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
+
+        // Only offered a chance once the list itself has left Up unhandled (i.e. at/above its top
+        // row) - otherwise (e.g. the input field already has focus) this declines, letting Up keep
+        // bubbling past this component entirely.
+        AddCommand(Command.Up, () => {
+            if (!_listView.HasFocus) return false;
+            _inputField.SetFocus();
+            return true;
+        });
+        KeyBindings.Add(Key.CursorUp, Command.Up);
 
         Add(_inputField, _listView);
 

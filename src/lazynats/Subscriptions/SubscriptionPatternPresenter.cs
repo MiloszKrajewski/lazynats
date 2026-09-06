@@ -1,4 +1,6 @@
-namespace lazynats;
+using lazynats.Components;
+
+namespace lazynats.Subscriptions;
 
 internal sealed class SubscriptionPatternPresenter: IValuePresenter<SubscriptionInfo>
 {

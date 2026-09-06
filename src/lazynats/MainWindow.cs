@@ -1,6 +1,8 @@
 ﻿using System.Threading.Channels;
+using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
+using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -16,9 +18,9 @@ internal sealed class MainWindow: Runnable
         var feedReader = Services.Root.GetRequiredService<ChannelReader<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
 
-        var subscriptionsView = new SubscriptionsView(registry) { Title = "Subscriptions" };
-        var publishView = new PublishView(connection) { Title = "Publish" };
-        var tabs = new Tabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
+        var subscriptionsView = new SubscriptionsView(registry) { Title = "Subscribe", Padding = { Thickness = new Thickness(1) } };
+        var publishView = new PublishView(connection) { Title = "Publish", Padding = { Thickness = new Thickness(1) } };
+        var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
         tabs.Add(subscriptionsView, publishView);
         tabs.Value = subscriptionsView;
 
@@ -32,6 +34,12 @@ internal sealed class MainWindow: Runnable
         var quitShortcut = new Shortcut { Text = "Quit", Key = Key.Q.WithAlt, BindKeyToApplication = true };
         quitShortcut.Action = () => App!.RequestStop();
 
+        var subscribeTabShortcut = new Shortcut { Text = "Subscribe", Key = Key.B.WithAlt, BindKeyToApplication = true };
+        subscribeTabShortcut.Action = () => tabs.Value = subscriptionsView;
+
+        var publishTabShortcut = new Shortcut { Text = "Publish", Key = Key.P.WithAlt, BindKeyToApplication = true };
+        publishTabShortcut.Action = () => tabs.Value = publishView;
+
         var clearShortcut = new Shortcut { Text = "Clear", Key = Key.C, Visible = false };
         clearShortcut.Action = liveUpdates.Clear;
         liveUpdates.HasFocusChanged += (_, _) => clearShortcut.Visible = liveUpdates.HasFocus;
@@ -42,7 +50,7 @@ internal sealed class MainWindow: Runnable
             publishStatusShortcut.Visible = true;
         };
 
-        var statusBar = new StatusBar([quitShortcut, clearShortcut, publishStatusShortcut]);
+        var statusBar = new StatusBar([quitShortcut, subscribeTabShortcut, publishTabShortcut, clearShortcut, publishStatusShortcut]);
 
         Add(tabs, feedFrame, statusBar);
     }

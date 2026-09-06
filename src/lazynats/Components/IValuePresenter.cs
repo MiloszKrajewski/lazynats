@@ -1,4 +1,4 @@
-namespace lazynats;
+namespace lazynats.Components;
 
 internal interface IValuePresenter<T>
 {

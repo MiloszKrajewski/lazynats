@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using Terminal.Gui.Views;
 
-namespace lazynats;
+namespace lazynats.Components;
 
 // Renders each item via the same presenter ListEditorView<T> uses for text conversion, so the
 // list shows exactly what Ctrl+E would load back into the input. MaxItemLength is 0 to avoid an
@@ -12,7 +12,6 @@ internal sealed class PresenterListDataSource<T>: IListDataSource
 {
     private readonly ObservableCollection<T> _items;
     private readonly IValuePresenter<T> _presenter;
-    private NotifyCollectionChangedEventHandler? _collectionChanged;
 
     public PresenterListDataSource(ObservableCollection<T> items, IValuePresenter<T> presenter)
     {
@@ -22,17 +21,13 @@ internal sealed class PresenterListDataSource<T>: IListDataSource
     }
 
     private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
-        _collectionChanged?.Invoke(this, e);
+        CollectionChanged?.Invoke(this, e);
 
     public int Count => _items.Count;
     public int MaxItemLength => 0;
     public bool SuspendCollectionChangedEvent { get; set; }
 
-    public event NotifyCollectionChangedEventHandler? CollectionChanged
-    {
-        add => _collectionChanged += value;
-        remove => _collectionChanged -= value;
-    }
+    public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
     public bool IsMarked(int item) => false;
     public void SetMark(int item, bool value) { }

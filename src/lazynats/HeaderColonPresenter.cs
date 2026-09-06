@@ -1,3 +1,5 @@
+using lazynats.Components;
+
 namespace lazynats;
 
 // Proves the IValuePresenter<T> abstraction against the existing HeaderPair type from

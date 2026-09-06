@@ -1,7 +1,7 @@
 using System.Threading.Channels;
 using NATS.Client.Core;
 
-namespace lazynats;
+namespace lazynats.Subscriptions;
 
 internal sealed record SubscriptionInfo(Guid Id, string Pattern);
 
