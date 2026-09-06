@@ -3,7 +3,6 @@ using System.Reactive.Linq;
 using System.Text;
 using lazynats.Components;
 using lazynats.Core;
-using lazynats.Subscriptions;
 using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
 using Terminal.Gui.Input;
@@ -50,16 +49,9 @@ internal sealed class ValuesTab: View, IShortcutSource
     // Null at the bucket level; the drilled-into bucket's name at the key level.
     private string? _currentBucket;
 
-    // Active server-side key filter pattern (NATS subject wildcard) for the currently
-    // drilled-into bucket, or null if unfiltered. Reset on both Descend and Ascend - a filter has
-    // no meaningful carry-over to a different bucket, or back at the bucket list. Read directly by
-    // RefreshKeyListAsync, so Ctrl+R and post-create/edit refreshes stay scoped for free. See
-    // openspec/changes/add-kv-key-filter/design.md Decision 3.
-    private string? _currentKeyFilter;
-
     // Whether the most recently completed key-list fetch hit KeyFilterCap - drives
     // UpdateKeyListTitle's truncation indicator. Only ever true while a filter is active; reset
-    // alongside _currentKeyFilter on Descend/Ascend for the same reason.
+    // alongside _keyListView's own active filter on Descend/Ascend for the same reason.
     private bool _keyListTruncated;
 
     public event Action<string>? StatusChanged;
@@ -97,7 +89,12 @@ internal sealed class ValuesTab: View, IShortcutSource
         _keyListView.CreateRequested += () => OpenCreateKeyDialog(null);
         _keyListView.DeleteRequested += () => _ = TryDeleteKeyAsync();
         _keyListView.EditRequested += OpenEditKeyDialog;
-        _keyListView.FilterRequested += OpenKeyFilterDialog;
+        // KeyListView (via the shared DrillableListView<T> Filter wiring) owns the Ctrl+F
+        // dialog/compile/in-memory-narrow mechanics itself; this tab only needs to additionally
+        // scope its server-side fetch and reflect the active pattern in the list's title - the one
+        // list in the app whose backing store supports that. See
+        // openspec/changes/unify-list-filtering/design.md Decision 2.
+        _keyListView.FilterChanged += pattern => { UpdateKeyListTitle(); _ = RefreshKeyListAsync(); };
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_bucketListFrame) + 1, Y = 0 };
         _details = new BucketDetails(_kv) { X = Pos.Right(_bucketListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -188,8 +185,10 @@ internal sealed class ValuesTab: View, IShortcutSource
         var name = BucketName.From(status);
         _currentBucket = name;
         // A filter never carries over into a (possibly different) bucket entered by a fresh
-        // descent - see "Server-Side Key Filter"'s reset-on-descend requirement.
-        _currentKeyFilter = null;
+        // descent - see "Server-Side Key Filter"'s reset-on-descend requirement. Silent: this tab
+        // is about to fetch unconditionally below regardless, so a FilterChanged-driven re-fetch
+        // here would just be redundant.
+        _keyListView.ClearFilterSilently();
         _keyListTruncated = false;
         // Clear before showing - otherwise whatever a *previous* descent left behind (a different
         // bucket's keys, or a stale highlight) would flash for a frame until the fetch below
@@ -219,7 +218,7 @@ internal sealed class ValuesTab: View, IShortcutSource
     private void Ascend()
     {
         _currentBucket = null;
-        _currentKeyFilter = null;
+        _keyListView.ClearFilterSilently();
         _keyListTruncated = false;
         _listLabel.Text = "Buckets";
         _detailsLabel.Text = "Details";
@@ -386,14 +385,19 @@ internal sealed class ValuesTab: View, IShortcutSource
 
     // `selectName` mirrors RefreshListAsync's own parameter - highlights a specific key after the
     // refresh (used right after a create/edit) instead of ReplaceItems' default "keep whatever was
-    // highlighted before" fallback. Reads `_currentKeyFilter` directly rather than taking it as a
-    // parameter, so Ctrl+R and post-create/edit refreshes stay scoped to the active filter (if
-    // any) for free - see openspec/changes/add-kv-key-filter/design.md Decision 3. Compiles
-    // `_currentKeyFilter` once per call - it's always valid NATS syntax, since it can only ever
-    // have been set from PatternDialog's own validator-gated confirmation. The two-phase
-    // fetch/filter/cap pipeline is an Rx chain (fetch-then-filter-then-cap reads best as
-    // Where/Take/ToList), per add-kv-filter-language/design.md Decision 3-4; an unfiltered fetch
-    // is untouched - no Take, no truncation tracking, matching today's behavior exactly.
+    // highlighted before" fallback. Reads `_keyListView.ActiveFilter` directly rather than taking
+    // it as a parameter, so Ctrl+R and post-create/edit refreshes stay scoped to the active filter
+    // (if any) for free - see openspec/changes/add-kv-key-filter/design.md Decision 3 (now owned
+    // by the shared DrillableListView<T> Filter wiring rather than a tab-local field - see
+    // openspec/changes/unify-list-filtering/design.md Decision 2). Compiles the active filter once
+    // per call - it's always valid NATS syntax, since it can only ever have been set from
+    // PatternDialog's own validator-gated confirmation. The two-phase fetch/filter/cap pipeline is
+    // an Rx chain (fetch-then-filter-then-cap reads best as Where/Take/ToList), per
+    // add-kv-filter-language/design.md Decision 3-4; an unfiltered fetch is untouched - no Take, no
+    // truncation tracking, matching today's behavior exactly. The base class's own in-memory regex
+    // narrowing re-applies the same expression to whatever ReplaceItems receives below - a harmless
+    // no-op here, since `keys` is already exactly-matching by the time it arrives (see design.md
+    // Decision 6 on why this can never reorder/re-widen the result).
     private async Task RefreshKeyListAsync(string? selectName = null)
     {
         if (_currentBucket is not { } bucket) return;
@@ -403,10 +407,10 @@ internal sealed class ValuesTab: View, IShortcutSource
             List<string> keys;
             var truncated = false;
 
-            if (_currentKeyFilter is { } filter) {
-                var compiled = KeyFilterExpression.TryCompile(filter);
+            if (_keyListView.ActiveFilter is { } filter) {
+                var compiled = FilterExpression.TryCompile(filter);
                 var observable = store.GetKeysAsync([compiled!.NativeFilter]).ToObservable();
-                if (compiled.PostFilter is { } regex) observable = observable.Where(key => regex.IsMatch(key));
+                if (!compiled.NativeFilterIsExact) observable = observable.Where(key => compiled.Regex.IsMatch(key));
                 var fetched = await observable.Take(KeyFilterCap + 1).ToList();
                 truncated = fetched.Count > KeyFilterCap;
                 keys = truncated ? fetched.Take(KeyFilterCap).ToList() : [..fetched];
@@ -428,24 +432,6 @@ internal sealed class ValuesTab: View, IShortcutSource
         }
     }
 
-    // Ctrl+F at the key level. PatternDialog's allowEmpty:true lets confirming an empty pattern
-    // clear an active filter, unlike SubscriptionsView's use of the same dialog. Cancelling
-    // (Result is null) leaves _currentKeyFilter and the list unchanged.
-    private void OpenKeyFilterDialog()
-    {
-        if (_currentBucket is null) return;
-
-        var dialog = new PatternDialog(
-            "Filter Keys", _currentKeyFilter ?? string.Empty, allowEmpty: true,
-            validator: p => KeyFilterExpression.TryCompile(p) is not null);
-        App!.Run(dialog);
-        if (dialog.Result is not { } pattern) return;
-
-        _currentKeyFilter = pattern.Length == 0 ? null : pattern;
-        UpdateKeyListTitle();
-        _ = RefreshKeyListAsync();
-    }
-
     // Reflects the active filter (if any) in the key list's title - the only UI surface
     // distinguishing "showing every key" from "showing a scoped subset", and (once a filtered
     // fetch has actually completed) whether that subset was truncated at KeyFilterCap - a
@@ -454,7 +440,7 @@ internal sealed class ValuesTab: View, IShortcutSource
     private void UpdateKeyListTitle()
     {
         if (_currentBucket is not { } bucket) return;
-        _listLabel.Text = _currentKeyFilter switch {
+        _listLabel.Text = _keyListView.ActiveFilter switch {
             { } pattern when _keyListTruncated => $"Keys of {bucket} (filter: {pattern}, truncated at {KeyFilterCap})",
             { } pattern => $"Keys of {bucket} (filter: {pattern})",
             _ => $"Keys of {bucket}",

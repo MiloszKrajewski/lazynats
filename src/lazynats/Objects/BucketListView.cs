@@ -14,11 +14,13 @@ internal sealed class BucketListView: DrillableListView<StreamInfo>
         EnableCreate();
         EnableDelete();
         EnableEdit();
+        EnableFilter();
     }
 
     protected override IValuePresenter<StreamInfo> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No buckets — Ctrl+R to refresh";
     protected override string GetIdentity(StreamInfo item) => BucketName.From(item);
+    protected override string FilterDialogTitle => "Filter Buckets";
 
     public StreamInfo? SelectedBucket => SelectedItem;
 }

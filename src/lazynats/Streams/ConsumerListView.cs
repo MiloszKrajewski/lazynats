@@ -14,11 +14,13 @@ internal sealed class ConsumerListView: DrillableListView<ConsumerInfo>
         EnableCreate();
         EnableDelete();
         EnableEdit();
+        EnableFilter();
     }
 
     protected override IValuePresenter<ConsumerInfo> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No consumers — Ctrl+R to refresh";
     protected override string GetIdentity(ConsumerInfo item) => item.Name!;
+    protected override string FilterDialogTitle => "Filter Consumers";
 
     public ConsumerInfo? SelectedConsumer => SelectedItem;
 }

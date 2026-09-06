@@ -186,6 +186,11 @@ internal sealed class StreamsTab: View, IShortcutSource
     private void Ascend()
     {
         _currentStream = null;
+        // The consumer-level filter has no meaningful carry-over once back at the stream list -
+        // see nats-streams' "Consumer List Filter" reset-on-ascend requirement. Silent: nothing
+        // here needs to react to the clear (the consumer list is about to be hidden, not
+        // re-fetched).
+        _consumerListView.ClearFilterSilently();
         _listLabel.Text = "Streams";
         _detailsLabel.Text = "Details";
         _consumerFilterBox.Visible = false;

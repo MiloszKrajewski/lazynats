@@ -14,11 +14,13 @@ internal sealed class StreamListView: DrillableListView<StreamInfo>
         EnableCreate();
         EnableDelete();
         EnableEdit();
+        EnableFilter();
     }
 
     protected override IValuePresenter<StreamInfo> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No streams — Ctrl+R to refresh";
     protected override string GetIdentity(StreamInfo item) => item.Config.Name!;
+    protected override string FilterDialogTitle => "Filter Streams";
 
     public StreamInfo? SelectedStream => SelectedItem;
 }

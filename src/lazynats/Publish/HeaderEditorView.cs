@@ -13,9 +13,10 @@ internal sealed class HeaderEditorView: ListEditorView<HeaderPair>
 {
     private static readonly HeaderColonPresenter Presenter = new();
 
-    public HeaderEditorView(ObservableCollection<HeaderPair> items): base(items, Presenter) { }
+    public HeaderEditorView(ObservableCollection<HeaderPair> items): base(items, Presenter) => EnableFilter();
 
     protected override string EmptyHint => "No headers — Ctrl+N to add one";
+    protected override string FilterDialogTitle => "Filter Headers";
 
     protected override bool TryCreate(out HeaderPair result) =>
         TryEditHeader("New Header", string.Empty, out result);

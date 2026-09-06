@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using lazynats.Core;
+using lazynats.Subscriptions;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -40,12 +42,27 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     public event Action? DeleteRequested;
     public event Action? EditRequested;
 
+    // Raised whenever the shared filter wiring's active pattern changes (set or cleared) - see
+    // EnableFilter. Purely an optional hook: an owning tab MAY subscribe to additionally scope a
+    // server-side fetch (only KV keys do today - see ValuesTab); this list's own in-memory
+    // narrowing (ApplyFilterAndSelect) works whether anything subscribes.
+    public event Action<string?>? FilterChanged;
+
     private bool _ascendEnabled;
     private bool _createEnabled;
     private bool _deleteEnabled;
     private bool _editEnabled;
+    private bool _filterEnabled;
 
     private FilterBox? _filterBox;
+
+    // The shared filter wiring's sticky pattern/regex (survives ReplaceItems, unlike
+    // _quickSearchQuery below - see "Active Filter Persists Across a Refresh"), and the live
+    // quick-search text (resets on every ReplaceItems) - both narrow `_filtered` together in
+    // ApplyFilterAndSelect, combined as an AND when both are active.
+    private string? _activeFilterPattern;
+    private Regex? _activeFilterRegex;
+    private string _quickSearchQuery = string.Empty;
 
     protected DrillableListView(ObservableCollection<T> items)
     {
@@ -139,6 +156,58 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         AddCommand(Command.Edit, () => { EditRequested?.Invoke(); return true; });
     }
 
+    // Ctrl+F -> opens a modal PatternDialog and, unlike Create/Delete/Edit, owns the whole
+    // non-native filtering case end-to-end: compiling the pattern (shared `* ? >` grammar),
+    // narrowing `_filtered` in memory, and persisting the pattern across ReplaceItems (see
+    // ClearFilter). A subclass activating this needs no dialog code or event handler of its own -
+    // only the one native-scoped consumer (ValuesTab, for KV keys) additionally subscribes to
+    // FilterChanged to also scope its server-side fetch. See
+    // openspec/changes/unify-list-filtering/design.md Decision 2.
+    protected void EnableFilter() => _filterEnabled = true;
+
+    // Overridable per item type so the filter dialog's title reads naturally (e.g. "Filter Keys");
+    // defaulted rather than abstract so a forgotten override still shows something useful.
+    protected virtual string FilterDialogTitle => "Filter";
+
+    // The shared filter wiring's currently active pattern, or null if none - exposed for an owning
+    // tab's title/header text (e.g. "Keys of bucket (filter: ...)").
+    public string? ActiveFilter => _activeFilterPattern;
+
+    private void OpenFilterDialog()
+    {
+        var dialog = new PatternDialog(
+            FilterDialogTitle, _activeFilterPattern ?? string.Empty, allowEmpty: true,
+            validator: p => FilterExpression.TryCompile(p) is not null);
+        App!.Run(dialog);
+        if (dialog.Result is not { } pattern) return;
+
+        SetActiveFilter(pattern.Length == 0 ? null : pattern);
+    }
+
+    // Exposed for an owning tab to call on scope-changing navigation (e.g. descending into a
+    // different bucket/stream) - the sticky filter otherwise survives ReplaceItems, so it only
+    // clears via an explicit call like this one. Deliberately silent (raises no FilterChanged,
+    // mirroring FilterBox.ResetSilently): a tab resetting scope already knows the filter is gone
+    // and manages its own fetch itself, so a notification-driven re-fetch here would just be a
+    // redundant network round trip - see ValuesTab.Descend/Ascend.
+    public void ClearFilterSilently() => ApplyActiveFilter(null);
+
+    private void SetActiveFilter(string? pattern)
+    {
+        ApplyActiveFilter(pattern);
+        FilterChanged?.Invoke(pattern);
+    }
+
+    private void ApplyActiveFilter(string? pattern)
+    {
+        _activeFilterPattern = pattern;
+        _activeFilterRegex = pattern is { } p ? FilterExpression.TryCompile(p)!.Regex : null;
+
+        var previousIdentity = SelectedItem is { } current ? GetIdentity(current) : null;
+        ApplyFilterAndSelect(previousIdentity);
+        HighlightChanged?.Invoke(SelectedItem);
+    }
+
     // Links an externally-created, externally-positioned FilterBox to this list, so "/" focuses it
     // and its text fuzzy-filters the currently-loaded items live, in memory - see
     // ApplyFilterAndSelect/FuzzyMatches and the IFilterable implementation below. Deliberately not
@@ -166,7 +235,8 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     void IFilterable.ApplyFilter(string query)
     {
         var previousIdentity = SelectedItem is { } current ? GetIdentity(current) : null;
-        ApplyFilterAndSelect(query, previousIdentity);
+        _quickSearchQuery = query;
+        ApplyFilterAndSelect(previousIdentity);
         HighlightChanged?.Invoke(SelectedItem);
     }
 
@@ -200,30 +270,39 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         _items.Clear();
         foreach (var item in sorted) _items.Add(item);
 
-        // Search text resets on every refresh - clear the attached box's field (silently, since
-        // ApplyFilterAndSelect below is the authoritative re-derive) rather than leave stale text
-        // filtering out whatever this refresh just brought in (e.g. a just-created item).
+        // Quick-search text resets on every refresh - clear the attached box's field (silently,
+        // since ApplyFilterAndSelect below is the authoritative re-derive) rather than leave stale
+        // text filtering out whatever this refresh just brought in (e.g. a just-created item).
+        // The shared filter wiring's sticky pattern (_activeFilterPattern/_activeFilterRegex) is
+        // deliberately left untouched here - it survives a refresh, unlike quick-search - see
+        // "Active Filter Persists Across a Refresh".
         _filterBox?.ResetSilently();
+        _quickSearchQuery = string.Empty;
 
-        ApplyFilterAndSelect(string.Empty, previousIdentity);
+        ApplyFilterAndSelect(previousIdentity);
         HighlightChanged?.Invoke(SelectedItem);
     }
 
-    // Re-derives `_filtered` from the master set (fuzzy-matched against `query`, if non-empty) and
-    // selects `preferredIdentity` within it if still present, otherwise the nearest remaining item
-    // by sort order (empty string sorts before everything, so a null/absent `preferredIdentity`
-    // naturally lands on the first item - the same "no previous selection" fallback ReplaceItems
-    // always had).
-    private void ApplyFilterAndSelect(string query, string? preferredIdentity)
+    // Re-derives `_filtered` from the master set, narrowed by the sticky filter wiring's active
+    // regex (if any) AND the live quick-search query (if any) - both apply together, per "Filter
+    // and Quick-Search Combine When Both Are Active" - and selects `preferredIdentity` within it if
+    // still present, otherwise the nearest remaining item by sort order (empty string sorts before
+    // everything, so a null/absent `preferredIdentity` naturally lands on the first item - the same
+    // "no previous selection" fallback ReplaceItems always had). Narrowing `_items` (already sorted
+    // ascending) with `.Where()` alone, never reordering it, is what keeps a filtered/searched view
+    // alphabetically ordered too - see design.md Decision 6.
+    private void ApplyFilterAndSelect(string? preferredIdentity)
     {
-        IEnumerable<T> matches;
-        if (query.Length == 0) {
-            matches = _items;
-        } else {
+        IEnumerable<T> matches = _items;
+
+        if (_activeFilterRegex is { } filterRegex)
+            matches = matches.Where(item => filterRegex.IsMatch(GetIdentity(item)));
+
+        if (_quickSearchQuery.Length > 0) {
             // Built once per query change, reused across every item, rather than re-parsed per
             // item - see FuzzyExtensions.FuzzyToRegex.
-            var regex = query.FuzzyToRegex();
-            matches = _items.Where(item => regex.IsMatch(GetIdentity(item)));
+            var regex = _quickSearchQuery.FuzzyToRegex();
+            matches = matches.Where(item => regex.IsMatch(GetIdentity(item)));
         }
 
         _filtered.Clear();
@@ -341,22 +420,19 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         }
     }
 
-    // Refresh/New/Delete/Edit - whatever the enabled shared shapes (EnableCreate/EnableDelete/
-    // EnableEdit) imply, for the owning tab to bind Ctrl+R/N/D/E to and dispatch through (see
-    // openspec/specs/tab-scoped-list-shortcuts/spec.md). A subclass with its own tab-dispatched
-    // operation beyond these shapes (e.g. KeyListView/ObjectListView's Ctrl+F) still appends to
-    // this via `base.TabOperations.Append(...)` rather than replacing it.
-    public virtual IEnumerable<ShortcutHint> TabOperations
-    {
-        get
-        {
-            IEnumerable<ShortcutHint> hints = [new(Key.R.WithCtrl, "Refresh", () => RefreshRequested?.Invoke())];
-            if (_createEnabled) hints = hints.Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()));
-            if (_deleteEnabled) hints = hints.Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
-            if (_editEnabled) hints = hints.Append(new ShortcutHint(Key.E.WithCtrl, "Edit", () => EditRequested?.Invoke()));
-            return hints;
-        }
-    }
+    // Refresh/New/Delete/Edit/Filter - whatever the enabled shared shapes (EnableCreate/
+    // EnableDelete/EnableEdit/EnableFilter) imply, for the owning tab to bind Ctrl+R/N/D/E/F to and
+    // dispatch through (see openspec/specs/tab-scoped-list-shortcuts/spec.md). A subclass with its
+    // own tab-dispatched operation beyond these shapes still appends to this via
+    // `base.TabOperations.Append(...)` rather than replacing it.
+    public virtual IEnumerable<ShortcutHint> TabOperations =>
+        new ShortcutHint?[] {
+            new ShortcutHint(Key.R.WithCtrl, "Refresh", () => RefreshRequested?.Invoke()),
+            _createEnabled ? new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()) : null,
+            _deleteEnabled ? new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()) : null,
+            _editEnabled ? new ShortcutHint(Key.E.WithCtrl, "Edit", () => EditRequested?.Invoke()) : null,
+            _filterEnabled ? new ShortcutHint(Key.F.WithCtrl, "Filter", OpenFilterDialog) : null,
+        }.OfType<ShortcutHint>();
 
     protected override void Dispose(bool disposing)
     {

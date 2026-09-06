@@ -42,12 +42,16 @@ internal sealed class PublishDialog: Dialog
 
         var headersLabel = new Label { Text = "Headers", X = 0, Y = 4 };
         var subjectBackground = _subjectField.GetAttributeForRole(VisualRole.Editable).Background;
+        // FilterBox's own fixed Height (3) pushes headerFrame and everything below it down by 3
+        // rows relative to before this field existed - see the hand-adjusted Y values below.
+        var headerFilterBox = new FilterBox { X = 0, Y = 5, Width = FieldWidth };
         var headerEditor = new HeaderEditorView(_headers) { Background = subjectBackground };
+        headerEditor.AttachFilterBox(headerFilterBox);
         // Height 5 -> 3 visible rows inside EditFrame's 1-row top/bottom border, enough to show
         // a few headers at once without scrolling immediately.
-        var headerFrame = WrapField(headerEditor, 5, 5);
+        var headerFrame = WrapField(headerEditor, 8, 5);
 
-        var payloadLabel = new Label { Text = "Payload", X = 0, Y = 10 };
+        var payloadLabel = new Label { Text = "Payload", X = 0, Y = 13 };
         // TabKeyAddsTab = false stops TextView from consuming Tab at all (mirroring
         // CreateKeyDialog's Value field), so Tab reaches normal focus-advance handling with no
         // Navigate/Edit mode needed - see design.md's "Payload uses TabKeyAddsTab = false" decision.
@@ -55,11 +59,16 @@ internal sealed class PublishDialog: Dialog
         _payloadView = new TextView { TabKeyAddsTab = false };
 #pragma warning restore CS0618
         // Height 11 -> 9 visible rows, room for a multi-line JSON/text payload.
-        var payloadFrame = WrapField(_payloadView, 11, 11);
+        var payloadFrame = WrapField(_payloadView, 14, 11);
 
-        _statusLabel = new Label { Text = string.Empty, X = 0, Y = 22 };
+        _statusLabel = new Label { Text = string.Empty, X = 0, Y = 25 };
 
-        Add(subjectLabel, subjectFrame, headersLabel, headerFrame, payloadLabel, payloadFrame, _statusLabel);
+        // Add()-order matches spatial top-down layout (label, then FilterBox, then its list) so
+        // Tab/Shift+Tab cycles in reading order - mirrors StreamsTab/ValuesTab/ObjectsTab/
+        // SubscribeTab.
+        Add(
+            subjectLabel, subjectFrame, headersLabel, headerFilterBox, headerFrame, payloadLabel, payloadFrame,
+            _statusLabel);
 
         // Result is left unset, matching Esc's own cancellation convention - added before Send so
         // Send, not Cancel, stays the last-added, Enter-activated default button.

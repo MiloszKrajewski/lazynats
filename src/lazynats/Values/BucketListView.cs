@@ -14,11 +14,13 @@ internal sealed class BucketListView: DrillableListView<NatsKVStatus>
         EnableCreate();
         EnableDelete();
         EnableEdit();
+        EnableFilter();
     }
 
     protected override IValuePresenter<NatsKVStatus> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No buckets — Ctrl+R to refresh";
     protected override string GetIdentity(NatsKVStatus item) => BucketName.From(item);
+    protected override string FilterDialogTitle => "Filter Buckets";
 
     public NatsKVStatus? SelectedBucket => SelectedItem;
 }
