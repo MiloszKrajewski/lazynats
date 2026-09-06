@@ -1,4 +1,5 @@
 using lazynats.Components;
+using lazynats.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 

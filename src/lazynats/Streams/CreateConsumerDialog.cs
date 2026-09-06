@@ -55,7 +55,7 @@ internal sealed class CreateConsumerDialog: Dialog<NewConsumerOptions>
 
     public CreateConsumerDialog(NewConsumerOptions? initial = null, bool isEdit = false)
     {
-        Title = DialogText.Pad(isEdit ? "Edit Consumer" : "New Consumer");
+        Title = isEdit ? " Edit Consumer " : " New Consumer ";
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var nameLabel = new Label { Text = "Name", X = 0, Y = 0 };

@@ -1,4 +1,5 @@
 using lazynats.Components;
+using lazynats.Core;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -40,7 +41,7 @@ internal sealed class ObjectFileDialog: Dialog<ObjectFileTransfer>
     public ObjectFileDialog(bool isUpload, ObjectFileTransfer? initial = null)
     {
         _isUpload = isUpload;
-        Title = DialogText.Pad(isUpload ? "Upload Object" : "Download Object");
+        Title = isUpload ? " Upload Object " : " Download Object ";
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var keyLabel = new Label { Text = "Key", X = 0, Y = 0 };
@@ -120,8 +121,8 @@ internal sealed class ObjectFileDialog: Dialog<ObjectFileTransfer>
     private void Browse()
     {
         FileDialog picker = _isUpload
-            ? new OpenDialog { Title = DialogText.Pad("Select File"), OpenMode = OpenMode.File, MustExist = true }
-            : new SaveDialog { Title = DialogText.Pad("Select File") };
+            ? new OpenDialog { Title = " Select File ", OpenMode = OpenMode.File, MustExist = true }
+            : new SaveDialog { Title = " Select File " };
 
         if (_pathField.Text.Length > 0) picker.Path = _pathField.Text;
 

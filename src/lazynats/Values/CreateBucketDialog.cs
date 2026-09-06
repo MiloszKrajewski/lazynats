@@ -27,7 +27,7 @@ internal sealed class CreateBucketDialog: Dialog<NewBucketOptions>
 
     public CreateBucketDialog(NewBucketOptions? initial = null, bool isEdit = false)
     {
-        Title = DialogText.Pad(isEdit ? "Edit Bucket" : "New Bucket");
+        Title = isEdit ? " Edit Bucket " : " New Bucket ";
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var nameLabel = new Label { Text = "Name", X = 0, Y = 0 };

@@ -22,7 +22,7 @@ internal sealed class ShortcutPickerDialog: Dialog<ShortcutHint?>
 {
     public ShortcutPickerDialog(IEnumerable<ShortcutHint> hints)
     {
-        Title = DialogText.Pad("Shortcuts");
+        Title = " Shortcuts ";
         Padding.Thickness = new Thickness(1, 0, 1, 0);
 
         var sorted = hints.OrderBy(hint => hint.Text, StringComparer.OrdinalIgnoreCase).ToList();

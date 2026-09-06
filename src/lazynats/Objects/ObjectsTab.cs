@@ -251,7 +251,7 @@ internal sealed class ObjectsTab: View, IShortcutSource
             _ = RefreshListAsync(options.Name);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Create Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Create Bucket Failed ", ex.Message.Pad(), "_Ok");
                 OpenCreateBucketDialog(options);
             });
         }
@@ -293,7 +293,7 @@ internal sealed class ObjectsTab: View, IShortcutSource
             _ = RefreshListAsync(edited.Name);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Edit Bucket Failed ", ex.Message.Pad(), "_Ok");
                 OpenEditBucketDialog(original, edited);
             });
         }
@@ -308,8 +308,8 @@ internal sealed class ObjectsTab: View, IShortcutSource
         var name = item.Name;
 
         var choice = MessageBox.Query(
-            App!, DialogText.Pad("Delete Bucket"),
-            DialogText.Pad($"Delete bucket '{name}'? This cannot be undone."),
+            App!, " Delete Bucket ",
+            $"Delete bucket '{name}'? This cannot be undone.".Pad(),
             "_Delete", "_Cancel");
         if (choice != 0) return;
 
@@ -319,7 +319,7 @@ internal sealed class ObjectsTab: View, IShortcutSource
             await _obj.DeleteObjectStore(name, default);
             _ = RefreshListAsync(neighborName);
         } catch (Exception ex) {
-            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Bucket Failed"), DialogText.Pad(ex.Message), "_Ok"));
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, " Delete Bucket Failed ", ex.Message.Pad(), "_Ok"));
         }
     }
 
@@ -327,7 +327,7 @@ internal sealed class ObjectsTab: View, IShortcutSource
     // BucketName's comment.
     private async Task<IList<ObjBucketItem>> FetchBucketsAsync() =>
         await _jetStream.ListStreamsAsync().ToObservable()
-            .Select(stream => (Name: BucketName.TryGetObjBucketName(stream.Info.Config), stream.Info))
+            .Select(stream => (Name: stream.Info.Config.TryGetObjBucketName(), stream.Info))
             .Where(x => x.Name is not null)
             .Select(x => new ObjBucketItem(x.Name!, x.Info))
             .ToList();
@@ -407,7 +407,7 @@ internal sealed class ObjectsTab: View, IShortcutSource
             _ = RefreshObjectListAsync(options.Key);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Upload Object Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Upload Object Failed ", ex.Message.Pad(), "_Ok");
                 OpenUploadDialog(options);
             });
         }
@@ -439,7 +439,7 @@ internal sealed class ObjectsTab: View, IShortcutSource
             await store.GetAsync(options.Key, stream, leaveOpen: false);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Download Object Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Download Object Failed ", ex.Message.Pad(), "_Ok");
                 OpenDownloadDialog(bucket, options);
             });
         }
@@ -454,8 +454,8 @@ internal sealed class ObjectsTab: View, IShortcutSource
         if (_objectListView.SelectedObject is not { } name) return;
 
         var choice = MessageBox.Query(
-            App!, DialogText.Pad("Delete Object"),
-            DialogText.Pad($"Delete object '{name}'? This cannot be undone."),
+            App!, " Delete Object ",
+            $"Delete object '{name}'? This cannot be undone.".Pad(),
             "_Delete", "_Cancel");
         if (choice != 0) return;
 
@@ -466,7 +466,7 @@ internal sealed class ObjectsTab: View, IShortcutSource
             await store.DeleteAsync(name);
             _ = RefreshObjectListAsync(neighborName);
         } catch (Exception ex) {
-            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Object Failed"), DialogText.Pad(ex.Message), "_Ok"));
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, " Delete Object Failed ", ex.Message.Pad(), "_Ok"));
         }
     }
 }

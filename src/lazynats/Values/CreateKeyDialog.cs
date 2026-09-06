@@ -26,7 +26,7 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
 
     public CreateKeyDialog(NewKeyOptions? initial = null, bool isEdit = false)
     {
-        Title = DialogText.Pad(isEdit ? "Edit Key" : "New Key");
+        Title = isEdit ? " Edit Key " : " New Key ";
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var nameLabel = new Label { Text = "Name", X = 0, Y = 0 };

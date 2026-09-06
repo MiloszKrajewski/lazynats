@@ -1,4 +1,4 @@
-namespace lazynats.Components;
+namespace lazynats.Core;
 
 // NATS JetStream server sentinel values for "no limit is enforced" differ by field type: -1 for
 // count fields, TimeSpan.Zero for duration fields (see openspec/changes/clarify-unlimited-detail-

@@ -32,7 +32,7 @@ internal sealed class PublishDialog: Dialog
     public PublishDialog(NatsConnection connection)
     {
         _connection = connection;
-        Title = DialogText.Pad("Publish");
+        Title = " Publish ";
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var subjectLabel = new Label { Text = "Subject", X = 0, Y = 0 };

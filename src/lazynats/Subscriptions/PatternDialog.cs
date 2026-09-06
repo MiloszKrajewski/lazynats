@@ -1,4 +1,5 @@
 using lazynats.Components;
+using lazynats.Core;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
@@ -27,7 +28,7 @@ internal sealed class PatternDialog: Dialog<string>
     // non-empty-only behavior for SubscriptionsView's plain-NATS-subject use.
     public PatternDialog(string title, string initialPattern, bool allowEmpty = false, Func<string, bool>? validator = null)
     {
-        Title = DialogText.Pad(title);
+        Title = title.Pad();
         Padding.Thickness = new Thickness(1, 0, 1, 0);
         _allowEmpty = allowEmpty;
         _validator = validator;

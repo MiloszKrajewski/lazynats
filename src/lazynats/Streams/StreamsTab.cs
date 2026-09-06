@@ -238,7 +238,7 @@ internal sealed class StreamsTab: View, IShortcutSource
         catch (Exception ex)
         {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Create Stream Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Create Stream Failed ", ex.Message.Pad(), "_Ok");
                 OpenCreateStreamDialog(options);
             });
         }
@@ -266,7 +266,7 @@ internal sealed class StreamsTab: View, IShortcutSource
         {
             App?.Invoke(() => {
                 MessageBox.ErrorQuery(
-                    App!, DialogText.Pad("Create Consumer Failed"), DialogText.Pad(ex.Message), "_Ok");
+                    App!, " Create Consumer Failed ", ex.Message.Pad(), "_Ok");
                 OpenCreateConsumerDialog(options);
             });
         }
@@ -311,7 +311,7 @@ internal sealed class StreamsTab: View, IShortcutSource
         catch (Exception ex)
         {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Stream Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Edit Stream Failed ", ex.Message.Pad(), "_Ok");
                 OpenEditStreamDialog(original, edited);
             });
         }
@@ -353,7 +353,7 @@ internal sealed class StreamsTab: View, IShortcutSource
         catch (Exception ex)
         {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Consumer Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Edit Consumer Failed ", ex.Message.Pad(), "_Ok");
                 OpenEditConsumerDialog(stream, original, edited);
             });
         }
@@ -364,8 +364,8 @@ internal sealed class StreamsTab: View, IShortcutSource
         if (_listView.SelectedStream?.Config.Name is not { } name) return;
 
         var choice = MessageBox.Query(
-            App!, DialogText.Pad("Delete Stream"),
-            DialogText.Pad($"Delete stream '{name}'? This cannot be undone."),
+            App!, " Delete Stream ",
+            $"Delete stream '{name}'? This cannot be undone.".Pad(),
             "_Delete", "_Cancel");
         if (choice != 0) return;
 
@@ -379,7 +379,7 @@ internal sealed class StreamsTab: View, IShortcutSource
         catch (Exception ex)
         {
             App?.Invoke(() => MessageBox.ErrorQuery(
-                App!, DialogText.Pad("Delete Stream Failed"), DialogText.Pad(ex.Message), "_Ok"));
+                App!, " Delete Stream Failed ", ex.Message.Pad(), "_Ok"));
         }
     }
 
@@ -391,8 +391,8 @@ internal sealed class StreamsTab: View, IShortcutSource
         if (_consumerListView.SelectedConsumer?.Name is not { } name) return;
 
         var choice = MessageBox.Query(
-            App!, DialogText.Pad("Delete Consumer"),
-            DialogText.Pad($"Delete consumer '{name}'? This cannot be undone."),
+            App!, " Delete Consumer ",
+            $"Delete consumer '{name}'? This cannot be undone.".Pad(),
             "_Delete", "_Cancel");
         if (choice != 0) return;
 
@@ -406,7 +406,7 @@ internal sealed class StreamsTab: View, IShortcutSource
         catch (Exception ex)
         {
             App?.Invoke(() => MessageBox.ErrorQuery(
-                App!, DialogText.Pad("Delete Consumer Failed"), DialogText.Pad(ex.Message), "_Ok"));
+                App!, " Delete Consumer Failed ", ex.Message.Pad(), "_Ok"));
         }
     }
 
@@ -424,8 +424,8 @@ internal sealed class StreamsTab: View, IShortcutSource
             .ToList();
 
     private static bool IsRegularStream(INatsJSStream stream) =>
-        BucketName.TryGetKvBucketName(stream.Info.Config) is null &&
-        BucketName.TryGetObjBucketName(stream.Info.Config) is null;
+        stream.Info.Config.TryGetKvBucketName() is null &&
+        stream.Info.Config.TryGetObjBucketName() is null;
 
     // `selectName` highlights a specific stream after the refresh (used right after a create, so
     // the new stream is selected instead of ReplaceItems' default "keep whatever was highlighted

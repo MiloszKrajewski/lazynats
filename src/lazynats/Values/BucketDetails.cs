@@ -1,4 +1,5 @@
 using lazynats.Components;
+using lazynats.Core;
 using NATS.Client.KeyValueStore;
 
 namespace lazynats.Values;
@@ -27,7 +28,7 @@ internal sealed class BucketDetails: PollingDetailsView<string, NatsKVStatus>
         var ttlLimit = status.LimitMarkerTTL > TimeSpan.Zero ? status.LimitMarkerTTL.ToString() : "(none)";
 
         return [
-            ("Bucket", BucketName.TryGetKvBucketName(config)!),
+            ("Bucket", config.TryGetKvBucketName() ?? "(unknown)"),
             ("Compressed", status.IsCompressed.ToString()),
             ("TTL Limit", ttlLimit),
             (string.Empty, string.Empty),

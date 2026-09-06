@@ -253,7 +253,7 @@ internal sealed class ValuesTab: View, IShortcutSource
             _ = RefreshListAsync(options.Name);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Create Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Create Bucket Failed ", ex.Message.Pad(), "_Ok");
                 OpenCreateBucketDialog(options);
             });
         }
@@ -334,7 +334,7 @@ internal sealed class ValuesTab: View, IShortcutSource
             _ = RefreshListAsync(edited.Name);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Edit Bucket Failed ", ex.Message.Pad(), "_Ok");
                 OpenEditBucketDialog(item, original, edited);
             });
         }
@@ -349,8 +349,8 @@ internal sealed class ValuesTab: View, IShortcutSource
         var name = item.Name;
 
         var choice = MessageBox.Query(
-            App!, DialogText.Pad("Delete Bucket"),
-            DialogText.Pad($"Delete bucket '{name}'? This cannot be undone."),
+            App!, " Delete Bucket ",
+            $"Delete bucket '{name}'? This cannot be undone.".Pad(),
             "_Delete", "_Cancel");
         if (choice != 0) return;
 
@@ -360,7 +360,7 @@ internal sealed class ValuesTab: View, IShortcutSource
             await _kv.DeleteStoreAsync(name);
             _ = RefreshListAsync(neighborName);
         } catch (Exception ex) {
-            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Bucket Failed"), DialogText.Pad(ex.Message), "_Ok"));
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, " Delete Bucket Failed ", ex.Message.Pad(), "_Ok"));
         }
     }
 
@@ -368,7 +368,7 @@ internal sealed class ValuesTab: View, IShortcutSource
     // BucketName's comment.
     private async Task<IList<KvBucketItem>> FetchBucketsAsync() =>
         await _kv.GetStatusesAsync().ToObservable()
-            .Select(status => (Name: BucketName.TryGetKvBucketName(status.Info.Config), Status: status))
+            .Select(status => (Name: status.Info.Config.TryGetKvBucketName(), Status: status))
             .Where(x => x.Name is not null)
             .Select(x => new KvBucketItem(x.Name!, x.Status))
             .ToList();
@@ -461,7 +461,7 @@ internal sealed class ValuesTab: View, IShortcutSource
             _ = RefreshKeyListAsync(options.Name);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Create Key Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Create Key Failed ", ex.Message.Pad(), "_Ok");
                 OpenCreateKeyDialog(options);
             });
         }
@@ -517,7 +517,7 @@ internal sealed class ValuesTab: View, IShortcutSource
             _ = RefreshKeyListAsync(key);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Key Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(App!, " Edit Key Failed ", ex.Message.Pad(), "_Ok");
                 OpenEditKeyDialog(bucket, key, edited);
             });
         }
@@ -534,8 +534,8 @@ internal sealed class ValuesTab: View, IShortcutSource
         if (_keyListView.SelectedKey is not { } key) return;
 
         var choice = MessageBox.Query(
-            App!, DialogText.Pad("Delete Key"),
-            DialogText.Pad($"Delete key '{key}'? This cannot be undone."),
+            App!, " Delete Key ",
+            $"Delete key '{key}'? This cannot be undone.".Pad(),
             "_Delete", "_Cancel");
         if (choice != 0) return;
 
@@ -546,7 +546,7 @@ internal sealed class ValuesTab: View, IShortcutSource
             await store.DeleteAsync(key);
             _ = RefreshKeyListAsync(neighborKey);
         } catch (Exception ex) {
-            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Key Failed"), DialogText.Pad(ex.Message), "_Ok"));
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, " Delete Key Failed ", ex.Message.Pad(), "_Ok"));
         }
     }
 }

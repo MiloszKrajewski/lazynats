@@ -28,7 +28,7 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
 
     public CreateStreamDialog(NewStreamOptions? initial = null, bool isEdit = false)
     {
-        Title = DialogText.Pad(isEdit ? "Edit Stream" : "New Stream");
+        Title = isEdit ? " Edit Stream " : " New Stream ";
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var nameLabel = new Label { Text = "Name", X = 0, Y = 0 };

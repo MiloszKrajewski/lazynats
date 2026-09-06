@@ -1,4 +1,5 @@
 using lazynats.Components;
+using lazynats.Core;
 using NATS.Client.ObjectStore;
 
 namespace lazynats.Objects;
@@ -29,7 +30,7 @@ internal sealed class BucketDetails: PollingDetailsView<string, NatsObjStatus>
         return [
             // status.Bucket is the raw, unstripped stream name (same caveat as NatsKVStatus.Bucket
             // - see Components/BucketName.cs), so go through BucketName.TryGetObjBucketName instead.
-            ("Bucket", BucketName.TryGetObjBucketName(config)!),
+            ("Bucket", config.TryGetObjBucketName() ?? "(unknown)"),
             ("Compressed", status.IsCompressed.ToString()),
             (string.Empty, string.Empty),
             // State.Messages counts stream messages, not necessarily distinct live objects - same
