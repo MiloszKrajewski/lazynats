@@ -1,10 +1,21 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net462;netstandard2.0;net6.0;net8.0</TargetFrameworks>
-    <IsPackable>true</IsPackable>
-    <SignAssembly>true</SignAssembly>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
-  <Import Project="$(PublicAssemblyProps)"/>
+  <ItemGroup>
+    <PackageReference Include="NATS.Client.JetStream" Version="2.8.2" />
+    <PackageReference Include="NATS.Client.KeyValueStore" Version="2.8.2" />
+    <PackageReference Include="NATS.Client.ObjectStore" Version="2.8.2" />
+    <PackageReference Include="System.Reactive" Version="6.1.0" />
+    <PackageReference Include="Terminal.Gui" Version="2.4.10" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+  </ItemGroup>
+
 </Project>
