@@ -215,7 +215,7 @@ internal sealed class StreamsTab: View
             "_Delete", "_Cancel");
         if (choice != 0) return;
 
-        var neighborName = NeighborStreamName(name);
+        var neighborName = _listView.NeighborIdentity(name);
 
         try {
             await _jetStream.DeleteStreamAsync(name);
@@ -223,22 +223,6 @@ internal sealed class StreamsTab: View
         } catch (Exception ex) {
             App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Stream Failed"), DialogText.Pad(ex.Message), "_Ok"));
         }
-    }
-
-    // The stream below `name` in the current (pre-delete) list, or the one above it if `name` is
-    // last, so deleting keeps the highlight near where it was instead of falling back to
-    // ReplaceItems' default "identity gone -> first item" behavior (see DrillableListView<T>).
-    private string? NeighborStreamName(string name)
-    {
-        var index = -1;
-        for (var i = 0; i < _items.Count; i++) {
-            if (_items[i].Config.Name != name) continue;
-            index = i;
-            break;
-        }
-        if (index < 0) return null;
-        if (index + 1 < _items.Count) return _items[index + 1].Config.Name;
-        return index - 1 >= 0 ? _items[index - 1].Config.Name : null;
     }
 
     // Scoped to _currentStream at call time, same as TryCreateConsumerAsync - the consumer-level
@@ -254,7 +238,7 @@ internal sealed class StreamsTab: View
             "_Delete", "_Cancel");
         if (choice != 0) return;
 
-        var neighborName = NeighborConsumerName(name);
+        var neighborName = _consumerListView.NeighborIdentity(name);
 
         try {
             await _jetStream.DeleteConsumerAsync(stream, name);
@@ -262,21 +246,6 @@ internal sealed class StreamsTab: View
         } catch (Exception ex) {
             App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Consumer Failed"), DialogText.Pad(ex.Message), "_Ok"));
         }
-    }
-
-    // The consumer below `name` in the current (pre-delete) list, or the one above it if `name` is
-    // last, mirroring NeighborStreamName.
-    private string? NeighborConsumerName(string name)
-    {
-        var index = -1;
-        for (var i = 0; i < _consumerItems.Count; i++) {
-            if (_consumerItems[i].Name != name) continue;
-            index = i;
-            break;
-        }
-        if (index < 0) return null;
-        if (index + 1 < _consumerItems.Count) return _consumerItems[index + 1].Name;
-        return index - 1 >= 0 ? _consumerItems[index - 1].Name : null;
     }
 
     // `selectName` highlights a specific stream after the refresh (used right after a create, so

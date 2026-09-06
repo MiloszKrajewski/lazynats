@@ -23,6 +23,16 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
     public event Action? RefreshRequested;
     public event Action<T?>? HighlightChanged;
 
+    // Raised only once the corresponding Enable* helper below has been called by a subclass - see
+    // EnableDescend/EnableAscend/EnableCreateDelete.
+    public event Action? DescendRequested;
+    public event Action? AscendRequested;
+    public event Action? CreateRequested;
+    public event Action? DeleteRequested;
+
+    private bool _ascendEnabled;
+    private bool _createDeleteEnabled;
+
     protected DrillableListView(ObservableCollection<T> items)
     {
         CanFocus = true;
@@ -57,10 +67,46 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
     protected abstract string EmptyHintText { get; }
     protected abstract string GetIdentity(T item);
 
-    // Exposed so a subclass can bind its own level-specific commands (e.g. Enter -> descend) on
-    // the inner ListView, the same way ConsumerListView binds Esc/Backspace on this component
-    // itself via the inherited AddCommand/KeyBindings.
+    // Exposed so a subclass can bind its own level-specific commands beyond the three shared
+    // shapes below directly on the inner ListView, the same way those shapes bind Esc/Backspace/
+    // Ctrl+N/Ctrl+D on this component itself via the inherited AddCommand/KeyBindings.
     protected ListView ListView => _listView;
+
+    // Opt-in shared navigation shapes, called from a subclass constructor to activate exactly the
+    // ones that subclass needs - independent of each other, so activating one has no effect on
+    // whether another is active (see openspec/specs/drillable-list/spec.md's "Shared ... Wiring"
+    // requirements). A subclass composes at most one of EnableDescend/EnableAscend, plus
+    // optionally EnableCreateDelete.
+
+    // Enter -> DescendRequested.
+    protected void EnableDescend() => _listView.Accepted += (_, _) => DescendRequested?.Invoke();
+
+    // Esc/Backspace -> AscendRequested, plus an Esc "Back" Shortcuts hint.
+    protected void EnableAscend()
+    {
+        _ascendEnabled = true;
+        AddCommand(Command.Cancel, () => { AscendRequested?.Invoke(); return true; });
+        KeyBindings.Add(Key.Esc, Command.Cancel);
+        KeyBindings.Add(Key.Backspace, Command.Cancel);
+    }
+
+    // Ctrl+N -> CreateRequested, Ctrl+D -> DeleteRequested, plus "New"/"Delete" Shortcuts hints.
+    protected void EnableCreateDelete()
+    {
+        _createDeleteEnabled = true;
+
+        // The inner ListView's own DefaultKeyBindings alias Ctrl+N to Command.Down (Emacs-style
+        // "next"), on top of the Down arrow key. It's the actual focus target, so left in place it
+        // would consume Ctrl+N before this component's own binding below ever sees it. Down arrow
+        // itself is untouched - only the redundant Ctrl+N alias for the same command is removed.
+        _listView.KeyBindings.Remove(Key.N.WithCtrl);
+
+        AddCommand(Command.New, () => { CreateRequested?.Invoke(); return true; });
+        KeyBindings.Add(Key.N.WithCtrl, Command.New);
+
+        AddCommand(Command.DeleteAll, () => { DeleteRequested?.Invoke(); return true; });
+        KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
+    }
 
     public T? SelectedItem =>
         _listView.SelectedItem is { } index and >= 0 && index < _items.Count ? _items[index] : default;
@@ -88,6 +134,17 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
             if (GetIdentity(_items[i]) == identity) return i;
 
         return -1;
+    }
+
+    // The identity of the item after `identity` in the current list, or the one before it if
+    // `identity` is last, or null if `identity` isn't present or the list would be emptied - used
+    // by an owning tab to refocus a neighbor after deleting the item at `identity`.
+    public string? NeighborIdentity(string identity)
+    {
+        var index = IndexOfIdentity(identity);
+        if (index < 0) return null;
+        if (index + 1 < _items.Count) return GetIdentity(_items[index + 1]);
+        return index - 1 >= 0 ? GetIdentity(_items[index - 1]) : null;
     }
 
     private Color? _background;
@@ -135,11 +192,21 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
         UpdateEmptyHintScheme();
     }
 
-    // Just the Ctrl+R hint - a subclass with its own navigation commands (e.g. ConsumerListView's
-    // Esc/Backspace) appends to this via `base.Shortcuts.Append(...)` rather than replacing it.
-    public virtual IEnumerable<ShortcutHint> Shortcuts => [
-        new(Key.R.WithCtrl, "Refresh", () => RefreshRequested?.Invoke()),
-    ];
+    // Ctrl+R plus whatever hints the enabled shared shapes (EnableAscend/EnableCreateDelete)
+    // imply - a subclass with its own navigation commands beyond those shapes still appends to
+    // this via `base.Shortcuts.Append(...)` rather than replacing it.
+    public virtual IEnumerable<ShortcutHint> Shortcuts
+    {
+        get
+        {
+            IEnumerable<ShortcutHint> hints = [new(Key.R.WithCtrl, "Refresh", () => RefreshRequested?.Invoke())];
+            if (_ascendEnabled) hints = hints.Append(new ShortcutHint(Key.Esc, "Back", () => AscendRequested?.Invoke()));
+            if (_createDeleteEnabled) hints = hints
+                .Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()))
+                .Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
+            return hints;
+        }
+    }
 
     protected override void Dispose(bool disposing)
     {
