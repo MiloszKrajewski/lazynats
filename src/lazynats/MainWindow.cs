@@ -1,5 +1,4 @@
 ﻿using lazynats.Components;
-using lazynats.Core;
 using lazynats.LiveFeed;
 using lazynats.Objects;
 using lazynats.Publish;
@@ -49,8 +48,7 @@ internal sealed class MainWindow: Runnable
         tabs.SelectTab(subscribeTab);
 
         var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
-        liveUpdates.ItemSelected += envelope => MessageBox.Query(
-            App!, " Selected ", envelope.Message.Subject.Pad(), "_Ok");
+        liveUpdates.ItemSelected += envelope => App!.Run(new MessageDetailDialog(envelope));
 
         // Dim.Fill(1) leaves the bottom row free for the StatusBar, which sits outside this frame.
         var feedFrame = new FrameView

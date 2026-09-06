@@ -30,8 +30,8 @@ instance.
 
 **Note:** the paste symptom cannot be reproduced through a terminal multiplexer's synthetic
 bracketed-paste injection (e.g. `tmux send-keys` / `paste-buffer`) - only a real terminal's own
-Ctrl+V reproduces it. The cursor symptom has no such limitation and is the more reliable of the
-two to demonstrate (e.g. in a GIF) - both come from the same root cause, see `../report.md`.
+Ctrl+V reproduces it. The paste symptom comes from the stale tracked focus described in
+`../report.md`.
 
 `SimpleFrame` (in `Program.cs`) is a stand-in for the reporting app's own wrapper view, stripped
 to the one piece of shape relevant to this bug: `CanFocus = true` with no focusable content of
