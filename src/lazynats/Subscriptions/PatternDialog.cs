@@ -1,3 +1,4 @@
+using lazynats.Components;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
@@ -12,9 +13,10 @@ namespace lazynats.Subscriptions;
 // Dialog<TResult>'s own default accept handling and closes the dialog regardless of validity.
 internal sealed class PatternDialog: Dialog<string>
 {
-    private static readonly Attribute InvalidPatternAttribute = new(ColorName16.Red, ColorName16.DarkGray);
+    private static readonly Attribute InvalidPatternAttribute = new(ColorName16.Red, Theme.EditableBackground);
 
     private readonly TextField _patternField;
+    private readonly EditFrame _patternFrame;
 
     public PatternDialog(string title, string initialPattern)
     {
@@ -22,7 +24,7 @@ internal sealed class PatternDialog: Dialog<string>
         Padding.Thickness = new Thickness(1, 0, 1, 0);
 
         var patternLabel = new Label { Text = "Pattern", X = 0, Y = 0 };
-        _patternField = new TextField { X = 0, Y = 1, Width = 40, Text = initialPattern };
+        _patternField = new TextField { Text = initialPattern };
         _patternField.ValueChanged += (_, _) => UpdateValidity();
         _patternField.Accepting += (_, e) => {
             e.Handled = true;
@@ -30,7 +32,16 @@ internal sealed class PatternDialog: Dialog<string>
             Result = _patternField.Text.Trim();
             RequestStop();
         };
-        Add(patternLabel, _patternField);
+        // A bare TextField only paints under its own text - width beyond that (notably the whole
+        // field when empty/invalid) would otherwise show through to the dialog's own background
+        // instead of reading as an editable region. EditFrame's own fill covers that regardless of
+        // content (see openspec/changes/add-dark-theme).
+        var patternBackground = _patternField.GetAttributeForRole(VisualRole.Editable).Background;
+        _patternFrame = new EditFrame(_patternField) {
+            X = 0, Y = 1, Width = 43, Height = 3,
+            InnerBackgroundNormal = patternBackground, InnerBackgroundFocused = patternBackground,
+        };
+        Add(patternLabel, _patternFrame);
 
         UpdateValidity();
     }
@@ -38,6 +49,10 @@ internal sealed class PatternDialog: Dialog<string>
     private void UpdateValidity()
     {
         var valid = _patternField.Text.Trim().Length > 0;
-        _patternField.SetScheme(valid ? null : new Scheme(InvalidPatternAttribute));
+        // new Scheme(Attribute)'s single-value constructor derives Editable independently and
+        // silently drops our background (defaults it to Black) - re-set Editable explicitly so
+        // invalid state only changes the foreground, never the background (EditFrame's own
+        // background is never touched here either, for the same reason).
+        _patternField.SetScheme(valid ? null : new Scheme(InvalidPatternAttribute) { Editable = InvalidPatternAttribute });
     }
 }

@@ -62,7 +62,9 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
 
     // Independent of any implicitly inherited scheme, so callers (e.g. EditFrame) can pair this
     // list visually with other edit controls. Unset (null) leaves prior inherited-scheme behavior
-    // untouched.
+    // untouched. Applies to the empty-hint overlay too - it fully covers the list while empty, so
+    // leaving it on its own unrelated (Disabled-role) background would defeat the point of setting
+    // this in the first place.
     public Terminal.Gui.Drawing.Color? Background
     {
         get => _background;
@@ -73,6 +75,9 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
                 ? new Terminal.Gui.Drawing.Scheme(new Terminal.Gui.Drawing.Attribute(
                     _listView.GetAttributeForRole(Terminal.Gui.Drawing.VisualRole.Normal).Foreground, background))
                 : null);
+            _emptyHintLabel.SetScheme(new Terminal.Gui.Drawing.Scheme(value is { } hintBackground
+                ? new Terminal.Gui.Drawing.Attribute(GetScheme().Disabled.Foreground, hintBackground)
+                : GetScheme().Disabled));
         }
     }
 

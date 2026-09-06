@@ -10,7 +10,7 @@ namespace lazynats;
 
 internal sealed class PublishView: View
 {
-    private static readonly Attribute InvalidSubject = new(ColorName16.Red, ColorName16.DarkGray);
+    private static readonly Attribute InvalidSubject = new(ColorName16.Red, Theme.EditableBackground);
 
     private readonly NatsConnection _connection;
     private readonly ObservableCollection<HeaderPair> _headers = [];
@@ -78,8 +78,11 @@ internal sealed class PublishView: View
     {
         var valid = _subjectField.Text.Trim().Length > 0;
         _sendButton.Enabled = valid;
-        _subjectField.SetScheme(valid ? null : new Scheme(InvalidSubject));
-        _subjectFrame.InnerBackgroundOverride = valid ? null : InvalidSubject.Background;
+        // new Scheme(Attribute)'s single-value constructor derives Editable independently and
+        // silently drops our background (defaults it to Black) - re-set Editable explicitly so
+        // invalid state only changes the foreground, never the background (EditFrame's own
+        // background is never touched here either, for the same reason).
+        _subjectField.SetScheme(valid ? null : new Scheme(InvalidSubject) { Editable = InvalidSubject });
     }
 
     private void Send()
