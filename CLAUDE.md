@@ -38,6 +38,12 @@ exists today.
   `PatternDialog`).
 - Titles on bordered containers get a leading and trailing space (e.g. `" Live Feed "` in
   `MainWindow.cs`) so the border corners don't crowd the text.
+- A `Dialog<T>` subclass with a button row (`CreateStreamDialog`, `CreateConsumerDialog`,
+  `CreateBucketDialog`) gives its content area one blank row above the first field/control
+  (`Padding.Thickness` top value `1`), matching the blank row Terminal.Gui's own `AddButton()`
+  already puts above the button row, so top and bottom read as symmetrically sparse.
+  Single-field, button-less dialogs that commit on Enter (`PatternDialog`, `HeaderDialog`) are
+  exempt — they have no bottom blank row to balance against, so they stay compact.
 
 ## Architecture
 

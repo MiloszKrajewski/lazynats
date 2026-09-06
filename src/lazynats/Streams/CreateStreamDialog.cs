@@ -29,7 +29,7 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
     public CreateStreamDialog(NewStreamOptions? initial = null)
     {
         Title = DialogText.Pad("New Stream");
-        Padding.Thickness = new Thickness(1, 0, 1, 0);
+        Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var nameLabel = new Label { Text = "Name", X = 0, Y = 0 };
         _nameField = new TextField { Text = initial?.Name ?? string.Empty };
