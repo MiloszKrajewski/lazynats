@@ -92,9 +92,12 @@ internal sealed class MessageDetailDialog: Dialog, IShortcutSource
         var headerFrameHeight = headerLineCount + 2;
 
         // Empty payload bypasses the presentation concept entirely - there's nothing to classify
-        // or switch between, so no selector is offered (unchanged from prior behavior).
+        // or switch between, so no selector is offered (unchanged from prior behavior). Reuses
+        // envelope.CachedContentKind (populated by FeedRowFormatter once the row is rendered,
+        // which it always has been by the time this dialog can be opened from it) rather than
+        // reclassifying from scratch, avoiding a redundant probe pass over the same bytes.
         var hasPayload = _payloadData.Length > 0;
-        var contentKind = hasPayload ? PayloadContentProbe.Classify(_payloadData) : default;
+        var contentKind = hasPayload ? envelope.CachedContentKind ??= PayloadContentProbe.Classify(_payloadData) : default;
         _allowedPresentationTypes = hasPayload ? PayloadPresentation.AllowedTypes(contentKind) : [];
         var defaultType = hasPayload ? PayloadPresentation.DefaultType(contentKind) : default;
 

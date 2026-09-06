@@ -34,6 +34,72 @@ internal static class PayloadPresentation
     private const int MinBase64LineWidth = 24;
     private const int MaxBase64LineWidth = 144;
 
+    // Compact, single-line counterpart to Render(...) above - for a display context with limited
+    // horizontal space and no line wrapping (a feed row), not the dialog's width-wrapped output.
+    // `kind` is the payload's own PayloadContentProbe.Classify result (unlike Render/AllowedTypes,
+    // there's no user-selectable type here - the row always renders under its classified kind).
+    // `maxLength` caps the body (post-prefix) only; the prefix is always shown in full.
+    public static string RenderSingleLine(byte[] data, PayloadContentKind kind, int maxLength) => kind switch
+    {
+        PayloadContentKind.Json => "(json) " + Cap(RenderMinifiedJson(data), maxLength),
+        PayloadContentKind.Utf8Text => "(text) " + Cap(CollapseWhitespace(Encoding.UTF8.GetString(data)), maxLength),
+        PayloadContentKind.Binary => "(blob) " + RenderHexBudgeted(data, maxLength),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+    };
+
+    // No Indented option (defaults to false) - the minified counterpart to RenderJson's indented
+    // re-serialization.
+    private static string RenderMinifiedJson(byte[] data)
+    {
+        var text = Encoding.UTF8.GetString(data);
+        using var document = JsonDocument.Parse(text);
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+            document.RootElement.WriteTo(writer);
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    // Collapses every maximal run of whitespace/control characters to a single space. IsControl
+    // covers the tab/newline/carriage-return PayloadContentProbe.Classify exempts from its
+    // Binary-rejection check; IsWhiteSpace covers everything else (plain space and beyond).
+    private static string CollapseWhitespace(string text)
+    {
+        var builder = new StringBuilder(text.Length);
+        var inRun = false;
+        foreach (var c in text)
+        {
+            if (char.IsWhiteSpace(c) || char.IsControl(c))
+            {
+                if (!inRun)
+                {
+                    builder.Append(' ');
+                    inRun = true;
+                }
+            }
+            else
+            {
+                builder.Append(c);
+                inRun = false;
+            }
+        }
+        return builder.ToString();
+    }
+
+    // Byte-budgeted before encoding, per payload-presentation's "Binary Single-Line Rendering Is
+    // Byte-Budgeted Before Encoding" requirement - only ever touches the leading bytes that could
+    // possibly fit within maxLength once hex-encoded (two chars/byte, no separators).
+    private static string RenderHexBudgeted(byte[] data, int maxLength)
+    {
+        var maxBytes = maxLength / 2;
+        var count = Math.Min(data.Length, maxBytes);
+        var builder = new StringBuilder(count * 2);
+        for (var i = 0; i < count; i++)
+            builder.Append(data[i].ToString("X2"));
+        return builder.ToString();
+    }
+
+    private static string Cap(string text, int maxLength) => text.Length <= maxLength ? text : text[..maxLength];
+
     // Callers are responsible for only requesting a type from AllowedTypes(kind) for this payload's
     // own classification - rendering an out-of-set combination (e.g. Json for non-JSON bytes) is
     // not a supported operation, per the payload-presentation spec. `width` is the payload
