@@ -5,12 +5,21 @@ for now is 70/30, but I will need to see it live to decide.
 
 # Management part
 
-Management has tab.
-* Subscriptions (live NATS monitoring)
-* Streams (durable streams)
-* Consumers (durable consumers on streams)
-* KV stores (key/value stores)
-* OBJ stores (object stores)
+Management has tabs, each with a dedicated Alt+letter shortcut to switch to it directly from
+anywhere in the app (only Subscribe and Publish exist today; the rest are reserved for when their
+tabs are built, so future additions don't collide):
+
+| Tab | Title | Shortcut |
+|---|---|---|
+| Subscribe (live NATS monitoring) | `Su[b]scribe` | Alt+B |
+| Publish | `[P]ublish` | Alt+P |
+| Streams (durable streams) | `[S]treams` | Alt+S |
+| Consumers (durable consumers on streams) | `[C]onsumers` | Alt+C |
+| KV stores (key/value stores) | `[K]V` | Alt+K |
+| OBJ stores (object stores) | `[O]BJ` | Alt+O |
+
+"Subscribe"/"Publish" are a matched verb pair (NATS's own `nats sub`/`nats pub` vocabulary).
+Subscribe uses Alt+B rather than Alt+S so it doesn't collide with Streams.
 
 Not decided: do consumers have their own tab or are part os streams tab
 

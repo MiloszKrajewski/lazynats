@@ -30,15 +30,15 @@ The system SHALL allow the user to delete an active subscription, which SHALL st
 
 ### Requirement: Modifying a Subscription Pattern
 The system SHALL provide a Ctrl+E convenience for changing an active subscription's pattern: it SHALL
-load the selected subscription's pattern into the input for editing, and on commit SHALL remove the
-existing subscription and add a new one with the edited pattern. This SHALL NOT preserve the
-subscription's identity — the new subscription SHALL be assigned a different `Guid` than the one it
-replaces — since a NATS subscription cannot be altered in place. The same effect SHALL also remain
-achievable via separate delete and add actions, without using Ctrl+E.
+open a modal pre-filled with the selected subscription's pattern for editing, and on commit SHALL
+remove the existing subscription and add a new one with the edited pattern. This SHALL NOT preserve
+the subscription's identity — the new subscription SHALL be assigned a different `Guid` than the one
+it replaces — since a NATS subscription cannot be altered in place. The same effect SHALL also
+remain achievable via separate delete and add actions, without using Ctrl+E.
 
-#### Scenario: Ctrl+E loads a pattern for editing
+#### Scenario: Ctrl+E opens a modal pre-filled with the selected pattern
 - **WHEN** the user selects an active subscription and presses Ctrl+E
-- **THEN** that subscription's pattern is loaded into the input for editing
+- **THEN** a modal opens pre-filled with that subscription's pattern for editing
 
 #### Scenario: Committing an edit replaces the subscription with a new identity
 - **WHEN** the user has loaded a subscription's pattern via Ctrl+E, changes the pattern text, and

@@ -10,12 +10,12 @@ internal sealed class SubscriptionsView: ListEditorView<SubscriptionInfo>
     private readonly SubscriptionRegistry _registry;
     private readonly ObservableCollection<SubscriptionInfo> _items;
 
-    public SubscriptionsView(SubscriptionRegistry registry): 
+    public SubscriptionsView(SubscriptionRegistry registry):
         this(registry, new ObservableCollection<SubscriptionInfo>(registry.Active)) { }
 
     private SubscriptionsView(
-        SubscriptionRegistry registry, 
-        ObservableCollection<SubscriptionInfo> items): 
+        SubscriptionRegistry registry,
+        ObservableCollection<SubscriptionInfo> items):
         base(items, Presenter)
     {
         _registry = registry;
@@ -23,24 +23,38 @@ internal sealed class SubscriptionsView: ListEditorView<SubscriptionInfo>
         _registry.Changed += RefreshFromRegistry;
     }
 
-    protected override void Append(string raw)
+    protected override bool TryCreate(out SubscriptionInfo result) =>
+        TryEditPattern("New Subscription", string.Empty, out result);
+
+    protected override bool TryEdit(SubscriptionInfo original, out SubscriptionInfo result) =>
+        TryEditPattern("Edit Subscription", original.Pattern, out result);
+
+    private bool TryEditPattern(string title, string initialPattern, out SubscriptionInfo result)
     {
-        if (!Presenter.TryParse(raw, out var value, out var error)) {
-            OnParseError(raw, error);
-            return;
+        var dialog = new PatternDialog(title, initialPattern);
+        App!.Run(dialog);
+
+        if (dialog.Result is { } pattern) {
+            result = new SubscriptionInfo(Guid.Empty, pattern);
+            return true;
         }
 
-        if (EditingIndex is { } index && index < _items.Count) _registry.Remove(_items[index].Id);
-        _registry.Add(value.Pattern);
-        ClearInput();
+        result = default!;
+        return false;
     }
 
-    protected override void Delete(int index)
+    // A NATS subscription can't be altered in place, so Add/Replace both go through the registry
+    // (add-new / remove-old-then-add-new) rather than touching `_items` directly; `_items` is kept
+    // in sync by RefreshFromRegistry reacting to the registry's own Changed event.
+    protected override void Add(SubscriptionInfo value) => _registry.Add(value.Pattern);
+
+    protected override void Replace(int index, SubscriptionInfo value)
     {
-        if (index >= _items.Count) return;
         _registry.Remove(_items[index].Id);
-        if (index == EditingIndex) ClearInput();
+        _registry.Add(value.Pattern);
     }
+
+    protected override void Delete(int index) => _registry.Remove(_items[index].Id);
 
     private void RefreshFromRegistry()
     {

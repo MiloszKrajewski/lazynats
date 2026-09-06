@@ -1,8 +1,5 @@
-# list-editor Specification
+## ADDED Requirements
 
-## Purpose
-TBD - created by archiving change add-list-editor-shortcuts. Update Purpose after archive.
-## Requirements
 ### Requirement: List-Only Layout
 The list editor SHALL present a selectable list of items and no other permanently visible editable
 control, where the list displays each item's text representation as produced by an injected
@@ -53,13 +50,7 @@ user cancelled), the item collection SHALL remain unchanged.
   (e.g. the user cancelled a modal dialog)
 - **THEN** the item collection is unchanged
 
-### Requirement: Delete Removes the Selected Item
-The list editor SHALL allow the user to remove the selected item from the item collection via
-Ctrl+D.
-
-#### Scenario: Ctrl+D removes the selected item
-- **WHEN** the user selects an existing item in the list and presses Ctrl+D
-- **THEN** that item is removed from the item collection
+## MODIFIED Requirements
 
 ### Requirement: Key Bindings Work Regardless of Focused Child
 The list editor's Ctrl+D, Ctrl+E, and Ctrl+N key bindings SHALL take effect regardless of which
@@ -102,3 +93,49 @@ their values are obtained.
   item collection asynchronously on its own
 - **THEN** the list editor does not also mutate the item collection directly for that create/edit,
   avoiding a duplicate entry
+
+## REMOVED Requirements
+
+### Requirement: Text Input and List Layout
+**Reason**: The list editor no longer has a permanently visible text input; New and Edit are now
+invoked via a modal callback instead of an inline field. Superseded by "List-Only Layout".
+**Migration**: Subclasses that displayed or relied on the shared input field must instead implement
+`TryCreate`/`TryEdit` to present their own modal.
+
+### Requirement: Append on Commit
+**Reason**: There is no inline input to commit via Enter; creation now goes through the
+`TryCreate` modal callback. Superseded by "Create via Modal Callback".
+**Migration**: Move append-time logic (e.g. parsing, side effects beyond the collection) into the
+subclass's `TryCreate` implementation.
+
+### Requirement: Edit Loads an Item for In-Place Update
+**Reason**: There is no inline input to load a value into; editing now goes through the `TryEdit`
+modal callback, which receives the item's current value directly as a parameter instead of via a
+formatted string loaded into a shared field. Superseded by "Edit via Modal Callback".
+**Migration**: Move edit-time logic into the subclass's `TryEdit` implementation, using the
+`original` parameter instead of presenter-formatted input text.
+
+### Requirement: Clear Cancels Input and Any In-Progress Edit
+**Reason**: There is no shared input or in-progress-edit state at the list-editor level to clear or
+cancel; a modal dialog's own Cancel action fills this role, scoped to that dialog.
+**Migration**: None needed at the list-editor level; a subclass's modal is responsible for its own
+cancel affordance (e.g. a Cancel button).
+
+### Requirement: Live Validation Feedback
+**Reason**: There is no inline input to validate live; validating what the user is entering is now
+the responsibility of whatever modal a subclass's `TryCreate`/`TryEdit` presents.
+**Migration**: Subclasses needing live validation feedback implement it within their own modal
+dialog.
+
+### Requirement: Parse Error on Commit
+**Reason**: There is no free-text commit path at the list-editor level to fail to parse; a modal
+either returns a valid value (success) or is cancelled (failure) — there is no third "invalid
+commit attempt" state visible to the list editor.
+**Migration**: Subclasses needing to surface a parse/validation error do so within their own modal
+dialog before allowing it to report success.
+
+### Requirement: Up at Top of List Focuses the Text Input
+**Reason**: There is no text input within the list editor to move focus to; the list is the only
+child, so there is nothing left within the component for Up at the top row to focus.
+**Migration**: None needed; Up at the top of the list is simply left unhandled by the list editor,
+same as any other key it doesn't bind.
