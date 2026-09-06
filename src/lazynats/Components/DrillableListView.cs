@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using lazynats.Core;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -219,7 +220,15 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, IFilterable
     // always had).
     private void ApplyFilterAndSelect(string query, string? preferredIdentity)
     {
-        IEnumerable<T> matches = query.Length == 0 ? _items : _items.Where(item => FuzzyMatches(query, GetIdentity(item)));
+        IEnumerable<T> matches;
+        if (query.Length == 0) {
+            matches = _items;
+        } else {
+            // Built once per query change, reused across every item, rather than re-parsed per
+            // item - see FuzzyExtensions.FuzzyToRegex.
+            var regex = query.FuzzyToRegex();
+            matches = _items.Where(item => regex.IsMatch(GetIdentity(item)));
+        }
 
         _filtered.Clear();
         foreach (var item in matches) _filtered.Add(item);
@@ -232,19 +241,6 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, IFilterable
         var index = preferredIdentity is not null ? IndexOfIdentity(_filtered, preferredIdentity) : -1;
         if (index < 0) index = IndexOfIdentity(_filtered, NearestIdentityCore(_filtered, preferredIdentity ?? string.Empty));
         _listView.SelectedItem = index;
-    }
-
-    // Case-insensitive fuzzy-subsequence match: `query`'s characters must occur in `identity`, in
-    // the same relative order, with any (including zero) characters in between - e.g. `oce`
-    // matches `OperationCancelledException`. Hand-rolled two-pointer scan rather than a library,
-    // to stay PublishAot-friendly.
-    private static bool FuzzyMatches(string query, string identity)
-    {
-        var qi = 0;
-        for (var i = 0; i < identity.Length && qi < query.Length; i++)
-            if (char.ToUpperInvariant(identity[i]) == char.ToUpperInvariant(query[qi])) qi++;
-
-        return qi == query.Length;
     }
 
     private int IndexOfIdentity(ObservableCollection<T> items, string identity)

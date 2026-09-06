@@ -13,6 +13,12 @@ internal sealed class ObjectListView: DrillableListView<string>
     // same pattern the base class's own Shortcuts doc comment describes.
     public event Action? DownloadRequested;
 
+    // Post-fetch name filter (Ctrl+F) - not a shared DrillableListView<T> Enable* shape, mirroring
+    // add-kv-key-filter's KeyListView.FilterRequested. ObjectsTab owns the actual dialog/
+    // result-narrowing in response to this event. See
+    // openspec/changes/add-obj-name-filter/design.md Decision 1.
+    public event Action? FilterRequested;
+
     public ObjectListView(ObservableCollection<string> items): base(items)
     {
         EnableAscend();
@@ -21,6 +27,11 @@ internal sealed class ObjectListView: DrillableListView<string>
 
         AddCommand(Command.Save, () => { DownloadRequested?.Invoke(); return true; });
         KeyBindings.Add(Key.S.WithCtrl, Command.Save);
+
+        // Command.Open is unused elsewhere on this view - repurposed here the same way
+        // Command.Save is repurposed above for Ctrl+S download.
+        AddCommand(Command.Open, () => { FilterRequested?.Invoke(); return true; });
+        KeyBindings.Add(Key.F.WithCtrl, Command.Open);
     }
 
     protected override IValuePresenter<string> Presenter => PresenterInstance;
@@ -30,5 +41,7 @@ internal sealed class ObjectListView: DrillableListView<string>
     public string? SelectedObject => SelectedItem;
 
     public override IEnumerable<ShortcutHint> Shortcuts =>
-        base.Shortcuts.Append(new ShortcutHint(Key.S.WithCtrl, "Download", () => DownloadRequested?.Invoke()));
+        base.Shortcuts
+            .Append(new ShortcutHint(Key.S.WithCtrl, "Download", () => DownloadRequested?.Invoke()))
+            .Append(new ShortcutHint(Key.F.WithCtrl, "Filter", () => FilterRequested?.Invoke()));
 }

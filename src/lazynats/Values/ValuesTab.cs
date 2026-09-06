@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Text;
 using lazynats.Components;
+using lazynats.Subscriptions;
 using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
 using Terminal.Gui.ViewBase;
@@ -40,6 +41,13 @@ internal sealed class ValuesTab: View
     // Null at the bucket level; the drilled-into bucket's name at the key level.
     private string? _currentBucket;
 
+    // Active server-side key filter pattern (NATS subject wildcard) for the currently
+    // drilled-into bucket, or null if unfiltered. Reset on both Descend and Ascend - a filter has
+    // no meaningful carry-over to a different bucket, or back at the bucket list. Read directly by
+    // RefreshKeyListAsync, so Ctrl+R and post-create/edit refreshes stay scoped for free. See
+    // openspec/changes/add-kv-key-filter/design.md Decision 3.
+    private string? _currentKeyFilter;
+
     public event Action<string>? StatusChanged;
 
     public ValuesTab(INatsKVContext kv)
@@ -75,6 +83,7 @@ internal sealed class ValuesTab: View
         _keyListView.CreateRequested += () => OpenCreateKeyDialog(null);
         _keyListView.DeleteRequested += () => _ = TryDeleteKeyAsync();
         _keyListView.EditRequested += OpenEditKeyDialog;
+        _keyListView.FilterRequested += OpenKeyFilterDialog;
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_bucketListFrame) + 1, Y = 0 };
         _details = new BucketDetails(_kv) { X = Pos.Right(_bucketListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -135,12 +144,15 @@ internal sealed class ValuesTab: View
 
         var name = BucketName.From(status);
         _currentBucket = name;
+        // A filter never carries over into a (possibly different) bucket entered by a fresh
+        // descent - see "Server-Side Key Filter"'s reset-on-descend requirement.
+        _currentKeyFilter = null;
         // Clear before showing - otherwise whatever a *previous* descent left behind (a different
         // bucket's keys, or a stale highlight) would flash for a frame until the fetch below
         // resolves. Clearing the list cascades into clearing the details pane too, via the same
         // HighlightChanged wiring an empty Ctrl+R result already goes through.
         _keyListView.ReplaceItems([]);
-        _listLabel.Text = $"Keys of {name}";
+        UpdateKeyListTitle();
         _detailsLabel.Text = "Key Details";
         _bucketFilterBox.Visible = false;
         _bucketListFrame.Visible = false;
@@ -162,6 +174,7 @@ internal sealed class ValuesTab: View
     private void Ascend()
     {
         _currentBucket = null;
+        _currentKeyFilter = null;
         _listLabel.Text = "Buckets";
         _detailsLabel.Text = "Details";
         _keyFilterBox.Visible = false;
@@ -326,7 +339,9 @@ internal sealed class ValuesTab: View
 
     // `selectName` mirrors RefreshListAsync's own parameter - highlights a specific key after the
     // refresh (used right after a create/edit) instead of ReplaceItems' default "keep whatever was
-    // highlighted before" fallback.
+    // highlighted before" fallback. Reads `_currentKeyFilter` directly rather than taking it as a
+    // parameter, so Ctrl+R and post-create/edit refreshes stay scoped to the active filter (if
+    // any) for free - see openspec/changes/add-kv-key-filter/design.md Decision 3.
     private async Task RefreshKeyListAsync(string? selectName = null)
     {
         if (_currentBucket is not { } bucket) return;
@@ -334,7 +349,8 @@ internal sealed class ValuesTab: View
         try {
             var store = await _kv.GetStoreAsync(bucket);
             var keys = new List<string>();
-            await foreach (var key in store.GetKeysAsync()) keys.Add(key);
+            var keySource = _currentKeyFilter is { } pattern ? store.GetKeysAsync([pattern]) : store.GetKeysAsync();
+            await foreach (var key in keySource) keys.Add(key);
             App?.Invoke(() => {
                 // The user may have ascended back out while this was in flight - only apply a
                 // result that's still for the currently-drilled-into bucket.
@@ -343,6 +359,31 @@ internal sealed class ValuesTab: View
         } catch (Exception ex) {
             App?.Invoke(() => StatusChanged?.Invoke($"Values: {ex.Message}"));
         }
+    }
+
+    // Ctrl+F at the key level. PatternDialog's allowEmpty:true lets confirming an empty pattern
+    // clear an active filter, unlike SubscriptionsView's use of the same dialog. Cancelling
+    // (Result is null) leaves _currentKeyFilter and the list unchanged.
+    private void OpenKeyFilterDialog()
+    {
+        if (_currentBucket is null) return;
+
+        var dialog = new PatternDialog("Filter Keys", _currentKeyFilter ?? string.Empty, allowEmpty: true);
+        App!.Run(dialog);
+        if (dialog.Result is not { } pattern) return;
+
+        _currentKeyFilter = pattern.Length == 0 ? null : pattern;
+        UpdateKeyListTitle();
+        _ = RefreshKeyListAsync();
+    }
+
+    // Reflects the active filter (if any) in the key list's title - the only UI surface
+    // distinguishing "showing every key" from "showing a scoped subset". No-op at the bucket
+    // level (_currentBucket is null).
+    private void UpdateKeyListTitle()
+    {
+        if (_currentBucket is not { } bucket) return;
+        _listLabel.Text = _currentKeyFilter is { } pattern ? $"Keys of {bucket} (filter: {pattern})" : $"Keys of {bucket}";
     }
 
     // Always runs on the UI thread - mirrors OpenCreateBucketDialog exactly. Scoped by

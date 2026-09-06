@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using lazynats.Components;
+using lazynats.Core;
+using lazynats.Subscriptions;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore;
@@ -41,6 +43,14 @@ internal sealed class ObjectsTab: View
     // Null at the bucket level; the drilled-into bucket's name at the object level.
     private string? _currentBucket;
 
+    // Active post-fetch name filter pattern (filesystem-style wildcard) for the currently
+    // drilled-into bucket, or null if unfiltered. Reset on both Descend and Ascend - a filter has
+    // no meaningful carry-over to a different bucket, or back at the bucket list. Read directly by
+    // RefreshObjectListAsync, so Ctrl+R and post-upload/delete refreshes stay narrowed for free.
+    // Unlike KV, the fetch itself is never scoped - see
+    // openspec/changes/add-obj-name-filter/design.md Decision 4.
+    private string? _currentObjectFilter;
+
     public event Action<string>? StatusChanged;
 
     public ObjectsTab(INatsJSContext jetStream, INatsObjContext obj)
@@ -77,6 +87,7 @@ internal sealed class ObjectsTab: View
         _objectListView.CreateRequested += () => OpenUploadDialog(null);
         _objectListView.DownloadRequested += OpenDownloadDialog;
         _objectListView.DeleteRequested += () => _ = TryDeleteObjectAsync();
+        _objectListView.FilterRequested += OpenObjectFilterDialog;
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_bucketListFrame) + 1, Y = 0 };
         _details = new BucketDetails(_obj) { X = Pos.Right(_bucketListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -141,12 +152,15 @@ internal sealed class ObjectsTab: View
 
         var name = BucketName.From(stream);
         _currentBucket = name;
+        // A filter never carries over into a (possibly different) bucket entered by a fresh
+        // descent - see "Post-Fetch Object Name Filter"'s reset-on-descend requirement.
+        _currentObjectFilter = null;
         // Clear before showing - otherwise whatever a *previous* descent left behind (a different
         // bucket's objects, or a stale highlight) would flash for a frame until the fetch below
         // resolves. Clearing the list cascades into clearing the details pane too, via the same
         // HighlightChanged wiring an empty Ctrl+R result already goes through.
         _objectListView.ReplaceItems([]);
-        _listLabel.Text = $"Objects of {name}";
+        UpdateObjectListTitle();
         _detailsLabel.Text = "Object Details";
         _bucketFilterBox.Visible = false;
         _bucketListFrame.Visible = false;
@@ -168,6 +182,7 @@ internal sealed class ObjectsTab: View
     private void Ascend()
     {
         _currentBucket = null;
+        _currentObjectFilter = null;
         _listLabel.Text = "Buckets";
         _detailsLabel.Text = "Details";
         _objectFilterBox.Visible = false;
@@ -294,7 +309,11 @@ internal sealed class ObjectsTab: View
 
     // `selectName` mirrors ValuesTab.RefreshKeyListAsync's own parameter - highlights a specific
     // object after the refresh (used right after an upload) instead of ReplaceItems' default
-    // "keep whatever was highlighted before" fallback.
+    // "keep whatever was highlighted before" fallback. Always fetches every name from the server -
+    // unlike KV, there's no server-side filter to scope this by (see design.md) - then, if
+    // _currentObjectFilter is set, narrows the fetched result to matches before it ever reaches
+    // ReplaceItems, so the list's own backing collection stays small even though the fetch itself
+    // doesn't shrink.
     private async Task RefreshObjectListAsync(string? selectName = null)
     {
         if (_currentBucket is not { } bucket) return;
@@ -303,6 +322,10 @@ internal sealed class ObjectsTab: View
             var store = await _obj.GetObjectStoreAsync(bucket);
             var names = new List<string>();
             await foreach (var metadata in store.ListAsync(new NatsObjListOpts())) names.Add(metadata.Name);
+            if (_currentObjectFilter is { } pattern) {
+                var regex = pattern.WildcardToRegex();
+                names = names.Where(name => regex.IsMatch(name)).ToList();
+            }
             App?.Invoke(() => {
                 // The user may have ascended back out while this was in flight - only apply a
                 // result that's still for the currently-drilled-into bucket.
@@ -311,6 +334,31 @@ internal sealed class ObjectsTab: View
         } catch (Exception ex) {
             App?.Invoke(() => StatusChanged?.Invoke($"Objects: {ex.Message}"));
         }
+    }
+
+    // Ctrl+F at the object level. PatternDialog's allowEmpty:true lets confirming an empty pattern
+    // clear an active filter, unlike SubscriptionsView's use of the same dialog. Cancelling
+    // (Result is null) leaves _currentObjectFilter and the list unchanged.
+    private void OpenObjectFilterDialog()
+    {
+        if (_currentBucket is null) return;
+
+        var dialog = new PatternDialog("Filter Objects", _currentObjectFilter ?? string.Empty, allowEmpty: true);
+        App!.Run(dialog);
+        if (dialog.Result is not { } pattern) return;
+
+        _currentObjectFilter = pattern.Length == 0 ? null : pattern;
+        UpdateObjectListTitle();
+        _ = RefreshObjectListAsync();
+    }
+
+    // Reflects the active filter (if any) in the object list's title - the only UI surface
+    // distinguishing "showing every object" from "showing a narrowed subset". No-op at the bucket
+    // level (_currentBucket is null).
+    private void UpdateObjectListTitle()
+    {
+        if (_currentBucket is not { } bucket) return;
+        _listLabel.Text = _currentObjectFilter is { } pattern ? $"Objects of {bucket} (filter: {pattern})" : $"Objects of {bucket}";
     }
 
     // Always runs on the UI thread - mirrors OpenCreateBucketDialog exactly. Scoped by
