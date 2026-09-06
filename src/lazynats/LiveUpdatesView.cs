@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Threading.Channels;
+using lazynats.LiveFeed;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;

@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using lazynats.LiveFeed;
 using NATS.Client.Core;
 
 namespace lazynats.Subscriptions;

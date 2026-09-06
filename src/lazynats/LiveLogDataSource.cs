@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using lazynats.LiveFeed;
 using Terminal.Gui.Views;
 
 namespace lazynats;

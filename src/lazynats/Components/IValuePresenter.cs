@@ -1,6 +1,6 @@
 namespace lazynats.Components;
 
-internal interface IValuePresenter<T>
+internal interface IValuePresenter<in T>
 {
     string Format(T value);
 }

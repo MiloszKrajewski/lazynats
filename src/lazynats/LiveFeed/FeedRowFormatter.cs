@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace lazynats;
+namespace lazynats.LiveFeed;
 
 internal static class FeedRowFormatter
 {

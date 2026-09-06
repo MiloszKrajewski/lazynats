@@ -118,22 +118,23 @@ internal sealed class EditFrame: View
         Move(0, bottom);
         AddRune(Qur);
 
-        if (contentHeight > 0) {
-            // LM: left margin, outer tick column, accent-colored.
-            SetAttribute(accentAttribute);
-            FillRect(new Rectangle(0, 1, 1, contentHeight), Hbr);
+        if (contentHeight <= 0) 
+            return true;
 
-            // LP through RM (columns 1..width-1): solid inner-colored fill, covering the child's
-            // own content area as well as its left/right padding. The child (TextField, TextView,
-            // ...) only paints under its actual content/text - e.g. an empty TextField paints
-            // nothing at all - so without this base fill, any cell the child doesn't touch falls
-            // through to whatever's behind it (typically the root Toplevel's own Normal
-            // background) instead of reading as part of the editable region. A solid block glyph
-            // (not a space) is used throughout, same as TOP/BOT, because a plain space doesn't
-            // reliably carry a custom background through Terminal.Gui's cell buffer.
-            SetAttribute(innerAttribute);
-            FillRect(new Rectangle(1, 1, width - 1, contentHeight), Ful);
-        }
+        // LM: left margin, outer tick column, accent-colored.
+        SetAttribute(accentAttribute);
+        FillRect(new Rectangle(0, 1, 1, contentHeight), Hbr);
+
+        // LP through RM (columns 1..width-1): solid inner-colored fill, covering the child's
+        // own content area as well as its left/right padding. The child (TextField, TextView,
+        // ...) only paints under its actual content/text - e.g. an empty TextField paints
+        // nothing at all - so without this base fill, any cell the child doesn't touch falls
+        // through to whatever's behind it (typically the root Toplevel's own Normal
+        // background) instead of reading as part of the editable region. A solid block glyph
+        // (not a space) is used throughout, same as TOP/BOT, because a plain space doesn't
+        // reliably carry a custom background through Terminal.Gui's cell buffer.
+        SetAttribute(innerAttribute);
+        FillRect(new Rectangle(1, 1, width - 1, contentHeight), Ful);
 
         return true;
     }

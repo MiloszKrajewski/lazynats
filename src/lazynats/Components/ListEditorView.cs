@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using Microsoft.Extensions.DependencyInjection;
+using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
+using Attribute = Terminal.Gui.Drawing.Attribute;
 
 namespace lazynats.Components;
 
@@ -19,8 +22,8 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
 {
     private readonly ObservableCollection<T> _items;
     private readonly PresenterListDataSource<T> _dataSource;
-    private readonly Terminal.Gui.Views.ListView _listView;
-    private readonly Terminal.Gui.Views.Label _emptyHintLabel;
+    private readonly ListView _listView;
+    private readonly Label _emptyHintLabel;
     private readonly ShortcutTracker _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
 
     public ListEditorView(ObservableCollection<T> items, IValuePresenter<T> presenter)
@@ -29,7 +32,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         _items = items;
 
         _dataSource = new PresenterListDataSource<T>(_items, presenter);
-        _listView = new Terminal.Gui.Views.ListView { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
+        _listView = new ListView { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         _listView.KeystrokeNavigator = null;
         _listView.Source = _dataSource;
 
@@ -40,16 +43,16 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         // navigation while the list is empty. So focus highlighting is driven manually below
         // (UpdateEmptyHintScheme/OnHasFocusChanged) rather than via the framework's normal
         // per-view Normal/Focus role switching.
-        _emptyHintLabel = new Terminal.Gui.Views.Label {
+        _emptyHintLabel = new Label {
             X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(), CanFocus = false, Text = EmptyHint,
         };
         UpdateEmptyHintScheme();
 
         // Bound here (on the whole component), not on the list, so Ctrl+N/E/D work no matter
         // which child currently has focus - same rationale as PublishTab.
-        AddCommand(Command.New, () => { TryCreateItem(); return true; });
-        AddCommand(Command.Edit, () => { if (SelectedIndex is { } index) TryEditItem(index); return true; });
-        AddCommand(Command.DeleteAll, () => { if (SelectedIndex is { } index) Delete(index); return true; });
+        AddCommand(Command.New, TryCreateItem);
+        AddCommand(Command.Edit, TryEditItem);
+        AddCommand(Command.DeleteAll, TryDeleteItem);
         KeyBindings.Add(Key.N.WithCtrl, Command.New);
         KeyBindings.Add(Key.E.WithCtrl, Command.Edit);
         KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
@@ -60,30 +63,40 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         EnsureValidSelection();
     }
 
+    private void AddCommand(Command command, Action action) =>
+        AddCommand(
+            command, () => {
+                action();
+                return true;
+            });
+
     // Overridden per item type so the hint reads naturally (e.g. "No subscriptions..." vs a
     // generic message); defaulted rather than abstract so a forgotten override still shows
     // something useful instead of nothing.
     protected virtual string EmptyHint => "No items — Ctrl+N to add one";
 
-    private Terminal.Gui.Drawing.Color? _background;
+    private Color? _background;
 
     // Independent of any implicitly inherited scheme, so callers (e.g. EditFrame) can pair this
     // list visually with other edit controls. Unset (null) leaves prior inherited-scheme behavior
     // untouched. Applies to the empty-hint overlay too - it fully covers the list while empty, so
     // leaving it on its own unrelated (Disabled-role) background would defeat the point of setting
     // this in the first place.
-    public Terminal.Gui.Drawing.Color? Background
+    public Color? Background
     {
         get => _background;
-        set
-        {
-            _background = value;
-            _listView.SetScheme(value is { } background
-                ? new Terminal.Gui.Drawing.Scheme(new Terminal.Gui.Drawing.Attribute(
-                    _listView.GetAttributeForRole(Terminal.Gui.Drawing.VisualRole.Normal).Foreground, background))
-                : null);
-            UpdateEmptyHintScheme();
-        }
+        set => SetBackgroundColor(value);
+    }
+
+    private void SetBackgroundColor(Color? value)
+    {
+        _background = value;
+        var foreground = _listView.GetAttributeForRole(VisualRole.Normal).Foreground;
+        var scheme = value is { } background
+            ? new Scheme(new Attribute(foreground, background))
+            : null;
+        _listView.SetScheme(scheme);
+        UpdateEmptyHintScheme();
     }
 
     // Unfocused keeps the original dim look (this component's own Disabled role). Focused mirrors
@@ -96,11 +109,13 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
     private void UpdateEmptyHintScheme()
     {
         var disabled = GetScheme().Disabled;
-        var foreground = HasFocus ? new Terminal.Gui.Drawing.Color(255, 255, 255) : disabled.Foreground;
-        var role = new Terminal.Gui.Drawing.Attribute(foreground, disabled.Background);
-        _emptyHintLabel.SetScheme(new Terminal.Gui.Drawing.Scheme(_background is { } background
-            ? new Terminal.Gui.Drawing.Attribute(role.Foreground, background)
-            : role));
+        var foreground = HasFocus ? new Color(255, 255, 255) : disabled.Foreground;
+        var role = new Attribute(foreground, disabled.Background);
+        var scheme = new Scheme(
+            _background is { } background
+                ? new Attribute(role.Foreground, background)
+                : role);
+        _emptyHintLabel.SetScheme(scheme);
     }
 
     // HasFocus is recursively true here whenever _listView (the only real focus target) is
@@ -134,12 +149,13 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
     private void EnsureValidSelection()
     {
         if (_items.Count == 0) return;
-        var selected = _listView.SelectedItem;
-        if (selected is null || selected < 0 || selected >= _items.Count) _listView.SelectedItem = 0;
+
+        if (SelectedIndex is null)
+            _listView.SelectedItem = 0;
     }
 
     private int? SelectedIndex =>
-        _listView.SelectedItem is { } index && index >= 0 && index < _items.Count ? index : null;
+        _listView.SelectedItem is { } index and >= 0 && index < _items.Count ? index : null;
 
     // Run a modal appropriate to T and report whether the user committed a new value.
     protected abstract bool TryCreate(out T result);
@@ -163,25 +179,35 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         _shortcutTracker.Refresh();
     }
 
-    private void TryEditItem(int index)
+    private void TryEditItem()
     {
+        if (SelectedIndex is not { } index) return;
+
         if (TryEdit(_items[index], out var result)) Replace(index, result);
         _shortcutTracker.Refresh();
     }
 
-    public virtual IEnumerable<ShortcutHint> Shortcuts =>
-    [
-        new ShortcutHint(Key.N.WithCtrl, "New", TryCreateItem),
-        new ShortcutHint(Key.E.WithCtrl, "Edit", () => { if (SelectedIndex is { } index) TryEditItem(index); }),
-        new ShortcutHint(Key.D.WithCtrl, "Delete", () => { if (SelectedIndex is { } index) Delete(index); }),
+    private void TryDeleteItem()
+    {
+        if (SelectedIndex is not { } index) return;
+
+        Delete(index);
+    }
+
+    public virtual IEnumerable<ShortcutHint> Shortcuts => [
+        new(Key.N.WithCtrl, "New", TryCreateItem),
+        new(Key.E.WithCtrl, "Edit", TryEditItem),
+        new(Key.D.WithCtrl, "Delete", TryDeleteItem),
     ];
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) {
+        if (disposing)
+        {
             _items.CollectionChanged -= OnItemsChanged;
             _dataSource.Dispose();
         }
+
         base.Dispose(disposing);
     }
 }

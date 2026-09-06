@@ -4,9 +4,9 @@
 
 `lazynats` is a terminal UI for NATS, in the spirit of `lazygit`/`lazydocker`: a fast,
 keyboard-driven client for watching and managing a NATS server without leaving the terminal.
-See [`doc/ui-design.md`](./doc/ui-design.md) for the intended UI shape (management tabs for
-subscriptions, streams, consumers, KV/OBJ stores, plus a live feed and message sending) and how
-much of it exists today.
+See [`doc/UI.md`](./doc/UI.md) for the intended UI shape (management tabs for subscriptions,
+streams, consumers, KV/OBJ stores, plus a live feed and message sending) and how much of it
+exists today.
 
 ## Stack
 
@@ -47,8 +47,25 @@ much of it exists today.
   and renders rows via `FeedRowFormatter`. `LiveLogDataSource` intentionally reports
   `MaxItemLength = 0` to avoid an O(n²) rescan on append — see the comment in that file before
   "fixing" it.
-- `MainWindow` currently hosts a fixed two-pane layout (`SubscriptionsView` over the live feed).
-  Per `doc/UI.md`, this is expected to grow into a tabbed management area.
+- `MainWindow` hosts `ManagementTabs` (currently `SubscribeTab`/`PublishTab`, per `doc/UI.md`'s
+  full tab list) over the live feed, plus a `StatusBar`. Each tab's content is a
+  self-contained component that owns its own internal layout (labels, `EditFrame` wrapping,
+  sub-bands); `MainWindow` only resolves dependencies, constructs the tab, and registers it with
+  `ManagementTabs` — see `openspec/specs/tab-content-structure/spec.md`.
+- Two reusable pieces in `Components/` back that per-tab UI: `EditFrame` (a thin padded frame
+  around a single edit-capable child — see `doc/glyphs.md` for its border glyph/position naming)
+  and `ListEditorView<T>` (a presenter-formatted list with New/Edit/Delete, generalizing the
+  shape shared by `SubscriptionsView` and `PublishTab`'s header editor; row creation/edit is
+  delegated to abstract callbacks, row formatting to an injected `IValuePresenter<T>`).
+- Status-bar shortcuts are discovered, not hardcoded: a view opts in via `IShortcutSource`,
+  `ShortcutAggregator` walks the focused-view ancestor chain collecting hints, and
+  `ShortcutTracker` (`ShortcutAggregator.cs`) recomputes them on every focus change (or on
+  demand via `Refresh()`) and raises `ShortcutsChanged`, which `MainWindow` uses to resync the
+  `StatusBar`'s dynamic tail. See `openspec/specs/keyboard-shortcut-discovery/spec.md`.
+- `Theme.cs` centralizes tunable theme colors (currently just `EditableBackground`); dependents
+  (`Program.cs`'s Base/Dialog scheme overrides, invalid-input highlights in
+  `PublishTab`/`HeaderDialog`/`PatternDialog`) read from there instead of repeating literals —
+  see `openspec/specs/color-theme/spec.md`.
 - `src/lazynats.AotProbe` is a standalone console app (not in `lazynats.sln`) used to validate
   that a package/pattern (NATS, DI, Rx, ...) actually trims/AOT-publishes cleanly before it's
   relied on in the main app. `test-aot.ps1` in that folder builds it, publishes it

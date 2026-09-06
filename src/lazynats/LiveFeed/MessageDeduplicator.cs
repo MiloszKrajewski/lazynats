@@ -1,6 +1,6 @@
 using NATS.Client.Core;
 
-namespace lazynats;
+namespace lazynats.LiveFeed;
 
 // Window size is a starting guess pending real traffic (see design.md). Only ever
 // called from the single FeedReaderLoop that owns it, so no locking is needed.
@@ -27,6 +27,7 @@ internal sealed class MessageDeduplicator(TimeSpan window)
                 (expired ??= []).Add(key);
 
         if (expired is null) return;
+
         foreach (var key in expired) _lastSeen.Remove(key);
     }
 
@@ -40,7 +41,8 @@ internal sealed class MessageDeduplicator(TimeSpan window)
         hash.Add(message.Subject);
 
         if (message.Headers is { Count: > 0 } headers)
-            foreach (var (headerKey, headerValue) in headers) {
+            foreach (var (headerKey, headerValue) in headers)
+            {
                 hash.Add(headerKey);
                 hash.Add(headerValue.ToString());
             }

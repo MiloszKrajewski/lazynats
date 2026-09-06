@@ -1,5 +1,6 @@
 ﻿using System.Threading.Channels;
 using lazynats;
+using lazynats.LiveFeed;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
