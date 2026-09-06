@@ -126,9 +126,12 @@ present after the item collection changes, the list editor SHALL select the firs
 - **THEN** the selection is not altered
 
 ### Requirement: Empty-State Hint
-The list editor SHALL, while its item collection is empty, display a dim, non-interactive hint
-line in place of the (otherwise blank) list content. The hint SHALL be hidden as soon as the item
+The list editor SHALL, while its item collection is empty, display a non-interactive hint line in
+place of the (otherwise blank) list content. The hint SHALL be hidden as soon as the item
 collection contains at least one item, and SHALL reappear if the collection becomes empty again.
+The hint's visual style SHALL reflect whether the list editor currently holds keyboard focus: a
+dim style while unfocused (its prior fixed appearance), and a visually prominent focused style
+while the list editor holds focus, clearly distinguishing it from the dim unfocused appearance.
 
 #### Scenario: Empty collection shows the hint
 - **WHEN** the list editor is displayed and its item collection is empty
@@ -149,6 +152,22 @@ collection contains at least one item, and SHALL reappear if the collection beco
 - **THEN** the hint cannot be selected, and Ctrl+N/E/D behave exactly as they do for any other
   empty collection (Ctrl+N invokes the create callback as usual; Ctrl+E and Ctrl+D are no-ops
   because there is no selected item)
+
+#### Scenario: Empty hint is highlighted while the list editor holds focus
+- **WHEN** the item collection is empty and keyboard focus is somewhere within the list editor
+- **THEN** the hint renders with a visually prominent focused style rather than its dim unfocused
+  style
+
+#### Scenario: Empty hint reverts to dim style when focus leaves
+- **WHEN** the item collection is empty, the hint is currently shown with the focused style, and
+  keyboard focus moves outside the list editor
+- **THEN** the hint reverts to its dim, unfocused style
+
+#### Scenario: Focus-driven style respects a configured background
+- **WHEN** an explicit background has been set on the list editor via the `Background` property
+  and the item collection is empty
+- **THEN** both the focused and unfocused hint styles are rendered against that configured
+  background, consistent with how the unfocused hint already honors it
 
 ### Requirement: Per-Subclass Hint Text
 The list editor SHALL obtain its empty-state hint text from an overridable source, so each

@@ -32,11 +32,16 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         _listView.Source = _dataSource;
 
         // A separate overlay, not a fake row in _dataSource - stays outside the list's selection
-        // model entirely, so SelectedIndex/Ctrl+N/E/D need no special-casing for it.
+        // model entirely, so SelectedIndex/Ctrl+N/E/D need no special-casing for it. Left
+        // CanFocus = false (its default): a Terminal.Gui Label that actually holds keyboard focus
+        // swallows all subsequent key input, which would break Ctrl+N/E/D and arrow-key tab
+        // navigation while the list is empty. So focus highlighting is driven manually below
+        // (UpdateEmptyHintScheme/OnHasFocusChanged) rather than via the framework's normal
+        // per-view Normal/Focus role switching.
         _emptyHintLabel = new Terminal.Gui.Views.Label {
             X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(), CanFocus = false, Text = EmptyHint,
         };
-        _emptyHintLabel.SetScheme(new Terminal.Gui.Drawing.Scheme(GetScheme().Disabled));
+        UpdateEmptyHintScheme();
 
         // Bound here (on the whole component), not on the list, so Ctrl+N/E/D work no matter
         // which child currently has focus - same rationale as PublishTab.
@@ -75,10 +80,33 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
                 ? new Terminal.Gui.Drawing.Scheme(new Terminal.Gui.Drawing.Attribute(
                     _listView.GetAttributeForRole(Terminal.Gui.Drawing.VisualRole.Normal).Foreground, background))
                 : null);
-            _emptyHintLabel.SetScheme(new Terminal.Gui.Drawing.Scheme(value is { } hintBackground
-                ? new Terminal.Gui.Drawing.Attribute(GetScheme().Disabled.Foreground, hintBackground)
-                : GetScheme().Disabled));
+            UpdateEmptyHintScheme();
         }
+    }
+
+    // Unfocused keeps the original dim look (this component's own Disabled role). Focused mirrors
+    // what a real selected row in this list looks like. A selected ListView row gets there via an
+    // inverted fg/bg bar, but Label - confirmed empirically - only ever paints its own foreground;
+    // its background always shows through as whatever its container already painted, so an inverted
+    // attribute here would render as invisible (dark-on-dark) rather than as a highlight bar. Bright
+    // white foreground against that same unchanged background is the closest a Label can get to
+    // "looks like the focused row."
+    private void UpdateEmptyHintScheme()
+    {
+        var disabled = GetScheme().Disabled;
+        var foreground = HasFocus ? new Terminal.Gui.Drawing.Color(255, 255, 255) : disabled.Foreground;
+        var role = new Terminal.Gui.Drawing.Attribute(foreground, disabled.Background);
+        _emptyHintLabel.SetScheme(new Terminal.Gui.Drawing.Scheme(_background is { } background
+            ? new Terminal.Gui.Drawing.Attribute(role.Foreground, background)
+            : role));
+    }
+
+    // HasFocus is recursively true here whenever _listView (the only real focus target) is
+    // focused, so this is what drives UpdateEmptyHintScheme's focused/unfocused choice.
+    protected override void OnHasFocusChanged(bool newHasFocus, View? previousFocusedView, View? focusedView)
+    {
+        base.OnHasFocusChanged(newHasFocus, previousFocusedView, focusedView);
+        UpdateEmptyHintScheme();
     }
 
     private void OnItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -87,7 +115,15 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         EnsureValidSelection();
     }
 
-    private void UpdateEmptyHintVisibility() => _emptyHintLabel.Visible = _items.Count == 0;
+    // Also re-syncs the scheme (not just OnHasFocusChanged): a modal opened via TryCreate/TryEdit
+    // (e.g. PatternDialog) doesn't reliably re-raise this component's own HasFocusChanged on close,
+    // so without this, deleting back down to empty right after an add-via-modal could leave the
+    // hint showing stale unfocused styling even though focus is still actually here.
+    private void UpdateEmptyHintVisibility()
+    {
+        _emptyHintLabel.Visible = _items.Count == 0;
+        UpdateEmptyHintScheme();
+    }
 
     // A subclass whose true source of truth lives elsewhere (e.g. SubscriptionsView redirecting
     // into a NATS subscription registry) can rebuild _items wholesale - Terminal.Gui's ListView
