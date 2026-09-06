@@ -62,6 +62,7 @@ internal sealed class MainWindow: Runnable
             new(Key.D3.WithAlt, "Values", () => tabs.SelectTab(valuesTab)),
             new(Key.D4.WithAlt, "Objects", () => tabs.SelectTab(objectsTab)),
             new(Key.D5.WithAlt, "Templates", () => tabs.SelectTab(templatesTab)),
+            new(Key.M.WithAlt, "Live Feed", () => liveUpdates.SetFocus()),
         };
         // Deferred via AddTimeout(Zero, ...) rather than calling App!.Run directly: this Action
         // runs from inside the very same Alt+P key dispatch that's still unwinding, and Run()
@@ -134,10 +135,6 @@ internal sealed class MainWindow: Runnable
                 }
         };
 
-        var clearShortcut = new Shortcut { Text = "Clear", Key = Key.C, Visible = false };
-        clearShortcut.Action = liveUpdates.Clear;
-        liveUpdates.HasFocusChanged += (_, _) => clearShortcut.Visible = liveUpdates.HasFocus;
-
         var streamsStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
         streamsTab.StatusChanged += message => {
             streamsStatusShortcut.Text = message;
@@ -164,7 +161,7 @@ internal sealed class MainWindow: Runnable
 
         _statusBar = new StatusBar(
         [
-            ..topLevelWidgets, clearShortcut,
+            ..topLevelWidgets,
             streamsStatusShortcut, valuesStatusShortcut, objectsStatusShortcut, templatesStatusShortcut,
         ]);
 

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
+using lazynats.Components;
 using lazynats.Core;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -7,7 +8,7 @@ using Terminal.Gui.Views;
 
 namespace lazynats.LiveFeed;
 
-internal sealed class LiveUpdatesView: View
+internal sealed class LiveUpdatesView: View, IShortcutSource
 {
     private static readonly TimeSpan BufferWindow = TimeSpan.FromMilliseconds(25);
 
@@ -49,6 +50,8 @@ internal sealed class LiveUpdatesView: View
     }
 
     public void Clear() => _events.Clear();
+
+    public IEnumerable<ShortcutHint> Shortcuts => [new ShortcutHint(Key.C, "Clear", Clear)];
 
     private void OnEvent(FeedEnvelope envelope)
     {
