@@ -76,6 +76,15 @@ internal sealed class PublishDialog: Dialog
             subjectLabel, subjectFrame, headersLabel, headerFrame, payloadTypeLabel, payloadTypeFrame,
             payloadLabel, payloadFrame, _statusLabel);
 
+        // A modal Dialog is its own top-level with no SuperView link back to MainWindow, so
+        // MainWindow's global `?` KeyDown handler never sees a keypress made while this dialog is
+        // open (same reasoning as MessageDetailDialog's identical binding). ShortcutPickerLauncher.
+        // BindKey owns the shared deferred-collect-run-invoke sequence, including picking its own
+        // start view (see BindKey/ResolveStartView) - this dialog needs no override: its own
+        // IShortcutSource shortcuts live on headerEditor, a focused descendant, which is exactly
+        // the case ResolveStartView's default handles.
+        ShortcutPickerLauncher.BindKey(this);
+
         // Result is left unset, matching Esc's own cancellation convention - added before Send so
         // Send, not Cancel, stays the last-added, Enter-activated default button.
         var cancelButton = new Button { Text = "Cancel" };

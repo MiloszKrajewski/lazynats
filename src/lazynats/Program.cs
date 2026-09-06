@@ -21,6 +21,11 @@ await connection.ConnectAsync();
 // can't accidentally bypass the serialization.
 var feed = Subject.Synchronize(new Subject<FeedEnvelope>());
 var registry = new SubscriptionRegistry(connection, feed);
+#if DEBUG
+// Dev convenience only (excluded from Release/AOT builds): see live traffic immediately without
+// first driving the Subscribe tab's N shortcut by hand.
+registry.Add(">");
+#endif
 var jetStream = connection.CreateJetStreamContext();
 var kv = jetStream.CreateKeyValueStoreContext();
 var obj = jetStream.CreateObjectStoreContext();

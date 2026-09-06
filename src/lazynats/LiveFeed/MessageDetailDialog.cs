@@ -157,37 +157,17 @@ internal sealed class MessageDetailDialog: Dialog, IShortcutSource
         // A modal Dialog is its own top-level with no SuperView link back to MainWindow (same
         // point MainWindow's own `?` binding comment makes), so MainWindow's global `?`
         // KeyDown handler never sees a keypress made while this dialog is open - confirmed via
-        // tmux, `?` was a no-op here before this binding existed. Mirrors MainWindow's own `?`
-        // handling almost exactly: same ShortcutAggregator/ShortcutPickerDialog pair, same
-        // AddTimeout(Zero, ...) deferral so the nested App.Run doesn't re-enter this
-        // still-unwinding key dispatch, and - like MainWindow - a raw KeyDown subscription
-        // rather than AddCommand/KeyBindings(Command.Context): confirmed via tmux that
-        // Command.Context specifically never reaches a custom handler here (Terminal.Gui's
-        // built-in "open context/popover menu" semantics for that command appear to take over
-        // first), the same reason MainWindow's own `?` avoids AddCommand/KeyBindings entirely.
-        // Scoped to this dialog's own focused-chain shortcuts (today, only the V/Presentation
-        // hint from Shortcuts below) rather than the app's top-level ones. Fires regardless of
-        // hasPayload - an empty-payload message correctly shows "no shortcuts" rather than the
-        // key silently doing nothing, same as any other view with nothing to advertise.
-        KeyDown += (_, key) => {
-            if (key != new Key('?')) return;
-            key.Handled = true;
-            app.AddTimeout(TimeSpan.Zero, () => {
-                // Collect(this) directly, not App.TopRunnableView?.MostFocused (MainWindow's own
-                // form, which needs the generality of "start from whatever's actually focused,
-                // app-wide") or this.MostFocused (confirmed via tmux to resolve, in this dialog's
-                // no-explicit-focus starting state, to an internal adornment scaffolding View
-                // that isn't a descendant reachable back to `this` via SuperView - both left the
-                // picker empty). This dialog's own IShortcutSource is the only one anywhere in
-                // its subtree, so starting the walk at `this` finds it unconditionally, in every
-                // focus state, without needing to locate "whatever's currently focused" first.
-                var hints = ShortcutAggregator.Collect(this);
-                var picker = new ShortcutPickerDialog(hints);
-                app.Run(picker);
-                picker.Result?.Action();
-                return false;
-            });
-        };
+        // tmux, `?` was a no-op here before this binding existed. ShortcutPickerLauncher.BindKey
+        // owns the shared deferred-collect-run-invoke sequence, including picking its own start
+        // view (see BindKey/ResolveStartView) - this dialog needs no override: every Label it adds
+        // is CanFocus=false and the presentation dropdown starts CanFocus=false too, so there is no
+        // genuinely focusable descendant for MostFocused to ever land on, which is exactly the case
+        // ResolveStartView's fallback (start at the dialog itself) handles. Scoped to this dialog's
+        // own focused-chain shortcuts (today, only the V/Presentation hint from Shortcuts below)
+        // rather than the app's top-level ones. Fires regardless of hasPayload - an empty-payload
+        // message correctly shows "no shortcuts" rather than the key silently doing nothing, same
+        // as any other view with nothing to advertise.
+        ShortcutPickerLauncher.BindKey(this);
 
         if (hasPayload)
         {

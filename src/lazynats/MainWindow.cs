@@ -125,12 +125,6 @@ internal sealed class MainWindow: Runnable
                         App!.Run(new PublishDialog(connection));
                         return false;
                     })));
-        // Same re-entrancy hazard as Publish above (this Action also opens a nested modal via
-        // App!.Run from inside a still-unwinding global key dispatch), same AddTimeout(Zero, ...)
-        // fix. Snapshots the focus chain at the moment the dialog actually opens (one main-loop
-        // iteration after this shortcut was pressed - focus can't have moved in between) rather
-        // than continuously tracking it, per design.md's "compute on demand" decision.
-        //
         // Key is bare `?`, not Ctrl-/, Alt-/, F1, or the originally-shipped Alt-K: the first two
         // were confirmed dead on the user's real Windows terminal (Ctrl+/ is explicitly excluded
         // from Terminal.Gui's own default Windows key bindings - e.g. their built-in Undo binding
@@ -142,20 +136,19 @@ internal sealed class MainWindow: Runnable
         // as text before MainWindow's own KeyDown subscriber below ever sees it - this handler
         // only fires once nothing more specific already claimed the key. It also echoes `/`'s
         // existing role as a punctuation-key global shortcut and reads naturally as "help".
+        //
+        // ShortcutPickerLauncher.MakeAction owns the deferred-collect-run-invoke sequence (see its
+        // own comments for the re-entrancy/deferral reasoning shared with Publish above).
+        // App!.TopRunnableView?.MostFocused - not App! itself or any fixed view - is the actual
+        // app-wide keyboard focus, wherever it is (several levels deep inside whichever tab is
+        // active); MainWindow itself never implements IShortcutSource, so its own hardcoded
+        // topLevelShortcuts are structurally excluded from Collect's upward walk rather than
+        // filtered out after the fact. Re-evaluated lazily by MakeAction each time the picker
+        // opens, not once here - see ShortcutPickerLauncher's own comment on why.
         topLevelShortcuts.Add(
             new ShortcutHint(
-                new Key('?'), "Shortcuts", () => App!.AddTimeout(
-                    TimeSpan.Zero, () => {
-                        // Deliberately excludes topLevelShortcuts: those are already permanently
-                        // visible in the status bar, unlike the per-view ones this picker exists
-                        // to surface because they don't fit there - listing them again here would
-                        // just be redundant.
-                        var hints = ShortcutAggregator.Collect(App!.TopRunnableView?.MostFocused);
-                        var dialog = new ShortcutPickerDialog(hints);
-                        App!.Run(dialog);
-                        dialog.Result?.Action();
-                        return false;
-                    })));
+                ShortcutPickerLauncher.Key, "Shortcuts",
+                ShortcutPickerLauncher.MakeAction(this, () => App!.TopRunnableView?.MostFocused)));
 
         // Deliberately NOT BindKeyToApplication: that binds the key at the Application level,
         // bypassing normal modal key-routing entirely - confirmed via tmux that it lets e.g. Alt+3
