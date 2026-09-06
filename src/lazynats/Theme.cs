@@ -6,7 +6,7 @@ namespace lazynats;
 
 // Single declared place for the app's tunable theme colors (see openspec/changes/add-dark-theme).
 // Swap a value here to experiment with alternatives - every dependent (Program.cs's Base/Dialog
-// scheme overrides, and the various invalid-input highlight Attributes in PublishTab/HeaderDialog/
+// scheme overrides, and the various invalid-input highlight Attributes in PublishDialog/HeaderDialog/
 // PatternDialog) reads from here instead of repeating the literal.
 internal static class Theme
 {

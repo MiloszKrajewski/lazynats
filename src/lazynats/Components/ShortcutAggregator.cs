@@ -17,8 +17,8 @@ internal static class ShortcutAggregator
 }
 
 // Recomputes the available shortcut set on every app-wide focus change (and on demand via
-// Refresh(), for state changes - like PublishTab's payload edit-mode toggle - that don't move
-// focus). Takes the owning IApplication instance (the same one views reach via `View.App`)
+// Refresh(), for state changes - like ListEditorView's post-modal re-sync after New/Edit - that
+// don't move focus). Takes the owning IApplication instance (the same one views reach via `View.App`)
 // rather than the obsolete static Application.Navigation. Wired into MainWindow's StatusBar.
 internal sealed class ShortcutTracker: IDisposable
 {

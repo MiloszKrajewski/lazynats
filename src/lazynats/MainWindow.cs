@@ -36,12 +36,11 @@ internal sealed class MainWindow: Runnable
         _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
 
         var subscribeTab = new SubscribeTab(registry) { Title = " 1:Subscribe ", Padding = { Thickness = new Thickness(1) } };
-        var publishTab = new PublishTab(connection, _shortcutTracker) { Title = " 2:Publish ", Padding = { Thickness = new Thickness(1) } };
-        var streamsTab = new StreamsTab(jetStream) { Title = " 3:Streams ", Padding = { Thickness = new Thickness(1) } };
-        var kvTab = new KvTab(kv) { Title = " 4:KV ", Padding = { Thickness = new Thickness(1) } };
-        var objTab = new ObjTab(jetStream, obj) { Title = " 5:OBJ ", Padding = { Thickness = new Thickness(1) } };
+        var streamsTab = new StreamsTab(jetStream) { Title = " 2:Streams ", Padding = { Thickness = new Thickness(1) } };
+        var kvTab = new KvTab(kv) { Title = " 3:KV ", Padding = { Thickness = new Thickness(1) } };
+        var objTab = new ObjTab(jetStream, obj) { Title = " 4:OBJ ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
-        tabs.Add(subscribeTab, publishTab, streamsTab, kvTab, objTab);
+        tabs.Add(subscribeTab, streamsTab, kvTab, objTab);
         tabs.Value = subscribeTab;
 
         var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -57,27 +56,27 @@ internal sealed class MainWindow: Runnable
         var subscribeTabShortcut = new Shortcut { Text = "Subscribe", Key = Key.D1.WithAlt, BindKeyToApplication = true };
         subscribeTabShortcut.Action = () => tabs.Value = subscribeTab;
 
-        var publishTabShortcut = new Shortcut { Text = "Publish", Key = Key.D2.WithAlt, BindKeyToApplication = true };
-        publishTabShortcut.Action = () => tabs.Value = publishTab;
-
-        var streamsTabShortcut = new Shortcut { Text = "Streams", Key = Key.D3.WithAlt, BindKeyToApplication = true };
+        var streamsTabShortcut = new Shortcut { Text = "Streams", Key = Key.D2.WithAlt, BindKeyToApplication = true };
         streamsTabShortcut.Action = () => tabs.Value = streamsTab;
 
-        var kvTabShortcut = new Shortcut { Text = "KV", Key = Key.D4.WithAlt, BindKeyToApplication = true };
+        var kvTabShortcut = new Shortcut { Text = "KV", Key = Key.D3.WithAlt, BindKeyToApplication = true };
         kvTabShortcut.Action = () => tabs.Value = kvTab;
 
-        var objTabShortcut = new Shortcut { Text = "OBJ", Key = Key.D5.WithAlt, BindKeyToApplication = true };
+        var objTabShortcut = new Shortcut { Text = "OBJ", Key = Key.D4.WithAlt, BindKeyToApplication = true };
         objTabShortcut.Action = () => tabs.Value = objTab;
+
+        var publishShortcut = new Shortcut { Text = "Publish", Key = Key.P.WithAlt, BindKeyToApplication = true };
+        // Deferred via AddTimeout(Zero, ...) rather than calling App!.Run directly: this Action
+        // runs from inside the very same Alt+P key dispatch that's still unwinding, and Run()
+        // pumps a nested loop that re-observes that same in-flight keypress as unhandled, feeding
+        // it back into this global binding and recursively stacking PublishDialog instances.
+        // Deferring to the next main-loop iteration runs it after that dispatch has fully
+        // unwound, breaking the re-entrancy.
+        publishShortcut.Action = () => App!.AddTimeout(TimeSpan.Zero, () => { App!.Run(new PublishDialog(connection)); return false; });
 
         var clearShortcut = new Shortcut { Text = "Clear", Key = Key.C, Visible = false };
         clearShortcut.Action = liveUpdates.Clear;
         liveUpdates.HasFocusChanged += (_, _) => clearShortcut.Visible = liveUpdates.HasFocus;
-
-        var publishStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
-        publishTab.StatusChanged += message => {
-            publishStatusShortcut.Text = message;
-            publishStatusShortcut.Visible = true;
-        };
 
         var streamsStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
         streamsTab.StatusChanged += message => {
@@ -98,8 +97,8 @@ internal sealed class MainWindow: Runnable
         };
 
         _statusBar = new StatusBar([
-            quitShortcut, subscribeTabShortcut, publishTabShortcut, streamsTabShortcut, kvTabShortcut, objTabShortcut, clearShortcut,
-            publishStatusShortcut, streamsStatusShortcut, kvStatusShortcut, objStatusShortcut,
+            quitShortcut, subscribeTabShortcut, streamsTabShortcut, kvTabShortcut, objTabShortcut, publishShortcut, clearShortcut,
+            streamsStatusShortcut, kvStatusShortcut, objStatusShortcut,
         ]);
         _staticShortcutCount = _statusBar.SubViews.Count;
 

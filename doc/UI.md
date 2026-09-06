@@ -6,20 +6,19 @@ for now is 70/30, but I will need to see it live to decide.
 # Management part
 
 Management has tabs, each titled with its 1-based position (`N:Title`) and switchable directly
-from anywhere in the app via Alt+N, where N is that position (only Subscribe and Publish exist
-today; the rest are reserved for when their tabs are built):
+from anywhere in the app via Alt+N, where N is that position:
 
 | Tab | Title | Shortcut |
 |---|---|---|
 | Subscribe (live NATS monitoring) | `1:Subscribe` | Alt+1 |
-| Publish | `2:Publish` | Alt+2 |
-| Streams (durable streams, drill down into consumers) | `3:Streams` | Alt+3 |
-| KV stores (key/value stores) | `4:KV` | Alt+4 |
-| OBJ stores (object stores) | `5:OBJ` | Alt+5 |
+| Streams (durable streams, drill down into consumers) | `2:Streams` | Alt+2 |
+| KV stores (key/value stores) | `3:KV` | Alt+3 |
+| OBJ stores (object stores) | `4:OBJ` | Alt+4 |
 
-"Subscribe"/"Publish" are a matched verb pair (NATS's own `nats sub`/`nats pub` vocabulary).
 Tab shortcuts use Alt+digit rather than Alt+letter so they never collide with a tab's own
-mnemonic buttons (e.g. Publish's `_Send`), which Terminal.Gui also binds via Alt+letter.
+mnemonic buttons, which Terminal.Gui also binds via Alt+letter. Publish isn't a tab: composing
+and sending a message is a one-off action, so it lives behind Alt+P as a modal dialog instead
+(see "Sending messages" below) - freeing the tab strip for the drill-down management views.
 
 Consumers don't get their own tab. JetStream itself never addresses a consumer without its
 parent stream (`consumer info`/`consumer ls` both require a stream), so the UI mirrors that:
@@ -56,18 +55,20 @@ messages are shown line per message, to get deeper you need to select it and "go
 
 # Sending messages
 
-I would like ability to send a message: subject, headers, payload. This lives in its own
-"Publish" management tab (inserted right after Subscriptions), not a modal window: subject as a
-single field, headers as an editable list of key/value pairs, payload as a multi-line text area.
+I would like ability to send a message: subject, headers, payload. This lives in a modal Publish
+dialog, opened from anywhere via Alt+P: subject as a single field, headers as an editable list of
+key/value pairs, payload as a multi-line text area, with Cancel and Send buttons. Composing and
+sending a message is a one-off action, so a dialog fits better than a permanent tab; each Alt+P
+press opens a fresh, empty dialog rather than resuming whatever was last typed.
 
 Headers are edited keyboard-only: a key/value input row adds a pair on Enter, Delete removes the
 selected pair from the list below it. No mouse-only affordances (no decorative or per-row
 buttons) for this.
 
 The Send button is disabled whenever the current entry is invalid (e.g. empty subject), with
-invalid fields flagged visually (e.g. red text/icon) rather than via a popup. Sending gives
-feedback in the status bar and keeps the form filled in, so the same message can be tweaked and
-resent.
+invalid fields flagged visually (e.g. red text/icon) rather than via a popup. Sending reports
+success/failure inline in the dialog and keeps the form filled in without closing the dialog, so
+the same message can be tweaked and resent. Cancel (or Esc) closes the dialog without sending.
 
 Initially payload as text only (enables JSON and UTF8), but loading a binary file might be
 considered later.

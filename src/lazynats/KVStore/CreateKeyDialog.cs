@@ -19,7 +19,7 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
     private static readonly Attribute InvalidAttribute = new(ColorName16.Red, Theme.EditableBackground);
 
     private readonly TextField _nameField;
-#pragma warning disable CS0618 // TextView is obsolete in favor of Terminal.Gui.Editor - see PublishTab's identical suppression.
+#pragma warning disable CS0618 // TextView is obsolete in favor of Terminal.Gui.Editor - see PublishDialog's identical suppression.
     private readonly TextView _valueView;
 #pragma warning restore CS0618
     private readonly Button _createButton;
@@ -76,7 +76,7 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
     private static EditFrame WrapField(View field, int y, int height)
     {
         // Same "TextField/TextView only paint under their own content" reasoning as
-        // CreateBucketDialog/PublishTab - EditFrame's own fill covers the rest of the field
+        // CreateBucketDialog/PublishDialog - EditFrame's own fill covers the rest of the field
         // regardless of content.
         var background = field.GetAttributeForRole(VisualRole.Editable).Background;
         return new EditFrame(field) {
