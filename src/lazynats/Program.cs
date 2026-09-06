@@ -16,9 +16,25 @@ using Attribute = Terminal.Gui.Drawing.Attribute;
 await ConsoleApp.RunAsync(args, RunAppAsync);
 
 /// <param name="server">-s, NATS server URL.</param>
-static async Task RunAppAsync(string? server = null)
+/// <param name="user">Username or Token.</param>
+/// <param name="password">Password.</param>
+/// <param name="token">Token.</param>
+static async Task RunAppAsync(string? server = null, string? user = null, string? password = null, string? token = null)
 {
-var connection = new NatsConnection(new NatsOpts { Url = ResolveServerUrl(server) });
+var (resolvedUser, resolvedPassword, resolvedToken) = ResolveAuth(user, password, token);
+
+NatsAuthOpts? authOpts = resolvedToken is not null
+    ? new NatsAuthOpts { Token = resolvedToken }
+    : resolvedUser is not null && resolvedPassword is not null
+        ? new NatsAuthOpts { Username = resolvedUser, Password = resolvedPassword }
+        : resolvedUser is not null
+            ? new NatsAuthOpts { Token = resolvedUser }
+            : null;
+
+var natsOpts = new NatsOpts { Url = ResolveServerUrl(server) };
+if (authOpts is not null) natsOpts = natsOpts with { AuthOpts = authOpts };
+
+var connection = new NatsConnection(natsOpts);
 await connection.ConnectAsync();
 
 // Synchronize() is load-bearing: SubscriptionRegistry runs one task per active subscription, all
@@ -76,6 +92,18 @@ app.Run<MainWindow>().Dispose();
 
 static string ResolveServerUrl(string? server) =>
     server ?? Environment.GetEnvironmentVariable("NATS_URL") ?? "nats://localhost:4222";
+
+// Resolved as a group, not per-field: a command-line auth option (any of the three) takes full,
+// exclusive control of auth resolution for this run, with no per-field env-var top-up - otherwise
+// a leftover NATS_TOKEN in the shell environment could silently override an explicit
+// --user/--password pair with no way to suppress it. Env vars only apply when the command line
+// gives none of the three at all - see design.md.
+static (string? User, string? Password, string? Token) ResolveAuth(string? user, string? password, string? token) =>
+    user is null && password is null && token is null
+        ? (Environment.GetEnvironmentVariable("NATS_USER"),
+           Environment.GetEnvironmentVariable("NATS_PASSWORD"),
+           Environment.GetEnvironmentVariable("NATS_TOKEN"))
+        : (user, password, token);
 
 // Overrides Terminal.Gui's stock "Base"/"Dialog" schemes with the app's own dark palette (see
 // openspec/changes/add-dark-theme). Must run after Application.Create(), which is what
