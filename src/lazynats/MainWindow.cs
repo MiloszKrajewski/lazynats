@@ -1,4 +1,5 @@
 ﻿using System.Threading.Channels;
+using lazynats.Components;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
@@ -18,11 +19,22 @@ internal sealed class MainWindow: Runnable
         var feedReader = Services.Root.GetRequiredService<ChannelReader<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
 
-        var subscriptionsView = new SubscriptionsView(registry) { Title = " Subscribe ", Padding = { Thickness = new Thickness(1) } };
+        var subscriptionsView = new SubscriptionsView(registry) { Background = Theme.EditableBackground };
+        var subscriptionsLabel = new Label { Text = "Subscriptions", X = 0, Y = 0 };
+        var subscriptionsFrame = new EditFrame(subscriptionsView) {
+            X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill(),
+            InnerBackgroundNormal = Theme.EditableBackground, InnerBackgroundFocused = Theme.EditableBackground,
+        };
+        var subscriptionsBand = new View {
+            X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(), CanFocus = true,
+            Title = " Subscribe ", Padding = { Thickness = new Thickness(1) },
+        };
+        subscriptionsBand.Add(subscriptionsLabel, subscriptionsFrame);
+
         var publishView = new PublishView(connection) { Title = " Publish ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
-        tabs.Add(subscriptionsView, publishView);
-        tabs.Value = subscriptionsView;
+        tabs.Add(subscriptionsBand, publishView);
+        tabs.Value = subscriptionsBand;
 
         var liveUpdates = new LiveUpdatesView(feedReader, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         liveUpdates.ItemSelected += envelope => MessageBox.Query(App!, "Selected", envelope.Message.Subject, "_Ok");
@@ -35,7 +47,7 @@ internal sealed class MainWindow: Runnable
         quitShortcut.Action = () => App!.RequestStop();
 
         var subscribeTabShortcut = new Shortcut { Text = "Subscribe", Key = Key.B.WithAlt, BindKeyToApplication = true };
-        subscribeTabShortcut.Action = () => tabs.Value = subscriptionsView;
+        subscribeTabShortcut.Action = () => tabs.Value = subscriptionsBand;
 
         var publishTabShortcut = new Shortcut { Text = "Publish", Key = Key.P.WithAlt, BindKeyToApplication = true };
         publishTabShortcut.Action = () => tabs.Value = publishView;
