@@ -30,27 +30,3 @@ ancestor (including the focused view itself) that implements the shortcut-source
 - **THEN** shortcuts advertised by a different view that is not an ancestor of the focused view are
   not included in the currently available set
 
-### Requirement: Available Shortcuts Update on Focus Change
-The system SHALL recompute the currently available set of shortcuts whenever keyboard focus moves
-to a different view anywhere in the application.
-
-#### Scenario: Moving focus changes the available shortcuts
-- **WHEN** keyboard focus moves from one view to another view with a different set of ancestor
-  shortcut sources
-- **THEN** the currently available set of shortcuts is recomputed to reflect the newly focused
-  view's ancestor chain
-
-### Requirement: Aggregated Shortcuts Are Rendered in the Status Bar
-The system SHALL render the currently-available set of shortcuts, as computed by shortcut
-aggregation, in the application's status bar, alongside the status bar's fixed/global shortcuts.
-
-#### Scenario: A view's advertised shortcuts appear in the status bar
-- **WHEN** keyboard focus is within a view (or one of its descendants) that implements the
-  shortcut-source contract
-- **THEN** that view's advertised shortcuts are visible in the status bar
-
-#### Scenario: Status bar shortcuts update when the available set changes without a focus change
-- **WHEN** the currently-focused view's advertised shortcuts change (e.g. because the view's
-  internal state changed) without keyboard focus moving to a different view
-- **THEN** the status bar's shortcut display is refreshed to reflect the new set
-

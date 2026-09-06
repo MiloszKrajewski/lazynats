@@ -19,10 +19,7 @@ namespace lazynats;
 
 internal sealed class MainWindow: Runnable
 {
-    private readonly ShortcutTracker _shortcutTracker;
     private readonly StatusBar _statusBar;
-    private readonly List<Shortcut> _dynamicShortcuts = [];
-    private readonly int _staticShortcutCount;
 
     public MainWindow()
     {
@@ -33,7 +30,6 @@ internal sealed class MainWindow: Runnable
         var objContext = Services.Root.GetRequiredService<INatsObjContext>();
         var feed = Services.Root.GetRequiredService<IObservable<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
-        _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
 
         var subscribeTab = new SubscribeTab(registry) { Title = " 1:Subscribe ", Padding = { Thickness = new Thickness(1) } };
         var streamsTab = new StreamsTab(jetStream) { Title = " 2:Streams ", Padding = { Thickness = new Thickness(1) } };
@@ -52,33 +48,82 @@ internal sealed class MainWindow: Runnable
             { Title = " Live Feed ", X = 0, Y = Pos.Bottom(tabs), Width = Dim.Fill(), Height = Dim.Fill(1) };
         feedFrame.Add(liveUpdates);
 
-        var quitShortcut = new Shortcut { Text = "Quit", Key = Key.Q.WithAlt, BindKeyToApplication = true };
-        quitShortcut.Action = () => App!.RequestStop();
-
-        var subscribeTabShortcut = new Shortcut { Text = "Subscribe", Key = Key.D1.WithAlt, BindKeyToApplication = true };
-        subscribeTabShortcut.Action = () => tabs.SelectTab(subscribeTab);
-
-        var streamsTabShortcut = new Shortcut { Text = "Streams", Key = Key.D2.WithAlt, BindKeyToApplication = true };
-        streamsTabShortcut.Action = () => tabs.SelectTab(streamsTab);
-
-        var valuesTabShortcut = new Shortcut { Text = "Values", Key = Key.D3.WithAlt, BindKeyToApplication = true };
-        valuesTabShortcut.Action = () => tabs.SelectTab(valuesTab);
-
-        var objectsTabShortcut = new Shortcut { Text = "Objects", Key = Key.D4.WithAlt, BindKeyToApplication = true };
-        objectsTabShortcut.Action = () => tabs.SelectTab(objectsTab);
-
-        var publishShortcut = new Shortcut { Text = "Publish", Key = Key.P.WithAlt, BindKeyToApplication = true };
+        // The single source of truth for the app's fixed, always-available shortcuts - both the
+        // StatusBar widgets below and ShortcutPickerDialog's hardcoded half are built from this
+        // same list, per openspec/changes/add-shortcut-picker/design.md, so there's one place to
+        // edit rather than two lists drifting apart.
+        var topLevelShortcuts = new List<ShortcutHint> {
+            new(Key.Q.WithAlt, "Quit", () => App!.RequestStop()),
+            new(Key.D1.WithAlt, "Subscribe", () => tabs.SelectTab(subscribeTab)),
+            new(Key.D2.WithAlt, "Streams", () => tabs.SelectTab(streamsTab)),
+            new(Key.D3.WithAlt, "Values", () => tabs.SelectTab(valuesTab)),
+            new(Key.D4.WithAlt, "Objects", () => tabs.SelectTab(objectsTab)),
+        };
         // Deferred via AddTimeout(Zero, ...) rather than calling App!.Run directly: this Action
         // runs from inside the very same Alt+P key dispatch that's still unwinding, and Run()
         // pumps a nested loop that re-observes that same in-flight keypress as unhandled, feeding
         // it back into this global binding and recursively stacking PublishDialog instances.
         // Deferring to the next main-loop iteration runs it after that dispatch has fully
         // unwound, breaking the re-entrancy.
-        publishShortcut.Action = () => App!.AddTimeout(
-            TimeSpan.Zero, () => {
-                App!.Run(new PublishDialog(connection));
-                return false;
-            });
+        topLevelShortcuts.Add(
+            new ShortcutHint(
+                Key.P.WithAlt, "Publish", () => App!.AddTimeout(
+                    TimeSpan.Zero, () => {
+                        App!.Run(new PublishDialog(connection));
+                        return false;
+                    })));
+        // Same re-entrancy hazard as Publish above (this Action also opens a nested modal via
+        // App!.Run from inside a still-unwinding global key dispatch), same AddTimeout(Zero, ...)
+        // fix. Snapshots the focus chain at the moment the dialog actually opens (one main-loop
+        // iteration after this shortcut was pressed - focus can't have moved in between) rather
+        // than continuously tracking it, per design.md's "compute on demand" decision.
+        //
+        // Key is Alt-K, not Ctrl-/, Alt-/, or F1: the first two were confirmed dead on the user's
+        // real Windows terminal (Ctrl+/ is explicitly excluded from Terminal.Gui's own default
+        // Windows key bindings - e.g. their built-in Undo binding is
+        // `Bind.AllPlus("Ctrl+Z", nonWindows: ["Ctrl+/"])" - and Alt+/ fared no better); F1
+        // worked but function keys are unreliable on some laptop keyboards (Fn-lock). Alt+<letter>
+        // matches the rest of this top-level set and has been reliable throughout.
+        topLevelShortcuts.Add(
+            new ShortcutHint(
+                Key.K.WithAlt, "Shortcuts", () => App!.AddTimeout(
+                    TimeSpan.Zero, () => {
+                        // Deliberately excludes topLevelShortcuts: those are already permanently
+                        // visible in the status bar, unlike the per-view ones this picker exists
+                        // to surface because they don't fit there - listing them again here would
+                        // just be redundant.
+                        var hints = ShortcutAggregator.Collect(App!.TopRunnableView?.MostFocused);
+                        var dialog = new ShortcutPickerDialog(hints);
+                        App!.Run(dialog);
+                        dialog.Result?.Action();
+                        return false;
+                    })));
+
+        // Deliberately NOT BindKeyToApplication: that binds the key at the Application level,
+        // bypassing normal modal key-routing entirely - confirmed via tmux that it lets e.g. Alt+3
+        // silently switch tabs out from under an already-open dialog (ShortcutPickerDialog
+        // included, which could even re-trigger itself and stack). Subscribing to this View's own
+        // KeyDown below instead means these only fire while MainWindow itself is part of the
+        // current key-dispatch chain - i.e. while no modal Dialog (a separate top-level session
+        // with no SuperView link back here) is running - the same way ListEditorView's Ctrl+N/E/D
+        // already work "from anywhere in this component" without needing BindKeyToApplication.
+        // The widgets below stay for status-bar display and mouse-click support only.
+        var topLevelWidgets = topLevelShortcuts.Select(
+            hint => {
+                var shortcut = new Shortcut { Text = hint.Text, Key = hint.Key };
+                shortcut.Action = hint.Action;
+                return shortcut;
+            }).ToArray();
+
+        KeyDown += (_, key) => {
+            foreach (var hint in topLevelShortcuts)
+                if (key == hint.Key)
+                {
+                    hint.Action();
+                    key.Handled = true;
+                    return;
+                }
+        };
 
         var clearShortcut = new Shortcut { Text = "Clear", Key = Key.C, Visible = false };
         clearShortcut.Action = liveUpdates.Clear;
@@ -104,46 +149,10 @@ internal sealed class MainWindow: Runnable
 
         _statusBar = new StatusBar(
         [
-            quitShortcut, subscribeTabShortcut, streamsTabShortcut, valuesTabShortcut, objectsTabShortcut,
-            publishShortcut, clearShortcut,
+            ..topLevelWidgets, clearShortcut,
             streamsStatusShortcut, valuesStatusShortcut, objectsStatusShortcut,
         ]);
-        _staticShortcutCount = _statusBar.SubViews.Count;
-
-        // Appends/replaces only the dynamic tail - the fixed shortcuts above and their own
-        // visibility wiring (e.g. clearShortcut) are never touched by this.
-        _shortcutTracker.ShortcutsChanged += SyncDynamicShortcuts;
 
         Add(tabs, feedFrame, _statusBar);
-    }
-
-    private void SyncDynamicShortcuts(IReadOnlyList<ShortcutHint> hints)
-    {
-        while (_statusBar.SubViews.Count > _staticShortcutCount) 
-            _statusBar.RemoveShortcut(_staticShortcutCount);
-        _dynamicShortcuts.Clear();
-
-        // Plain Add, not AddShortcutAt: this always appends at the end, and AddShortcutAt's
-        // insert-at-index implementation removes and re-adds every SubView in the Bar (statics
-        // included) to do that, once per hint. Beyond being wasteful, this refresh runs from
-        // ShortcutTracker.Refresh(), which itself can fire from inside Terminal.Gui's own
-        // in-progress focus-change dispatch (SetHasFocusTrue raises FocusedChanged before the
-        // new focus has fully settled) - repeatedly tearing down and rebuilding the StatusBar
-        // while that's happening was observed to leave keyboard Tab navigation one press behind
-        // until it self-corrected.
-        foreach (var hint in hints)
-        {
-            var shortcut = new Shortcut { Text = hint.Text, Key = hint.Key };
-            shortcut.Action = hint.Action;
-            _dynamicShortcuts.Add(shortcut);
-            _statusBar.Add(shortcut);
-        }
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing) 
-            _shortcutTracker.ShortcutsChanged -= SyncDynamicShortcuts;
-        base.Dispose(disposing);
     }
 }

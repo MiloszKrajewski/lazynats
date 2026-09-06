@@ -1,6 +1,5 @@
 ﻿using System.Reactive.Subjects;
 using lazynats;
-using lazynats.Components;
 using lazynats.LiveFeed;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,9 +25,6 @@ var jetStream = connection.CreateJetStreamContext();
 var kv = jetStream.CreateKeyValueStoreContext();
 var obj = jetStream.CreateObjectStoreContext();
 
-// Application.Create() must run before Services.Configure() - ShortcutTracker needs a live
-// IApplication at construction time (to subscribe to Navigation.FocusedChanged), and unlike every
-// other View.App usage in this codebase (always deferred to a callback), it can't wait for that.
 Application.MaximumIterationsPerSecond = 60;
 var app = Application.Create();
 ApplyColorTheme();
@@ -62,7 +58,6 @@ services.AddSingleton<IObserver<FeedEnvelope>>(feed);
 services.AddSingleton<IObservable<FeedEnvelope>>(feed);
 services.AddSingleton(new MessageDeduplicator(TimeSpan.FromMilliseconds(50)));
 services.AddSingleton(app);
-services.AddSingleton(new ShortcutTracker(app));
 Services.Configure(services);
 
 app.Run<MainWindow>().Dispose();
