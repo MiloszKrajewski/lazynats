@@ -1,20 +1,4 @@
-# nats-publish
-
-## Purpose
-
-Provide a "Publish" tab in the management area that lets the user compose and send a single
-NATS message (subject, headers, payload) via the connected NATS connection, entirely through the
-keyboard.
-
-## Requirements
-
-### Requirement: Publish Tab
-The system SHALL provide a "Publish" tab in the management area's tab view, positioned
-immediately after the "Subscriptions" tab, for composing and sending a single NATS message.
-
-#### Scenario: Publish tab is available after Subscriptions
-- **WHEN** the user views the management area's tabs
-- **THEN** "Subscriptions" is the first tab and "Publish" is the second tab
+## MODIFIED Requirements
 
 ### Requirement: Compose Message Fields
 The Publish tab SHALL provide an editable Subject field, an editable list of header key/value
@@ -87,42 +71,3 @@ requiring any pointer/mouse action.
 - **WHEN** the headers list is focused, the user selects an existing header pair, and presses
   Ctrl+D
 - **THEN** that pair is removed from the headers list and no longer sent with the message
-
-### Requirement: Send Validation
-The system SHALL disable the Send action whenever the Subject field is empty, and SHALL visually
-flag the Subject field as invalid (e.g. distinct color) while it is empty. No other field SHALL
-block Send.
-
-#### Scenario: Empty subject disables Send
-- **WHEN** the Subject field is empty
-- **THEN** the Send action is disabled and the Subject field is shown in its invalid visual state
-
-#### Scenario: Non-empty subject enables Send regardless of other fields
-- **WHEN** the Subject field is non-empty, regardless of whether headers or payload are empty
-- **THEN** the Send action is enabled
-
-### Requirement: Send Publishes the Message
-The system SHALL, when Send is activated, publish a NATS message on the entered subject using the
-entered header pairs and the entered payload text (UTF-8 encoded) via the connected NATS
-connection.
-
-#### Scenario: Sending publishes with the entered subject, headers, and payload
-- **WHEN** the user has entered subject `orders.created`, header pair `tenant`/`acme-co`, payload
-  text `{"id":42}`, and activates Send
-- **THEN** a NATS message is published on subject `orders.created` carrying the `tenant: acme-co`
-  header and the UTF-8 encoded payload `{"id":42}`
-
-### Requirement: Send Feedback and Form Retention
-The system SHALL report the outcome of a Send (success or failure) via the status bar, and SHALL
-NOT clear the Subject, Headers, or Payload fields after a Send, so the same message can be
-edited and resent.
-
-#### Scenario: Successful send reports status and keeps the form filled
-- **WHEN** a message is sent successfully
-- **THEN** the status bar reports the successful publish and the Subject, Headers, and Payload
-  fields remain populated with the values that were just sent
-
-#### Scenario: Failed send reports status and keeps the form filled
-- **WHEN** a send attempt fails (e.g. connection error)
-- **THEN** the status bar reports the failure and the Subject, Headers, and Payload fields remain
-  populated as entered, so the user can retry
