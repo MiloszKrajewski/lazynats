@@ -24,14 +24,15 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
     public event Action<T?>? HighlightChanged;
 
     // Raised only once the corresponding Enable* helper below has been called by a subclass - see
-    // EnableDescend/EnableAscend/EnableCreateDelete.
+    // EnableDescend/EnableAscend/EnableCreate/EnableDelete.
     public event Action? DescendRequested;
     public event Action? AscendRequested;
     public event Action? CreateRequested;
     public event Action? DeleteRequested;
 
     private bool _ascendEnabled;
-    private bool _createDeleteEnabled;
+    private bool _createEnabled;
+    private bool _deleteEnabled;
 
     protected DrillableListView(ObservableCollection<T> items)
     {
@@ -76,7 +77,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
     // ones that subclass needs - independent of each other, so activating one has no effect on
     // whether another is active (see openspec/specs/drillable-list/spec.md's "Shared ... Wiring"
     // requirements). A subclass composes at most one of EnableDescend/EnableAscend, plus
-    // optionally EnableCreateDelete.
+    // optionally EnableCreate and/or EnableDelete, activatable independently of each other.
 
     // Enter -> DescendRequested.
     protected void EnableDescend() => _listView.Accepted += (_, _) => DescendRequested?.Invoke();
@@ -90,10 +91,10 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
         KeyBindings.Add(Key.Backspace, Command.Cancel);
     }
 
-    // Ctrl+N -> CreateRequested, Ctrl+D -> DeleteRequested, plus "New"/"Delete" Shortcuts hints.
-    protected void EnableCreateDelete()
+    // Ctrl+N -> CreateRequested, plus a "New" Shortcuts hint. Independent of EnableDelete.
+    protected void EnableCreate()
     {
-        _createDeleteEnabled = true;
+        _createEnabled = true;
 
         // The inner ListView's own DefaultKeyBindings alias Ctrl+N to Command.Down (Emacs-style
         // "next"), on top of the Down arrow key. It's the actual focus target, so left in place it
@@ -103,6 +104,12 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
 
         AddCommand(Command.New, () => { CreateRequested?.Invoke(); return true; });
         KeyBindings.Add(Key.N.WithCtrl, Command.New);
+    }
+
+    // Ctrl+D -> DeleteRequested, plus a "Delete" Shortcuts hint. Independent of EnableCreate.
+    protected void EnableDelete()
+    {
+        _deleteEnabled = true;
 
         AddCommand(Command.DeleteAll, () => { DeleteRequested?.Invoke(); return true; });
         KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
@@ -192,18 +199,17 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
         UpdateEmptyHintScheme();
     }
 
-    // Ctrl+R plus whatever hints the enabled shared shapes (EnableAscend/EnableCreateDelete)
-    // imply - a subclass with its own navigation commands beyond those shapes still appends to
-    // this via `base.Shortcuts.Append(...)` rather than replacing it.
+    // Ctrl+R plus whatever hints the enabled shared shapes (EnableAscend/EnableCreate/
+    // EnableDelete) imply - a subclass with its own navigation commands beyond those shapes still
+    // appends to this via `base.Shortcuts.Append(...)` rather than replacing it.
     public virtual IEnumerable<ShortcutHint> Shortcuts
     {
         get
         {
             IEnumerable<ShortcutHint> hints = [new(Key.R.WithCtrl, "Refresh", () => RefreshRequested?.Invoke())];
             if (_ascendEnabled) hints = hints.Append(new ShortcutHint(Key.Esc, "Back", () => AscendRequested?.Invoke()));
-            if (_createDeleteEnabled) hints = hints
-                .Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()))
-                .Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
+            if (_createEnabled) hints = hints.Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()));
+            if (_deleteEnabled) hints = hints.Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
             return hints;
         }
     }

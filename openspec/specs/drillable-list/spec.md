@@ -154,24 +154,49 @@ without the subclass needing to bind either key, the event, or the hint itself.
 - **WHEN** a subclass activates the shared ascend wiring
 - **THEN** an Esc "Back" hint is present among the list's shortcut hints
 
-### Requirement: Shared Create/Delete Wiring
-A drillable list SHALL offer a shared, opt-in implementation of "create" and "delete" affordances:
-when activated by a subclass, pressing Ctrl+N or Ctrl+D while the list holds focus SHALL raise a
-create-requested or delete-requested event respectively, and "New"/"Delete" hints SHALL appear
-among the list's shortcut hints, without the subclass needing to bind either key, either event, or
-either hint itself.
+### Requirement: Shared Create Wiring
+A drillable list SHALL offer a shared, opt-in implementation of a "create" affordance: when
+activated by a subclass, pressing Ctrl+N while the list holds focus SHALL raise a create-requested
+event, and a "New" hint SHALL appear among the list's shortcut hints, without the subclass needing
+to bind the key, the event, or the hint itself. This wiring SHALL be activatable independently of
+the shared delete wiring — a subclass MAY activate create without delete, delete without create,
+both, or neither.
 
-#### Scenario: Activating create/delete wiring raises events on Ctrl+N and Ctrl+D
-- **WHEN** a subclass activates the shared create/delete wiring and the user presses Ctrl+N, then
-  separately Ctrl+D, while the list holds focus
-- **THEN** the create-requested event is raised on Ctrl+N and the delete-requested event is raised
-  on Ctrl+D
+#### Scenario: Activating create wiring raises the event on Ctrl+N
+- **WHEN** a subclass activates the shared create wiring and the user presses Ctrl+N while the
+  list holds focus
+- **THEN** the create-requested event is raised
 
-#### Scenario: Activating create/delete wiring surfaces New and Delete hints
-- **WHEN** a subclass activates the shared create/delete wiring
-- **THEN** "New" and "Delete" hints are present among the list's shortcut hints
+#### Scenario: Activating create wiring surfaces a New hint
+- **WHEN** a subclass activates the shared create wiring
+- **THEN** a "New" hint is present among the list's shortcut hints
 
-#### Scenario: A subclass that does not activate create/delete wiring has neither affordance
-- **WHEN** a subclass does not activate the shared create/delete wiring
+#### Scenario: Create wiring without delete wiring has no delete affordance
+- **WHEN** a subclass activates the shared create wiring but not the shared delete wiring
+- **THEN** Ctrl+D has no effect on that list and no "Delete" hint appears among its shortcut hints
+
+### Requirement: Shared Delete Wiring
+A drillable list SHALL offer a shared, opt-in implementation of a "delete" affordance: when
+activated by a subclass, pressing Ctrl+D while the list holds focus SHALL raise a delete-requested
+event, and a "Delete" hint SHALL appear among the list's shortcut hints, without the subclass
+needing to bind the key, the event, or the hint itself. This wiring SHALL be activatable
+independently of the shared create wiring — a subclass MAY activate delete without create, create
+without delete, both, or neither.
+
+#### Scenario: Activating delete wiring raises the event on Ctrl+D
+- **WHEN** a subclass activates the shared delete wiring and the user presses Ctrl+D while the
+  list holds focus
+- **THEN** the delete-requested event is raised
+
+#### Scenario: Activating delete wiring surfaces a Delete hint
+- **WHEN** a subclass activates the shared delete wiring
+- **THEN** a "Delete" hint is present among the list's shortcut hints
+
+#### Scenario: Delete wiring without create wiring has no create affordance
+- **WHEN** a subclass activates the shared delete wiring but not the shared create wiring
+- **THEN** Ctrl+N has no effect on that list and no "New" hint appears among its shortcut hints
+
+#### Scenario: A subclass that activates neither wiring has neither affordance
+- **WHEN** a subclass activates neither the shared create wiring nor the shared delete wiring
 - **THEN** Ctrl+N and Ctrl+D have no effect on that list and no "New"/"Delete" hints appear among
   its shortcut hints

@@ -11,7 +11,8 @@ internal sealed class BucketListView: DrillableListView<NatsKVStatus>
     public BucketListView(ObservableCollection<NatsKVStatus> items): base(items)
     {
         EnableDescend();
-        EnableCreateDelete();
+        EnableCreate();
+        EnableDelete();
     }
 
     protected override IValuePresenter<NatsKVStatus> Presenter => PresenterInstance;

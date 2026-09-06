@@ -56,6 +56,8 @@ internal sealed class ObjTab: View
         _listView.RefreshRequested += () => _ = RefreshListAsync();
         _listView.HighlightChanged += OnBucketHighlightChanged;
         _listView.DescendRequested += Descend;
+        _listView.CreateRequested += () => OpenCreateBucketDialog(null);
+        _listView.DeleteRequested += () => _ = TryDeleteBucketAsync();
 
         _objectListView = new ObjectListView(_objectItems) { Background = Theme.EditableBackground };
         _objectListFrame = new EditFrame(_objectListView) {
@@ -163,7 +165,58 @@ internal sealed class ObjTab: View
         _listView.SetFocus();
     }
 
-    private async Task RefreshListAsync()
+    // Always runs on the UI thread - either directly from the Ctrl+N key command (already on the
+    // UI thread) or via the App.Invoke below, reached from TryCreateBucketAsync's continuation
+    // after an await. Mirrors KvTab.OpenCreateBucketDialog exactly - see its comment for the full
+    // rationale.
+    private void OpenCreateBucketDialog(NewBucketOptions? seed)
+    {
+        var dialog = new CreateBucketDialog(seed);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryCreateBucketAsync(options);
+    }
+
+    private async Task TryCreateBucketAsync(NewBucketOptions options)
+    {
+        try {
+            await _obj.CreateObjectStoreAsync(options.ToNatsObjConfig());
+            _ = RefreshListAsync(options.Name);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Create Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
+                OpenCreateBucketDialog(options);
+            });
+        }
+    }
+
+    // Scoped by _listView.SelectedBucket alone - no _currentBucket check needed, since Ctrl+D is
+    // only bound at the bucket level (see BucketListView) and this is unreachable from the object
+    // level. Mirrors KvTab.TryDeleteBucketAsync exactly.
+    private async Task TryDeleteBucketAsync()
+    {
+        if (_listView.SelectedBucket is not { } stream) return;
+        var name = BucketName.From(stream);
+
+        var choice = MessageBox.Query(
+            App!, DialogText.Pad("Delete Bucket"),
+            DialogText.Pad($"Delete bucket '{name}'? This cannot be undone."),
+            "_Delete", "_Cancel");
+        if (choice != 0) return;
+
+        var neighborName = _listView.NeighborIdentity(name);
+
+        try {
+            await _obj.DeleteObjectStore(name, default);
+            _ = RefreshListAsync(neighborName);
+        } catch (Exception ex) {
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Bucket Failed"), DialogText.Pad(ex.Message), "_Ok"));
+        }
+    }
+
+    // `selectName` highlights a specific bucket after the refresh (used right after a create, so
+    // the new bucket is selected instead of ReplaceItems' default "keep whatever was highlighted
+    // before" fallback) - null for a plain Ctrl+R/initial-load refresh.
+    private async Task RefreshListAsync(string? selectName = null)
     {
         try {
             var buckets = new List<StreamInfo>();
@@ -171,7 +224,7 @@ internal sealed class ObjTab: View
             // buckets - see BucketName's comment.
             await foreach (var stream in _jetStream.ListStreamsAsync())
                 if (BucketName.IsObjStream(stream.Info.Config.Name)) buckets.Add(stream.Info);
-            App?.Invoke(() => _listView.ReplaceItems(buckets));
+            App?.Invoke(() => _listView.ReplaceItems(buckets, selectName));
         } catch (Exception ex) {
             // Keep whatever the list previously showed rather than clearing it on a transient
             // error - matches KvTab's "poll or refresh error" handling.

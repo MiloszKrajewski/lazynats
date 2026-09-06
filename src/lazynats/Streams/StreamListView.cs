@@ -11,7 +11,8 @@ internal sealed class StreamListView: DrillableListView<StreamInfo>
     public StreamListView(ObservableCollection<StreamInfo> items): base(items)
     {
         EnableDescend();
-        EnableCreateDelete();
+        EnableCreate();
+        EnableDelete();
     }
 
     protected override IValuePresenter<StreamInfo> Presenter => PresenterInstance;

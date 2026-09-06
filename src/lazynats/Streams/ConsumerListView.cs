@@ -11,7 +11,8 @@ internal sealed class ConsumerListView: DrillableListView<ConsumerInfo>
     public ConsumerListView(ObservableCollection<ConsumerInfo> items): base(items)
     {
         EnableAscend();
-        EnableCreateDelete();
+        EnableCreate();
+        EnableDelete();
     }
 
     protected override IValuePresenter<ConsumerInfo> Presenter => PresenterInstance;
