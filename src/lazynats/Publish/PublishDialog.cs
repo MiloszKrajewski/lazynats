@@ -42,14 +42,12 @@ internal sealed class PublishDialog: Dialog
 
         var headersLabel = new Label { Text = "Headers", X = 0, Y = 4 };
         var subjectBackground = _subjectField.GetAttributeForRole(VisualRole.Editable).Background;
-        // FilterBox's own fixed Height (3) pushes headerFrame and everything below it down by 3
-        // rows relative to before this field existed - see the hand-adjusted Y values below.
-        var headerFilterBox = new FilterBox { X = 0, Y = 5, Width = FieldWidth };
+        // No FilterBox - HeaderEditorView never offers filter/search (see its own comment); the
+        // frame starts right where the label ends instead. Height 8 -> 6 visible rows inside
+        // EditFrame's 1-row top/bottom border, enough to show several headers at once without
+        // scrolling immediately.
         var headerEditor = new HeaderEditorView(_headers) { Background = subjectBackground };
-        headerEditor.AttachFilterBox(headerFilterBox);
-        // Height 5 -> 3 visible rows inside EditFrame's 1-row top/bottom border, enough to show
-        // a few headers at once without scrolling immediately.
-        var headerFrame = WrapField(headerEditor, 8, 5);
+        var headerFrame = WrapField(headerEditor, 5, 8);
 
         var payloadLabel = new Label { Text = "Payload", X = 0, Y = 13 };
         // TabKeyAddsTab = false stops TextView from consuming Tab at all (mirroring
@@ -63,11 +61,8 @@ internal sealed class PublishDialog: Dialog
 
         _statusLabel = new Label { Text = string.Empty, X = 0, Y = 25 };
 
-        // Add()-order matches spatial top-down layout (label, then FilterBox, then its list) so
-        // Tab/Shift+Tab cycles in reading order - mirrors StreamsTab/ValuesTab/ObjectsTab/
-        // SubscribeTab.
         Add(
-            subjectLabel, subjectFrame, headersLabel, headerFilterBox, headerFrame, payloadLabel, payloadFrame,
+            subjectLabel, subjectFrame, headersLabel, headerFrame, payloadLabel, payloadFrame,
             _statusLabel);
 
         // Result is left unset, matching Esc's own cancellation convention - added before Send so

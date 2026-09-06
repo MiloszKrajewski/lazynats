@@ -10,7 +10,6 @@ internal sealed class StreamListView: DrillableListView<StreamInfo>
 
     public StreamListView(ObservableCollection<StreamInfo> items): base(items)
     {
-        EnableDescend();
         EnableCreate();
         EnableDelete();
         EnableEdit();

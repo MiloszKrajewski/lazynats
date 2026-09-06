@@ -9,14 +9,17 @@ internal readonly record struct HeaderPair(string Key, string Value);
 // SubscriptionsView) instead of the always-visible key/value input row it used to be. Add/Replace/
 // Delete stay the base class defaults - unlike subscriptions, headers have no external registry to
 // keep in sync with, PublishDialog only reads the collection at Send time.
+//
+// No filter/search (no EnableFilter, no attached FilterBox anywhere this is used) - a handful of
+// headers (realistically well under 10) is never worth "/"-search/Ctrl+F chrome, so that vertical
+// space is given back to the header list itself instead (see PublishDialog/TemplateDialog).
 internal sealed class HeaderEditorView: ListEditorView<HeaderPair>
 {
     private static readonly HeaderColonPresenter Presenter = new();
 
-    public HeaderEditorView(ObservableCollection<HeaderPair> items): base(items, Presenter) => EnableFilter();
+    public HeaderEditorView(ObservableCollection<HeaderPair> items): base(items, Presenter) { }
 
     protected override string EmptyHint => "No headers — Ctrl+N to add one";
-    protected override string FilterDialogTitle => "Filter Headers";
 
     protected override bool TryCreate(out HeaderPair result) =>
         TryEditHeader("New Header", string.Empty, out result);

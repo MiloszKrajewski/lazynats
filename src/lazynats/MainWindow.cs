@@ -5,6 +5,7 @@ using lazynats.Objects;
 using lazynats.Publish;
 using lazynats.Streams;
 using lazynats.Subscriptions;
+using lazynats.Templates;
 using lazynats.Values;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
@@ -36,8 +37,9 @@ internal sealed class MainWindow: Runnable
         var streamsTab = new StreamsTab(jetStream) { Title = " 2:Streams ", Padding = { Thickness = new Thickness(1) } };
         var valuesTab = new ValuesTab(kvContext) { Title = " 3:Values ", Padding = { Thickness = new Thickness(1) } };
         var objectsTab = new ObjectsTab(jetStream, objContext) { Title = " 4:Objects ", Padding = { Thickness = new Thickness(1) } };
+        var templatesTab = new TemplatesTab(kvContext) { Title = " 5:Templates ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
-        tabs.Add(subscribeTab, streamsTab, valuesTab, objectsTab);
+        tabs.Add(subscribeTab, streamsTab, valuesTab, objectsTab, templatesTab);
         tabs.SelectTab(subscribeTab);
 
         var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -59,6 +61,7 @@ internal sealed class MainWindow: Runnable
             new(Key.D2.WithAlt, "Streams", () => tabs.SelectTab(streamsTab)),
             new(Key.D3.WithAlt, "Values", () => tabs.SelectTab(valuesTab)),
             new(Key.D4.WithAlt, "Objects", () => tabs.SelectTab(objectsTab)),
+            new(Key.D5.WithAlt, "Templates", () => tabs.SelectTab(templatesTab)),
         };
         // Deferred via AddTimeout(Zero, ...) rather than calling App!.Run directly: this Action
         // runs from inside the very same Alt+P key dispatch that's still unwinding, and Run()
@@ -148,10 +151,16 @@ internal sealed class MainWindow: Runnable
             objectsStatusShortcut.Visible = true;
         };
 
+        var templatesStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
+        templatesTab.StatusChanged += message => {
+            templatesStatusShortcut.Text = message;
+            templatesStatusShortcut.Visible = true;
+        };
+
         _statusBar = new StatusBar(
         [
             ..topLevelWidgets, clearShortcut,
-            streamsStatusShortcut, valuesStatusShortcut, objectsStatusShortcut,
+            streamsStatusShortcut, valuesStatusShortcut, objectsStatusShortcut, templatesStatusShortcut,
         ]);
 
         Add(tabs, feedFrame, _statusBar);

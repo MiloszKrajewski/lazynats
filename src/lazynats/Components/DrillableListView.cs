@@ -88,6 +88,13 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         UpdateEmptyHintScheme();
 
         AddCommand(Command.Refresh, () => { RefreshRequested?.Invoke(); return true; });
+        // Claims Command.Accept (Enter) unconditionally, marking it handled - without this, a
+        // list that never calls EnableDescend (every "leaf" list: KeyListView, ObjectListView,
+        // TemplateListView) leaves the inner ListView's own unhandled Enter to bubble further up
+        // the view hierarchy, where Terminal.Gui's fallback ends up moving focus to the attached
+        // FilterBox instead of doing nothing. DescendRequested simply has no subscribers on those
+        // lists, so this is a genuine no-op there; EnableDescend is what makes it do something.
+        AddCommand(Command.Accept, () => { DescendRequested?.Invoke(); return true; });
 
         Add(_listView, _emptyHintLabel);
         _items.CollectionChanged += (_, _) => UpdateEmptyHintVisibility();
@@ -109,13 +116,11 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     // Opt-in shared navigation shapes, called from a subclass constructor to activate exactly the
     // ones that subclass needs - independent of each other, so activating one has no effect on
     // whether another is active (see openspec/specs/drillable-list/spec.md's "Shared ... Wiring"
-    // requirements). A subclass composes at most one of EnableDescend/EnableAscend, plus
-    // optionally EnableCreate, EnableDelete, and/or EnableEdit, activatable independently of each
-    // other. Quick-search is a separate opt-in, made by the owning Tab rather than the subclass
-    // itself - see AttachFilterBox.
-
-    // Enter -> DescendRequested.
-    protected void EnableDescend() => _listView.Accepted += (_, _) => DescendRequested?.Invoke();
+    // requirements). A subclass composes at most one of EnableAscend plus (Enter -> Descend is
+    // unconditional - see the constructor's own Command.Accept handler, not an Enable* shape),
+    // plus optionally EnableCreate, EnableDelete, and/or EnableEdit, activatable independently of
+    // each other. Quick-search is a separate opt-in, made by the owning Tab rather than the
+    // subclass itself - see AttachFilterBox.
 
     // Esc/Backspace -> AscendRequested, plus an Esc "Back" Shortcuts hint.
     protected void EnableAscend()

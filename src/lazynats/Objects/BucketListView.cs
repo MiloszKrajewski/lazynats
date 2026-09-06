@@ -15,7 +15,6 @@ internal sealed class BucketListView: DrillableListView<ObjBucketItem>
 
     public BucketListView(ObservableCollection<ObjBucketItem> items): base(items)
     {
-        EnableDescend();
         EnableCreate();
         EnableDelete();
         EnableEdit();
