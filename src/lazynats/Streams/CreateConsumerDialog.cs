@@ -39,9 +39,10 @@ internal enum ConsumerCreateDeliverPolicy
 
 // Multi-field modal for creating a consumer on the currently drilled-into stream (not itself a
 // dialog field - see StreamsTab.OpenCreateConsumerDialog). Same shape as CreateStreamDialog: Tab
-// moves between fields, Enter-on-a-field is a swallowed no-op, Create is the single explicit
-// button, Esc cancels via Dialog<T>'s own built-in behavior. `initial` seeds every field, used to
-// reopen the dialog pre-filled after a failed CreateConsumerAsync (see StreamsTab).
+// moves between fields, Enter-on-a-field is a swallowed no-op, Create is the primary button, Esc
+// cancels via Dialog<T>'s own built-in behavior, and Cancel is a plain mnemonic-less button for
+// mouse users (see CreateStreamDialog for why it has no "C" hotkey). `initial` seeds every field,
+// used to reopen the dialog pre-filled after a failed CreateConsumerAsync (see StreamsTab).
 internal sealed class CreateConsumerDialog: Dialog<NewConsumerOptions>
 {
     private static readonly Attribute InvalidAttribute = new(ColorName16.Red, Theme.EditableBackground);
@@ -72,17 +73,25 @@ internal sealed class CreateConsumerDialog: Dialog<NewConsumerOptions>
         _ackPolicyDropDown = new DropDownList<ConsumerCreateAckPolicy> {
             Value = initial is null ? ConsumerCreateAckPolicy.Explicit : ToCurated(initial.AckPolicy),
         };
+        Theme.ApplyEditableScheme(_ackPolicyDropDown);
         var ackPolicyFrame = WrapField(_ackPolicyDropDown, 9);
 
         var deliverPolicyLabel = new Label { Text = "Deliver Policy", X = 0, Y = 12 };
         _deliverPolicyDropDown = new DropDownList<ConsumerCreateDeliverPolicy> {
             Value = initial is null ? ConsumerCreateDeliverPolicy.All : ToCurated(initial.DeliverPolicy),
         };
+        Theme.ApplyEditableScheme(_deliverPolicyDropDown);
         var deliverPolicyFrame = WrapField(_deliverPolicyDropDown, 13);
 
         Add(
             nameLabel, nameFrame, filterSubjectsLabel, filterSubjectsFrame,
             ackPolicyLabel, ackPolicyFrame, deliverPolicyLabel, deliverPolicyFrame);
+
+        // Result is left unset (null), matching Esc's own cancellation convention. Added before
+        // Create so Create - not Cancel - stays the last-added, Enter-activated default button.
+        var cancelButton = new Button { Text = "Cancel" };
+        cancelButton.Accepting += (_, e) => { e.Handled = true; RequestStop(); };
+        AddButton(cancelButton);
 
         // Marks the event Handled - same reason CreateStreamDialog's own Create button does: left
         // unhandled, Dialog<T>'s own default "unhandled Accept -> RequestStop" behavior fires

@@ -1,13 +1,4 @@
-# color-theme Specification
-
-## Purpose
-
-The app applies a single, centrally-declared black/dark-gray color theme across the whole UI —
-including Terminal.Gui's built-in dialog scheme — so the background, editor-control background,
-and dialog rendering are explicit and consistent rather than dependent on the terminal emulator's
-own default rendering or Terminal.Gui's stock blue-toned dialog colors.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: App-wide base color theme
 The system SHALL apply a single, app-wide base color theme at startup, so the app's background
@@ -99,31 +90,3 @@ resolving `Editable` directly.
 - **WHEN** a `DropDownList<T>`'s popup list is expanded
 - **THEN** the popup's background is the same single editor-background constant as the control's
   own closed-state background, not the ambient background of whatever view last held focus
-
-### Requirement: Dialogs match the app's base color theme
-The system SHALL apply the same black/gray palette to Terminal.Gui's built-in `"Dialog"` scheme
-(used by `Dialog`-derived views and `MessageBox`), so dialogs render visually consistent with the
-rest of the app instead of using Terminal.Gui's stock blue-toned dialog colors.
-
-#### Scenario: Dialog background is black
-- **WHEN** a `Dialog` (e.g. `PatternDialog`, `HeaderDialog`) or a `MessageBox` resolves its
-  `VisualRole.Normal` color
-- **THEN** the resolved background is `ColorName16.Black`, not the stock blue-toned background
-
-#### Scenario: Editable fields inside a dialog use the app's editor background
-- **WHEN** an editable control inside a `Dialog` (e.g. `PatternDialog`'s or `HeaderDialog`'s text
-  field) resolves its `VisualRole.Editable` color
-- **THEN** the resolved background is the same single editor-background constant used elsewhere
-  in the app, and remains distinguishable from the dialog's own `Normal` background
-
-#### Scenario: A dialog's field background is the same whether valid or invalid
-- **WHEN** `PatternDialog`'s or `HeaderDialog`'s field is empty/invalid (its default state) versus
-  when it holds valid text
-- **THEN** the field's full width shows the same editor-background color in both states — only
-  the foreground (e.g. red for invalid) differs, never the background falling back to the
-  dialog's own `Normal` color in either state
-
-#### Scenario: Dialog focus highlight is no longer blue-tinted
-- **WHEN** a focusable element inside a `Dialog` resolves its `VisualRole.Focus` color
-- **THEN** the resolved colors no longer include the stock blue tones (`LightSkyBlue`/
-  `OuterSpace`)

@@ -12,11 +12,10 @@ namespace lazynats.Streams;
 // one field (PatternDialog/HeaderDialog are both single-TextField precedent that commit on
 // Enter). Tab has to be free to move between fields here, so Enter-on-a-field is deliberately
 // inert rather than "submit" - Create is a single explicit button instead (clicked, or reached
-// via Tab and activated with Enter/Space). No Cancel button: Esc already cancels via Dialog<T>'s
-// own built-in behavior (same as the buttonless PatternDialog/HeaderDialog), and a second button
-// starting with the same mnemonic letter ("_Cancel" vs "_Create") would only collide. `initial`
-// seeds every field, used to reopen the dialog pre-filled after a failed CreateStreamAsync (see
-// StreamsTab).
+// via Tab and activated with Enter/Space). Cancel is a plain, mnemonic-less button ("Cancel", not
+// "_Cancel") purely for mouse users - Esc already cancels via Dialog<T>'s own built-in behavior,
+// and a keyboard mnemonic sharing "C" with "_Create" would only collide. `initial` seeds every
+// field, used to reopen the dialog pre-filled after a failed CreateStreamAsync (see StreamsTab).
 internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
 {
     private static readonly Attribute InvalidAttribute = new(ColorName16.Red, Theme.EditableBackground);
@@ -44,6 +43,7 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
 
         var retentionLabel = new Label { Text = "Retention", X = 0, Y = 8 };
         _retentionDropDown = new DropDownList<StreamConfigRetention> { Value = initial?.Retention ?? StreamConfigRetention.Limits };
+        Theme.ApplyEditableScheme(_retentionDropDown);
         var retentionFrame = WrapField(_retentionDropDown, 9);
 
         var maxAgeLabel = new Label { Text = "Max Age", X = 0, Y = 12 };
@@ -52,6 +52,12 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
         var maxAgeFrame = WrapField(_maxAgeField, 13);
 
         Add(nameLabel, nameFrame, subjectsLabel, subjectsFrame, retentionLabel, retentionFrame, maxAgeLabel, maxAgeFrame);
+
+        // Result is left unset (null), matching Esc's own cancellation convention. Added before
+        // Create so Create - not Cancel - stays the last-added, Enter-activated default button.
+        var cancelButton = new Button { Text = "Cancel" };
+        cancelButton.Accepting += (_, e) => { e.Handled = true; RequestStop(); };
+        AddButton(cancelButton);
 
         // Marks the event Handled - same reason PatternDialog's field-level Accepting handler
         // does: left unhandled, Dialog<T>'s own default "unhandled Accept -> RequestStop"

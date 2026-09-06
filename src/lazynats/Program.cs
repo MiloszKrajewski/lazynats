@@ -9,6 +9,7 @@ using NATS.Net;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 
 var connection = new NatsConnection(new NatsOpts { Url = "nats://localhost:4222" });
@@ -30,6 +31,25 @@ var obj = jetStream.CreateObjectStoreContext();
 Application.MaximumIterationsPerSecond = 60;
 var app = Application.Create();
 ApplyColorTheme();
+
+// DropDownList's expanded popup sizes its ContentView.Width to Dim.Auto(DimAutoStyle.Content) -
+// its longest item's text - with no reference to the anchor DropDownList's own width. Fix it
+// centrally here (rather than per dialog) so every dropdown's popup, present or future, matches
+// its control's width instead - see openspec/changes/dropdown-visual-consistency/design.md.
+// Confirmed via an interactive tmux spike against this exact build: PopoverRegistered fires
+// before the popup's first MakeVisible()/Layout() (so this assignment lands before first draw)
+// and again on every subsequent open (DropDownList.OnHasFocusChanging DeRegisters its popover on
+// focus-loss and re-Registers on focus-gain, re-firing this event each time). The same spike
+// showed the popup's own Normal background already resolves to the DropDownList's - which
+// Theme.ApplyEditableScheme (Theme.cs) has set to Theme.EditableBackground - because
+// Application.TopRunnableView.MostFocused while the popup is open is the DropDownList itself, so
+// no separate background fix is needed here.
+if (app.Popovers != null) {
+    app.Popovers.PopoverRegistered += (_, e) => {
+        if (e.Value is not Popover<ListView, string?> popover) return;
+        if (popover.Anchor?.Invoke()?.Width is int width && popover.ContentView != null) popover.ContentView.Width = width;
+    };
+}
 
 var services = new ServiceCollection();
 services.AddSingleton(connection);

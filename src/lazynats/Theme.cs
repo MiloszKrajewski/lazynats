@@ -1,4 +1,6 @@
 using Terminal.Gui.Drawing;
+using Terminal.Gui.ViewBase;
+using Attribute = Terminal.Gui.Drawing.Attribute;
 
 namespace lazynats;
 
@@ -13,4 +15,20 @@ internal static class Theme
     // ColorName16.Black, not DarkGray: Color.GetClosestNamedColor16() confirms (32,32,32) is
     // nearer Black than any other 16-color palette entry.
     public static readonly Color EditableBackground = new(32, 32, 32);
+
+    private static readonly Attribute EditableAttribute = new(ColorName16.White, EditableBackground);
+
+    // DropDownList redirects its VisualRole.Editable lookups to Normal/Focus in its default
+    // (read-only) mode (see openspec/changes/dropdown-visual-consistency/design.md), so it never
+    // picks up Program.cs's ApplyColorTheme() Editable attribute the way a TextField does. Setting
+    // an explicit Scheme directly on the instance gives its closed, unfocused state the same
+    // White-on-EditableBackground look as a TextField.
+    //
+    // Only Normal is set here (via the single-Attribute Scheme constructor) - Focus is
+    // deliberately left to derive Terminal.Gui's default inverted fg/bg bar, the same mechanism
+    // ListEditorView/DrillableListView rely on for a selected list row's highlight (see
+    // ListEditorView.SetBackgroundColor). A TextField gets its focus affordance from its blinking
+    // cursor and stays background-stable per the color-theme spec; DropDownList has no cursor
+    // (ReadOnly), so without this it was indistinguishable focused vs. unfocused while closed.
+    public static void ApplyEditableScheme(View view) => view.SetScheme(new Scheme(EditableAttribute));
 }
