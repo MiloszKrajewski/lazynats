@@ -16,11 +16,17 @@ using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
+using Attribute = Terminal.Gui.Drawing.Attribute;
 
 namespace lazynats;
 
 internal sealed class MainWindow: Runnable
 {
+    // Trailing indicator glyph in the Live Feed border status: "following down" as new messages
+    // arrive, vs. a stopped/pinned marker while sticky.
+    private const char FollowingGlyph = '↓';
+    private const char StickyGlyph = '●';
+
     private readonly StatusBar _statusBar;
 
     public MainWindow()
@@ -50,6 +56,50 @@ internal sealed class MainWindow: Runnable
         var feedFrame = new FrameView
             { Title = " Live Feed ", X = 0, Y = Pos.Bottom(tabs), Width = Dim.Fill(), Height = Dim.Fill(1) };
         feedFrame.Add(liveUpdates);
+
+        // Sibling of feedFrame (not a child of its Border, not inside LiveUpdatesView itself, per
+        // the live-feed spec's "No In-View Header" requirement) so it draws after feedFrame's own
+        // border paint completes - no LineCanvas.Exclude bookkeeping needed. `Pos.AnchorEnd()`
+        // (no offset) tracks the label's own current Width (it's the width-aware form, unlike
+        // `AnchorEnd(n)` which is a fixed offset that a growing digit count - up to 5 at the
+        // 10,000-message cap - would run past, overwriting the border's corner glyph), flush
+        // against MainWindow's right edge - which is also the corner glyph's own column, so `- 2`
+        // shifts the label two columns further left: one to clear the corner's column entirely,
+        // one more to leave an actual blank gutter column before it (confirmed empirically against
+        // the running app - `- 1` still abuts the corner with no visible gap). `Pos.Bottom(feedFrame)
+        // - 1` puts it on the bottom border row instead - same right-corner column, one row up from
+        // feedFrame's own bottom edge.
+        // See openspec/changes/live-feed-message-count/design.md decisions 2-4.
+        var feedStatusLabel = new Label
+        {
+            X = Pos.AnchorEnd() - 2, Y = Pos.Bottom(feedFrame) - 1, Width = Dim.Auto(), Height = 1,
+            CanFocus = false, Text = FormatFeedStatus(new LiveFeedStatus(0, true, 0)),
+        };
+        // Whole-label color override (per-view Scheme, not per-run text markup - Terminal.Gui
+        // Labels have no inline "markdown-like" styling): green while following, yellow while
+        // sticky. Background is read once, before the first override, so later overrides keep
+        // matching the ambient border color rather than whatever the previous override left behind.
+        var feedStatusBackground = feedStatusLabel.GetAttributeForRole(VisualRole.Normal).Background;
+        feedStatusLabel.SetScheme(new Scheme(new Attribute(Theme.LiveFeedFollowingColor, feedStatusBackground)));
+        liveUpdates.StatusChanged += status => {
+            feedStatusLabel.Text = FormatFeedStatus(status);
+            var color = status.Following ? Theme.LiveFeedFollowingColor : Theme.LiveFeedStickyColor;
+            feedStatusLabel.SetScheme(new Scheme(new Attribute(color, feedStatusBackground)));
+            feedStatusLabel.SetNeedsDraw();
+        };
+        // Sibling dirty-tracking doesn't cascade: feedFrame's own border repaint (resize, or its
+        // subtree's focus state changing) can redraw over the label without touching it, so it
+        // must be explicitly invalidated alongside those triggers too.
+        feedFrame.FrameChanged += (_, _) => feedStatusLabel.SetNeedsDraw();
+        feedFrame.HasFocusChanged += (_, _) => feedStatusLabel.SetNeedsDraw();
+
+        // Following: total message count plus a down arrow ("following down" as new messages
+        // arrive). Sticky (paused): the selected message's 1-based position out of the total,
+        // plus a filled circle marking that the feed is stopped/pinned rather than scrolling.
+        // Padded with a leading/trailing space for breathing room against the border line.
+        static string FormatFeedStatus(LiveFeedStatus status) => status.Following
+            ? $" {status.Count} {FollowingGlyph} "
+            : $" {status.SelectedIndex + 1}/{status.Count} {StickyGlyph} ";
 
         // The single source of truth for the app's fixed, always-available shortcuts - both the
         // StatusBar widgets below and ShortcutPickerDialog's hardcoded half are built from this
@@ -165,6 +215,6 @@ internal sealed class MainWindow: Runnable
             streamsStatusShortcut, valuesStatusShortcut, objectsStatusShortcut, templatesStatusShortcut,
         ]);
 
-        Add(tabs, feedFrame, _statusBar);
+        Add(tabs, feedFrame, feedStatusLabel, _statusBar);
     }
 }

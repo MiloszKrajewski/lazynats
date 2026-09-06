@@ -16,6 +16,12 @@ internal static class Theme
     // nearer Black than any other 16-color palette entry.
     public static readonly Color EditableBackground = new(32, 32, 32);
 
+    // Live Feed border status indicator glyph colors (openspec/changes/live-feed-message-count):
+    // green while following ("going"), yellow while sticky/paused ("caution") - a red
+    // "completely inactive" tier is anticipated but has no corresponding feed state yet.
+    public static readonly Color LiveFeedFollowingColor = new(ColorName16.BrightGreen);
+    public static readonly Color LiveFeedStickyColor = new(ColorName16.BrightYellow);
+
     private static readonly Attribute EditableAttribute = new(ColorName16.White, EditableBackground);
 
     // Dimmed foreground, same EditableBackground - explicit rather than left to derive from

@@ -8,6 +8,11 @@ using Terminal.Gui.Views;
 
 namespace lazynats.LiveFeed;
 
+// SelectedIndex is only meaningful when Following is false ("sticky" - the selection has stuck to
+// a specific message while the feed keeps arriving underneath it); while Following, the feed is
+// always scrolled to the newest message so there is no independent position to report.
+internal readonly record struct LiveFeedStatus(int Count, bool Following, int SelectedIndex);
+
 internal sealed class LiveUpdatesView: View, IShortcutSource
 {
     private const int MaximumFeedLength = 10_000;
@@ -21,6 +26,7 @@ internal sealed class LiveUpdatesView: View, IShortcutSource
     private bool _suppressValueChanged;
 
     public event Action<FeedEnvelope>? ItemSelected;
+    public event Action<LiveFeedStatus>? StatusChanged;
 
     // App resolves via the SuperView chain, so it's unavailable during the constructor (this
     // view has no SuperView yet - it's added to feedFrame/MainWindow afterward). Wiring the Rx
@@ -35,7 +41,11 @@ internal sealed class LiveUpdatesView: View, IShortcutSource
         _listView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
         _listView.Source = _dataSource;
         _listView.Accepted += OnAccepted;
-        _listView.ValueChanged += (_, _) => { if (!_suppressValueChanged) _following = false; };
+        _listView.ValueChanged += (_, _) => {
+            if (_suppressValueChanged) return;
+            _following = false;
+            RaiseStatusChanged();
+        };
 
         // ListView claims Space for its own mark-toggle behavior (Command.Toggle) before it ever
         // bubbles up here, and - confirmed empirically against the running app - that claim isn't
@@ -77,6 +87,7 @@ internal sealed class LiveUpdatesView: View, IShortcutSource
     {
         _events.Clear();
         SetSelectedItemGuarded(null);
+        RaiseStatusChanged();
     }
 
     public IEnumerable<ShortcutHint> Shortcuts => [
@@ -88,6 +99,7 @@ internal sealed class LiveUpdatesView: View, IShortcutSource
     {
         _following = !_following;
         if (_following) MoveEndGuarded();
+        RaiseStatusChanged();
     }
 
     private void OnEvent(FeedEnvelope envelope)
@@ -109,7 +121,12 @@ internal sealed class LiveUpdatesView: View, IShortcutSource
 
         if (_following) MoveEndGuarded();
         else if (selectedItem != _listView.SelectedItem) SetSelectedItemGuarded(selectedItem);
+
+        RaiseStatusChanged();
     }
+
+    private void RaiseStatusChanged() =>
+        StatusChanged?.Invoke(new LiveFeedStatus(_events.Count, _following, _listView.SelectedItem ?? 0));
 
     private void SetSelectedItemGuarded(int? value)
     {
