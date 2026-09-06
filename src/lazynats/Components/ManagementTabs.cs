@@ -30,6 +30,71 @@ internal sealed class ManagementTabs: Tabs
         AddCommand(Command.Down, FocusOwnContent);
         AddCommand(Command.Left, () => SwitchTab(-1));
         AddCommand(Command.Right, () => SwitchTab(1));
+
+        // Tab/Shift+Tab resolve differently from ordinary keys in Terminal.Gui: rather than
+        // bubbling through each ancestor's own KeyBindings from the focused view outward (how
+        // Ctrl+R, Up/Down above, etc. all work), they route straight to the nearest enclosing
+        // TabGroup - which, for every management tab's content, is this view (Tabs sets
+        // TabStop = TabBehavior.TabGroup on itself). A FilterBox or DrillableListView<T> binding
+        // Key.Tab on themselves is never actually consulted; this is the only place in the tree
+        // such a binding can take effect at all. Left to Terminal.Gui's own default AdvanceFocus,
+        // reaching either end of a page's own focus chain (now that a page can have more than one
+        // focusable child) escapes to the tab's own header, or even a *different* management tab
+        // entirely - the same kind of leak the class comment above describes for arrow keys, just
+        // via Tab instead. See AdvanceWithinPage.
+        //
+        // Deliberately bound to Command.Accept, not Command.NextTabStop/PreviousTabStop - the
+        // list<->FilterBox toggle AdvanceWithinPage implements is direction-agnostic (there are
+        // only ever the two of them), but more importantly, routing *through* NextTabStop/
+        // PreviousTabStop specifically - even with a custom handler overriding them here - left
+        // Terminal.Gui's own internal Tab-navigation bookkeeping in a state where, once
+        // PreviousTabStop (Shift+Tab) had fired once in a session, NextTabStop (Tab) silently
+        // stopped reaching this view's KeyBindings at all for the rest of the session (reproduced
+        // repeatedly; Shift+Tab kept working indefinitely, only Tab broke, and only after the
+        // first Shift+Tab). Using an unrelated Command sidesteps whatever that internal coupling
+        // is entirely.
+        KeyBindings.Add(Key.Tab, Command.Accept);
+        KeyBindings.Add(Key.Tab.WithShift, Command.Accept);
+        AddCommand(Command.Accept, AdvanceWithinPage);
+    }
+
+    // Switches to `tab` and focuses its default target (skipping any FilterBox - see
+    // FindFirstFocusableDescendant), rather than whatever the base Value setter's own SetFocus()
+    // picks by default (its own first-in-SubViews-order descendant, unaware of FilterBox's spatial
+    // Add()-order-driven placement ahead of the list it filters). Every direct-selection path
+    // (Alt+1..4 shortcuts, the initial tab on startup) goes through this, not `Value = tab`
+    // directly - unlike arrow-key header<->content navigation (FocusOwnContent), which already
+    // resolves the same way.
+    public void SelectTab(View tab)
+    {
+        Value = tab;
+        (FindFirstFocusableDescendant(tab) ?? tab).SetFocus();
+    }
+
+    // A list<->FilterBox pairing toggles directly between the two, regardless of direction (there
+    // are only ever the two of them) - walks up from the actually-focused view (not just Value's
+    // immediate child) looking for either half of such a pairing and focuses it. Falls back to
+    // generic forward AdvanceFocus for anything else (a tab with no FilterBox, or focus already
+    // outside any pairing) - unchanged from, and no worse than, Terminal.Gui's own default there.
+    private bool? AdvanceWithinPage()
+    {
+        for (var view = App?.Navigation?.GetFocused(); view is not null; view = view.SuperView)
+        {
+            if (view is FilterBox { Target: { } target })
+            {
+                target.FocusList();
+                return true;
+            }
+
+            if (view is IFilterable { AttachedFilterBox: { } box })
+            {
+                box.Focus();
+                return true;
+            }
+        }
+
+        App?.Navigation?.AdvanceFocus(NavigationDirection.Forward, TabBehavior.TabStop);
+        return true;
     }
 
     private bool? FocusOwnHeader()
@@ -64,7 +129,11 @@ internal sealed class ManagementTabs: Tabs
     {
         foreach (var sub in view.SubViews)
         {
-            if (!sub.Visible || !sub.Enabled) continue;
+            // A FilterBox is deliberately Add()-ed before its list (so Tab/Shift+Tab cycles in
+            // top-down spatial order - see each *Tab.cs's Add() call) but should never itself be
+            // where a tab's content lands by default on entry: skipped here entirely (not just
+            // deprioritized) so this DFS's "first" is still the list, independent of that order.
+            if (!sub.Visible || !sub.Enabled || sub is FilterBox) continue;
 
             var deeper = FindFirstFocusableDescendant(sub);
             if (deeper is not null) return deeper;

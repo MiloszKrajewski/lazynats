@@ -1,10 +1,10 @@
 ﻿using lazynats.Components;
-using lazynats.Values;
 using lazynats.LiveFeed;
 using lazynats.Objects;
 using lazynats.Publish;
 using lazynats.Streams;
 using lazynats.Subscriptions;
+using lazynats.Values;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
@@ -29,41 +29,43 @@ internal sealed class MainWindow: Runnable
         var registry = Services.Root.GetRequiredService<SubscriptionRegistry>();
         var connection = Services.Root.GetRequiredService<NatsConnection>();
         var jetStream = Services.Root.GetRequiredService<INatsJSContext>();
-        var kv = Services.Root.GetRequiredService<INatsKVContext>();
-        var obj = Services.Root.GetRequiredService<INatsObjContext>();
+        var kvContext = Services.Root.GetRequiredService<INatsKVContext>();
+        var objContext = Services.Root.GetRequiredService<INatsObjContext>();
         var feed = Services.Root.GetRequiredService<IObservable<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
         _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
 
         var subscribeTab = new SubscribeTab(registry) { Title = " 1:Subscribe ", Padding = { Thickness = new Thickness(1) } };
         var streamsTab = new StreamsTab(jetStream) { Title = " 2:Streams ", Padding = { Thickness = new Thickness(1) } };
-        var valuesTab = new ValuesTab(kv) { Title = " 3:Values ", Padding = { Thickness = new Thickness(1) } };
-        var objectsTab = new ObjectsTab(jetStream, obj) { Title = " 4:Objects ", Padding = { Thickness = new Thickness(1) } };
+        var valuesTab = new ValuesTab(kvContext) { Title = " 3:Values ", Padding = { Thickness = new Thickness(1) } };
+        var objectsTab = new ObjectsTab(jetStream, objContext) { Title = " 4:Objects ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
         tabs.Add(subscribeTab, streamsTab, valuesTab, objectsTab);
-        tabs.Value = subscribeTab;
+        tabs.SelectTab(subscribeTab);
 
         var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
-        liveUpdates.ItemSelected += envelope => MessageBox.Query(App!, DialogText.Pad("Selected"), DialogText.Pad(envelope.Message.Subject), "_Ok");
+        liveUpdates.ItemSelected += envelope => MessageBox.Query(
+            App!, DialogText.Pad("Selected"), DialogText.Pad(envelope.Message.Subject), "_Ok");
 
         // Dim.Fill(1) leaves the bottom row free for the StatusBar, which sits outside this frame.
-        var feedFrame = new FrameView { Title = " Live Feed ", X = 0, Y = Pos.Bottom(tabs), Width = Dim.Fill(), Height = Dim.Fill(1) };
+        var feedFrame = new FrameView
+            { Title = " Live Feed ", X = 0, Y = Pos.Bottom(tabs), Width = Dim.Fill(), Height = Dim.Fill(1) };
         feedFrame.Add(liveUpdates);
 
         var quitShortcut = new Shortcut { Text = "Quit", Key = Key.Q.WithAlt, BindKeyToApplication = true };
         quitShortcut.Action = () => App!.RequestStop();
 
         var subscribeTabShortcut = new Shortcut { Text = "Subscribe", Key = Key.D1.WithAlt, BindKeyToApplication = true };
-        subscribeTabShortcut.Action = () => tabs.Value = subscribeTab;
+        subscribeTabShortcut.Action = () => tabs.SelectTab(subscribeTab);
 
         var streamsTabShortcut = new Shortcut { Text = "Streams", Key = Key.D2.WithAlt, BindKeyToApplication = true };
-        streamsTabShortcut.Action = () => tabs.Value = streamsTab;
+        streamsTabShortcut.Action = () => tabs.SelectTab(streamsTab);
 
         var valuesTabShortcut = new Shortcut { Text = "Values", Key = Key.D3.WithAlt, BindKeyToApplication = true };
-        valuesTabShortcut.Action = () => tabs.Value = valuesTab;
+        valuesTabShortcut.Action = () => tabs.SelectTab(valuesTab);
 
         var objectsTabShortcut = new Shortcut { Text = "Objects", Key = Key.D4.WithAlt, BindKeyToApplication = true };
-        objectsTabShortcut.Action = () => tabs.Value = objectsTab;
+        objectsTabShortcut.Action = () => tabs.SelectTab(objectsTab);
 
         var publishShortcut = new Shortcut { Text = "Publish", Key = Key.P.WithAlt, BindKeyToApplication = true };
         // Deferred via AddTimeout(Zero, ...) rather than calling App!.Run directly: this Action
@@ -72,7 +74,11 @@ internal sealed class MainWindow: Runnable
         // it back into this global binding and recursively stacking PublishDialog instances.
         // Deferring to the next main-loop iteration runs it after that dispatch has fully
         // unwound, breaking the re-entrancy.
-        publishShortcut.Action = () => App!.AddTimeout(TimeSpan.Zero, () => { App!.Run(new PublishDialog(connection)); return false; });
+        publishShortcut.Action = () => App!.AddTimeout(
+            TimeSpan.Zero, () => {
+                App!.Run(new PublishDialog(connection));
+                return false;
+            });
 
         var clearShortcut = new Shortcut { Text = "Clear", Key = Key.C, Visible = false };
         clearShortcut.Action = liveUpdates.Clear;
@@ -96,8 +102,10 @@ internal sealed class MainWindow: Runnable
             objectsStatusShortcut.Visible = true;
         };
 
-        _statusBar = new StatusBar([
-            quitShortcut, subscribeTabShortcut, streamsTabShortcut, valuesTabShortcut, objectsTabShortcut, publishShortcut, clearShortcut,
+        _statusBar = new StatusBar(
+        [
+            quitShortcut, subscribeTabShortcut, streamsTabShortcut, valuesTabShortcut, objectsTabShortcut,
+            publishShortcut, clearShortcut,
             streamsStatusShortcut, valuesStatusShortcut, objectsStatusShortcut,
         ]);
         _staticShortcutCount = _statusBar.SubViews.Count;
@@ -111,7 +119,8 @@ internal sealed class MainWindow: Runnable
 
     private void SyncDynamicShortcuts(IReadOnlyList<ShortcutHint> hints)
     {
-        while (_statusBar.SubViews.Count > _staticShortcutCount) _statusBar.RemoveShortcut(_staticShortcutCount);
+        while (_statusBar.SubViews.Count > _staticShortcutCount) 
+            _statusBar.RemoveShortcut(_staticShortcutCount);
         _dynamicShortcuts.Clear();
 
         // Plain Add, not AddShortcutAt: this always appends at the end, and AddShortcutAt's
@@ -122,7 +131,8 @@ internal sealed class MainWindow: Runnable
         // new focus has fully settled) - repeatedly tearing down and rebuilding the StatusBar
         // while that's happening was observed to leave keyboard Tab navigation one press behind
         // until it self-corrected.
-        foreach (var hint in hints) {
+        foreach (var hint in hints)
+        {
             var shortcut = new Shortcut { Text = hint.Text, Key = hint.Key };
             shortcut.Action = hint.Action;
             _dynamicShortcuts.Add(shortcut);
@@ -132,7 +142,8 @@ internal sealed class MainWindow: Runnable
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _shortcutTracker.ShortcutsChanged -= SyncDynamicShortcuts;
+        if (disposing) 
+            _shortcutTracker.ShortcutsChanged -= SyncDynamicShortcuts;
         base.Dispose(disposing);
     }
 }

@@ -18,11 +18,13 @@ internal sealed class StreamsTab: View
 
     private readonly ObservableCollection<StreamInfo> _items = [];
     private readonly StreamListView _listView;
+    private readonly FilterBox _streamFilterBox;
     private readonly EditFrame _streamListFrame;
     private readonly StreamDetails _details;
 
     private readonly ObservableCollection<ConsumerInfo> _consumerItems = [];
     private readonly ConsumerListView _consumerListView;
+    private readonly FilterBox _consumerFilterBox;
     private readonly EditFrame _consumerListFrame;
     private readonly ConsumerDetails _consumerDetails;
 
@@ -44,9 +46,11 @@ internal sealed class StreamsTab: View
         _jetStream = jetStream;
 
         _listLabel = new Label { Text = "Streams", X = 0, Y = 0 };
+        _streamFilterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40) };
         _listView = new StreamListView(_items) { Background = Theme.EditableBackground };
+        _listView.AttachFilterBox(_streamFilterBox);
         _streamListFrame = new EditFrame(_listView) {
-            X = 0, Y = 1, Width = Dim.Percent(40), Height = Dim.Fill(),
+            X = 0, Y = Pos.Bottom(_streamFilterBox), Width = Dim.Percent(40), Height = Dim.Fill(),
             InnerBackgroundNormal = Theme.EditableBackground, InnerBackgroundFocused = Theme.EditableBackground,
         };
         _listView.RefreshRequested += () => _ = RefreshListAsync();
@@ -56,9 +60,11 @@ internal sealed class StreamsTab: View
         _listView.DeleteRequested += () => _ = TryDeleteStreamAsync();
         _listView.EditRequested += OpenEditStreamDialog;
 
+        _consumerFilterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40), Visible = false };
         _consumerListView = new ConsumerListView(_consumerItems) { Background = Theme.EditableBackground };
+        _consumerListView.AttachFilterBox(_consumerFilterBox);
         _consumerListFrame = new EditFrame(_consumerListView) {
-            X = 0, Y = 1, Width = Dim.Percent(40), Height = Dim.Fill(), Visible = false,
+            X = 0, Y = Pos.Bottom(_consumerFilterBox), Width = Dim.Percent(40), Height = Dim.Fill(), Visible = false,
             InnerBackgroundNormal = Theme.EditableBackground, InnerBackgroundFocused = Theme.EditableBackground,
         };
         _consumerListView.RefreshRequested += () => _ = RefreshConsumerListAsync();
@@ -77,7 +83,11 @@ internal sealed class StreamsTab: View
         };
         _consumerDetails.Error += message => StatusChanged?.Invoke($"Streams: {message}");
 
-        Add(_listLabel, _streamListFrame, _consumerListFrame, _detailsLabel, _details, _consumerDetails);
+        // Add()-order matches spatial top-down layout (label, then FilterBox, then its list) so
+        // Tab/Shift+Tab cycles in reading order - ManagementTabs.FindFirstFocusableDescendant
+        // separately skips FilterBox for the tab's *default* focus target, so entering/returning
+        // to this tab still lands on the list, not the search field, despite that order.
+        Add(_listLabel, _streamFilterBox, _streamListFrame, _consumerFilterBox, _consumerListFrame, _detailsLabel, _details, _consumerDetails);
     }
 
     // "Selected tab" in this app is focus-driven (doc/terminal-gui-howto.md: "The focused SubView
@@ -125,7 +135,9 @@ internal sealed class StreamsTab: View
         _consumerListView.ReplaceItems([]);
         _listLabel.Text = $"Consumers of {name}";
         _detailsLabel.Text = "Consumer Details";
+        _streamFilterBox.Visible = false;
         _streamListFrame.Visible = false;
+        _consumerFilterBox.Visible = true;
         _consumerListFrame.Visible = true;
         _details.Visible = false;
         _consumerDetails.Visible = true;
@@ -145,7 +157,9 @@ internal sealed class StreamsTab: View
         _currentStream = null;
         _listLabel.Text = "Streams";
         _detailsLabel.Text = "Details";
+        _consumerFilterBox.Visible = false;
         _consumerListFrame.Visible = false;
+        _streamFilterBox.Visible = true;
         _streamListFrame.Visible = true;
         _consumerDetails.Visible = false;
         _details.Visible = true;

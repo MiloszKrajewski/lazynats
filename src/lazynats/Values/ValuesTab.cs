@@ -20,11 +20,13 @@ internal sealed class ValuesTab: View
 
     private readonly ObservableCollection<NatsKVStatus> _items = [];
     private readonly BucketListView _listView;
+    private readonly FilterBox _bucketFilterBox;
     private readonly EditFrame _bucketListFrame;
     private readonly BucketDetails _details;
 
     private readonly ObservableCollection<string> _keyItems = [];
     private readonly KeyListView _keyListView;
+    private readonly FilterBox _keyFilterBox;
     private readonly EditFrame _keyListFrame;
     private readonly KeyDetails _keyDetails;
 
@@ -46,9 +48,11 @@ internal sealed class ValuesTab: View
         _kv = kv;
 
         _listLabel = new Label { Text = "Buckets", X = 0, Y = 0 };
+        _bucketFilterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40) };
         _listView = new BucketListView(_items) { Background = Theme.EditableBackground };
+        _listView.AttachFilterBox(_bucketFilterBox);
         _bucketListFrame = new EditFrame(_listView) {
-            X = 0, Y = 1, Width = Dim.Percent(40), Height = Dim.Fill(),
+            X = 0, Y = Pos.Bottom(_bucketFilterBox), Width = Dim.Percent(40), Height = Dim.Fill(),
             InnerBackgroundNormal = Theme.EditableBackground, InnerBackgroundFocused = Theme.EditableBackground,
         };
         _listView.RefreshRequested += () => _ = RefreshListAsync();
@@ -58,9 +62,11 @@ internal sealed class ValuesTab: View
         _listView.DeleteRequested += () => _ = TryDeleteBucketAsync();
         _listView.EditRequested += OpenEditBucketDialog;
 
+        _keyFilterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40), Visible = false };
         _keyListView = new KeyListView(_keyItems) { Background = Theme.EditableBackground };
+        _keyListView.AttachFilterBox(_keyFilterBox);
         _keyListFrame = new EditFrame(_keyListView) {
-            X = 0, Y = 1, Width = Dim.Percent(40), Height = Dim.Fill(), Visible = false,
+            X = 0, Y = Pos.Bottom(_keyFilterBox), Width = Dim.Percent(40), Height = Dim.Fill(), Visible = false,
             InnerBackgroundNormal = Theme.EditableBackground, InnerBackgroundFocused = Theme.EditableBackground,
         };
         _keyListView.RefreshRequested += () => _ = RefreshKeyListAsync();
@@ -79,7 +85,11 @@ internal sealed class ValuesTab: View
         };
         _keyDetails.Error += message => StatusChanged?.Invoke($"Values: {message}");
 
-        Add(_listLabel, _bucketListFrame, _keyListFrame, _detailsLabel, _details, _keyDetails);
+        // Add()-order matches spatial top-down layout (label, then FilterBox, then its list) so
+        // Tab/Shift+Tab cycles in reading order - ManagementTabs.FindFirstFocusableDescendant
+        // separately skips FilterBox for the tab's *default* focus target, so entering/returning
+        // to this tab still lands on the list, not the search field, despite that order.
+        Add(_listLabel, _bucketFilterBox, _bucketListFrame, _keyFilterBox, _keyListFrame, _detailsLabel, _details, _keyDetails);
     }
 
     // "Selected tab" in this app is focus-driven (doc/terminal-gui-howto.md: "The focused SubView
@@ -132,7 +142,9 @@ internal sealed class ValuesTab: View
         _keyListView.ReplaceItems([]);
         _listLabel.Text = $"Keys of {name}";
         _detailsLabel.Text = "Key Details";
+        _bucketFilterBox.Visible = false;
         _bucketListFrame.Visible = false;
+        _keyFilterBox.Visible = true;
         _keyListFrame.Visible = true;
         _details.Visible = false;
         _keyDetails.Visible = true;
@@ -152,7 +164,9 @@ internal sealed class ValuesTab: View
         _currentBucket = null;
         _listLabel.Text = "Buckets";
         _detailsLabel.Text = "Details";
+        _keyFilterBox.Visible = false;
         _keyListFrame.Visible = false;
+        _bucketFilterBox.Visible = true;
         _bucketListFrame.Visible = true;
         _keyDetails.Visible = false;
         _details.Visible = true;

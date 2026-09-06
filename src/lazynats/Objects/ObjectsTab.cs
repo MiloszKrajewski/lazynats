@@ -21,11 +21,13 @@ internal sealed class ObjectsTab: View
 
     private readonly ObservableCollection<StreamInfo> _items = [];
     private readonly BucketListView _listView;
+    private readonly FilterBox _bucketFilterBox;
     private readonly EditFrame _bucketListFrame;
     private readonly BucketDetails _details;
 
     private readonly ObservableCollection<string> _objectItems = [];
     private readonly ObjectListView _objectListView;
+    private readonly FilterBox _objectFilterBox;
     private readonly EditFrame _objectListFrame;
     private readonly ObjectDetails _objectDetails;
 
@@ -48,9 +50,11 @@ internal sealed class ObjectsTab: View
         _obj = obj;
 
         _listLabel = new Label { Text = "Buckets", X = 0, Y = 0 };
+        _bucketFilterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40) };
         _listView = new BucketListView(_items) { Background = Theme.EditableBackground };
+        _listView.AttachFilterBox(_bucketFilterBox);
         _bucketListFrame = new EditFrame(_listView) {
-            X = 0, Y = 1, Width = Dim.Percent(40), Height = Dim.Fill(),
+            X = 0, Y = Pos.Bottom(_bucketFilterBox), Width = Dim.Percent(40), Height = Dim.Fill(),
             InnerBackgroundNormal = Theme.EditableBackground, InnerBackgroundFocused = Theme.EditableBackground,
         };
         _listView.RefreshRequested += () => _ = RefreshListAsync();
@@ -60,9 +64,11 @@ internal sealed class ObjectsTab: View
         _listView.DeleteRequested += () => _ = TryDeleteBucketAsync();
         _listView.EditRequested += OpenEditBucketDialog;
 
+        _objectFilterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40), Visible = false };
         _objectListView = new ObjectListView(_objectItems) { Background = Theme.EditableBackground };
+        _objectListView.AttachFilterBox(_objectFilterBox);
         _objectListFrame = new EditFrame(_objectListView) {
-            X = 0, Y = 1, Width = Dim.Percent(40), Height = Dim.Fill(), Visible = false,
+            X = 0, Y = Pos.Bottom(_objectFilterBox), Width = Dim.Percent(40), Height = Dim.Fill(), Visible = false,
             InnerBackgroundNormal = Theme.EditableBackground, InnerBackgroundFocused = Theme.EditableBackground,
         };
         _objectListView.RefreshRequested += () => _ = RefreshObjectListAsync();
@@ -81,7 +87,11 @@ internal sealed class ObjectsTab: View
         };
         _objectDetails.Error += message => StatusChanged?.Invoke($"Objects: {message}");
 
-        Add(_listLabel, _bucketListFrame, _objectListFrame, _detailsLabel, _details, _objectDetails);
+        // Add()-order matches spatial top-down layout (label, then FilterBox, then its list) so
+        // Tab/Shift+Tab cycles in reading order - ManagementTabs.FindFirstFocusableDescendant
+        // separately skips FilterBox for the tab's *default* focus target, so entering/returning
+        // to this tab still lands on the list, not the search field, despite that order.
+        Add(_listLabel, _bucketFilterBox, _bucketListFrame, _objectFilterBox, _objectListFrame, _detailsLabel, _details, _objectDetails);
     }
 
     // "Selected tab" in this app is focus-driven (doc/terminal-gui-howto.md: "The focused SubView
@@ -138,7 +148,9 @@ internal sealed class ObjectsTab: View
         _objectListView.ReplaceItems([]);
         _listLabel.Text = $"Objects of {name}";
         _detailsLabel.Text = "Object Details";
+        _bucketFilterBox.Visible = false;
         _bucketListFrame.Visible = false;
+        _objectFilterBox.Visible = true;
         _objectListFrame.Visible = true;
         _details.Visible = false;
         _objectDetails.Visible = true;
@@ -158,7 +170,9 @@ internal sealed class ObjectsTab: View
         _currentBucket = null;
         _listLabel.Text = "Buckets";
         _detailsLabel.Text = "Details";
+        _objectFilterBox.Visible = false;
         _objectListFrame.Visible = false;
+        _bucketFilterBox.Visible = true;
         _bucketListFrame.Visible = true;
         _objectDetails.Visible = false;
         _details.Visible = true;

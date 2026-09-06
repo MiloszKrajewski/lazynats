@@ -13,9 +13,17 @@ namespace lazynats.Components;
 // descend, Esc/Backspace -> ascend, ...) is deliberately left to each subclass - list behavior is
 // driven by list type, not item type. See
 // openspec/changes/extract-drillable-list-base/design.md.
-internal abstract class DrillableListView<T>: View, IShortcutSource
+//
+// Items are always kept sorted ascending by GetIdentity (Ordinal) in `_items` - the master set,
+// entirely owned by this class once passed in (see ReplaceItems). `_filtered` is a second,
+// always-sorted-the-same-way ObservableCollection that PresenterListDataSource/ListView actually
+// render: identical to `_items` when no FilterBox is attached or its field is empty, otherwise the
+// subset matching the search query - see openspec/changes/add-drillable-list-search/design.md
+// Decision 2.
+internal abstract class DrillableListView<T>: View, IShortcutSource, IFilterable
 {
     private readonly ObservableCollection<T> _items;
+    private readonly ObservableCollection<T> _filtered;
     private readonly PresenterListDataSource<T> _dataSource;
     private readonly ListView _listView;
     private readonly Label _emptyHintLabel;
@@ -36,13 +44,19 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
     private bool _deleteEnabled;
     private bool _editEnabled;
 
+    private FilterBox? _filterBox;
+
     protected DrillableListView(ObservableCollection<T> items)
     {
         CanFocus = true;
         _items = items;
+        _filtered = [];
 
-        _dataSource = new PresenterListDataSource<T>(_items, Presenter);
+        _dataSource = new PresenterListDataSource<T>(_filtered, Presenter);
         _listView = new ListView { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
+        // Disables ListView's own built-in type-to-jump navigation - AttachFilterBox's field is
+        // this class's own answer to "find an item by typing", so the two must not compete for
+        // the same keystrokes.
         _listView.KeystrokeNavigator = null;
         _listView.Source = _dataSource;
         _listView.ValueChanged += (_, _) => HighlightChanged?.Invoke(SelectedItem);
@@ -79,7 +93,9 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
     // ones that subclass needs - independent of each other, so activating one has no effect on
     // whether another is active (see openspec/specs/drillable-list/spec.md's "Shared ... Wiring"
     // requirements). A subclass composes at most one of EnableDescend/EnableAscend, plus
-    // optionally EnableCreate and/or EnableDelete, activatable independently of each other.
+    // optionally EnableCreate, EnableDelete, and/or EnableEdit, activatable independently of each
+    // other. Quick-search is a separate opt-in, made by the owning Tab rather than the subclass
+    // itself - see AttachFilterBox.
 
     // Enter -> DescendRequested.
     protected void EnableDescend() => _listView.Accepted += (_, _) => DescendRequested?.Invoke();
@@ -126,43 +142,151 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
         KeyBindings.Add(Key.E.WithCtrl, Command.Edit);
     }
 
-    public T? SelectedItem =>
-        _listView.SelectedItem is { } index and >= 0 && index < _items.Count ? _items[index] : default;
-
-    // Re-fetched contents from a Ctrl+R (or the initial load) replace _items wholesale; the
-    // previously-highlighted item stays highlighted if it's still present (by GetIdentity),
-    // otherwise the first item is selected - per "Identity-Preserving Replace". `selectIdentity`
-    // overrides that fallback (e.g. after a create, to highlight the newly added item instead of
-    // whatever was selected before it existed).
-    public void ReplaceItems(IReadOnlyList<T> items, string? selectIdentity = null)
+    // Links an externally-created, externally-positioned FilterBox to this list, so "/" focuses it
+    // and its text fuzzy-filters the currently-loaded items live, in memory - see
+    // ApplyFilterAndSelect/FuzzyMatches and the IFilterable implementation below. Deliberately not
+    // a View this class creates and embeds itself (that read as a frame within a frame, since this
+    // whole component is already wrapped in its own EditFrame by the owning Tab) - the Tab
+    // constructs and positions the box like any other View and links it here, per
+    // openspec/changes/add-drillable-list-search/design.md.
+    public void AttachFilterBox(FilterBox box)
     {
-        var currentIdentity = selectIdentity ?? (SelectedItem is { } current ? GetIdentity(current) : null);
+        _filterBox = box;
+        box.AttachTo(this);
 
-        _items.Clear();
-        foreach (var item in items) _items.Add(item);
+        AddCommand(Command.Find, () => { box.Focus(); return true; });
+        KeyBindings.Add(new Key('/'), Command.Find);
 
-        var index = currentIdentity is null ? -1 : IndexOfIdentity(currentIdentity);
-        _listView.SelectedItem = _items.Count == 0 ? null : index >= 0 ? index : 0;
+        // Up-arrow at the top of the list (declined by the inner ListView itself, which only
+        // handles Up when it can actually move the selection) moves to the attached FilterBox
+        // directly - it sits immediately above the list on screen, so this is what "up" should do,
+        // rather than bubbling out to the tab's own header via Terminal.Gui's generic
+        // TabStop/AdvanceFocus handling. See design.md Decision 7.
+        AddCommand(Command.Up, () => { box.Focus(); return true; });
+        KeyBindings.Add(Key.CursorUp, Command.Up);
+    }
+
+    void IFilterable.ApplyFilter(string query)
+    {
+        var previousIdentity = SelectedItem is { } current ? GetIdentity(current) : null;
+        ApplyFilterAndSelect(query, previousIdentity);
         HighlightChanged?.Invoke(SelectedItem);
     }
 
-    private int IndexOfIdentity(string identity)
+    void IFilterable.FocusList() => _listView.SetFocus();
+
+    FilterBox? IFilterable.AttachedFilterBox => _filterBox;
+
+    // Esc on the attached FilterBox while it was already empty - the same result as pressing Esc
+    // directly on this list, per "Esc on an already-empty search field falls through to ascend".
+    void IFilterable.HandleEmptySearchEscape()
     {
-        for (var i = 0; i < _items.Count; i++)
-            if (GetIdentity(_items[i]) == identity) return i;
+        if (_ascendEnabled) AscendRequested?.Invoke();
+    }
+
+    public T? SelectedItem =>
+        _listView.SelectedItem is { } index and >= 0 && index < _filtered.Count ? _filtered[index] : default;
+
+    // Re-fetched contents from a Ctrl+R (or the initial load) replace the master set wholesale,
+    // sorted ascending by GetIdentity (Ordinal) - every subclass gets alphabetical order for free.
+    // Any active search text is reset to empty (so a create/edit/refresh always leaves its result
+    // visible regardless of what was previously typed), then the filtered projection is
+    // re-derived and the previously-highlighted item's identity restored if still present,
+    // otherwise the nearest remaining item by sort order - per "Identity-Preserving Replace".
+    // `selectIdentity` overrides that fallback (e.g. after a create, to highlight the newly added
+    // item instead of whatever was selected before it existed).
+    public void ReplaceItems(IReadOnlyList<T> items, string? selectIdentity = null)
+    {
+        var previousIdentity = selectIdentity ?? (SelectedItem is { } current ? GetIdentity(current) : null);
+
+        var sorted = items.OrderBy(GetIdentity, StringComparer.Ordinal);
+        _items.Clear();
+        foreach (var item in sorted) _items.Add(item);
+
+        // Search text resets on every refresh - clear the attached box's field (silently, since
+        // ApplyFilterAndSelect below is the authoritative re-derive) rather than leave stale text
+        // filtering out whatever this refresh just brought in (e.g. a just-created item).
+        _filterBox?.ResetSilently();
+
+        ApplyFilterAndSelect(string.Empty, previousIdentity);
+        HighlightChanged?.Invoke(SelectedItem);
+    }
+
+    // Re-derives `_filtered` from the master set (fuzzy-matched against `query`, if non-empty) and
+    // selects `preferredIdentity` within it if still present, otherwise the nearest remaining item
+    // by sort order (empty string sorts before everything, so a null/absent `preferredIdentity`
+    // naturally lands on the first item - the same "no previous selection" fallback ReplaceItems
+    // always had).
+    private void ApplyFilterAndSelect(string query, string? preferredIdentity)
+    {
+        IEnumerable<T> matches = query.Length == 0 ? _items : _items.Where(item => FuzzyMatches(query, GetIdentity(item)));
+
+        _filtered.Clear();
+        foreach (var item in matches) _filtered.Add(item);
+
+        if (_filtered.Count == 0) {
+            _listView.SelectedItem = null;
+            return;
+        }
+
+        var index = preferredIdentity is not null ? IndexOfIdentity(_filtered, preferredIdentity) : -1;
+        if (index < 0) index = IndexOfIdentity(_filtered, NearestIdentityCore(_filtered, preferredIdentity ?? string.Empty));
+        _listView.SelectedItem = index;
+    }
+
+    // Case-insensitive fuzzy-subsequence match: `query`'s characters must occur in `identity`, in
+    // the same relative order, with any (including zero) characters in between - e.g. `oce`
+    // matches `OperationCancelledException`. Hand-rolled two-pointer scan rather than a library,
+    // to stay PublishAot-friendly.
+    private static bool FuzzyMatches(string query, string identity)
+    {
+        var qi = 0;
+        for (var i = 0; i < identity.Length && qi < query.Length; i++)
+            if (char.ToUpperInvariant(identity[i]) == char.ToUpperInvariant(query[qi])) qi++;
+
+        return qi == query.Length;
+    }
+
+    private int IndexOfIdentity(ObservableCollection<T> items, string identity)
+    {
+        for (var i = 0; i < items.Count; i++)
+            if (GetIdentity(items[i]) == identity) return i;
 
         return -1;
     }
 
-    // The identity of the item after `identity` in the current list, or the one before it if
-    // `identity` is last, or null if `identity` isn't present or the list would be emptied - used
-    // by an owning tab to refocus a neighbor after deleting the item at `identity`.
+    // Binary-search insertion-point lookup: the identity of the item in `items` (sorted ascending
+    // by GetIdentity, Ordinal) nearest to `identity` by sort order - used as ReplaceItems'/
+    // ApplyFilterAndSelect's fallback when `identity` itself isn't present. `items` must be
+    // non-empty.
+    private string NearestIdentityCore(ObservableCollection<T> items, string identity)
+    {
+        var lo = 0;
+        var hi = items.Count;
+        while (lo < hi) {
+            var mid = lo + (hi - lo) / 2;
+            if (string.CompareOrdinal(GetIdentity(items[mid]), identity) < 0) lo = mid + 1;
+            else hi = mid;
+        }
+
+        return GetIdentity(items[lo < items.Count ? lo : items.Count - 1]);
+    }
+
+    // The identity of the nearest remaining item to `identity` by sort order within the currently
+    // visible (filtered) collection, or null if it's empty - distinct from NeighborIdentity, which
+    // looks up by list-position adjacency rather than sort order.
+    public string? NearestIdentity(string identity) =>
+        _filtered.Count == 0 ? null : NearestIdentityCore(_filtered, identity);
+
+    // The identity of the item after `identity` in the current (filtered) list, or the one before
+    // it if `identity` is last, or null if `identity` isn't present or the list would be emptied -
+    // used by an owning tab to refocus a neighbor after deleting the item at `identity`.
     public string? NeighborIdentity(string identity)
     {
-        var index = IndexOfIdentity(identity);
+        var index = IndexOfIdentity(_filtered, identity);
         if (index < 0) return null;
-        if (index + 1 < _items.Count) return GetIdentity(_items[index + 1]);
-        return index - 1 >= 0 ? GetIdentity(_items[index - 1]) : null;
+        if (index + 1 < _filtered.Count) return GetIdentity(_filtered[index + 1]);
+        return index - 1 >= 0 ? GetIdentity(_filtered[index - 1]) : null;
     }
 
     private Color? _background;
@@ -211,8 +335,9 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
     }
 
     // Ctrl+R plus whatever hints the enabled shared shapes (EnableAscend/EnableCreate/
-    // EnableDelete) imply - a subclass with its own navigation commands beyond those shapes still
-    // appends to this via `base.Shortcuts.Append(...)` rather than replacing it.
+    // EnableDelete/EnableEdit/AttachFilterBox) imply - a subclass with its own navigation commands
+    // beyond those shapes still appends to this via `base.Shortcuts.Append(...)` rather than
+    // replacing it.
     public virtual IEnumerable<ShortcutHint> Shortcuts
     {
         get
@@ -222,6 +347,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
             if (_createEnabled) hints = hints.Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()));
             if (_deleteEnabled) hints = hints.Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
             if (_editEnabled) hints = hints.Append(new ShortcutHint(Key.E.WithCtrl, "Edit", () => EditRequested?.Invoke()));
+            if (_filterBox is { } box) hints = hints.Append(new ShortcutHint(new Key('/'), "Search", box.Focus));
             return hints;
         }
     }
