@@ -27,7 +27,7 @@ internal sealed class BucketDetails: PollingDetailsView<string, NatsKVStatus>
         var ttlLimit = status.LimitMarkerTTL > TimeSpan.Zero ? status.LimitMarkerTTL.ToString() : "(none)";
 
         return [
-            ("Bucket", BucketName.From(status)),
+            ("Bucket", BucketName.TryGetKvBucketName(config)!),
             ("Compressed", status.IsCompressed.ToString()),
             ("TTL Limit", ttlLimit),
             (string.Empty, string.Empty),

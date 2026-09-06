@@ -1,9 +1,8 @@
 using lazynats.Components;
-using NATS.Client.KeyValueStore;
 
 namespace lazynats.Values;
 
-internal sealed class BucketNamePresenter: IValuePresenter<NatsKVStatus>
+internal sealed class BucketNamePresenter: IValuePresenter<KvBucketItem>
 {
-    public string Format(NatsKVStatus value) => BucketName.From(value);
+    public string Format(KvBucketItem value) => value.Name;
 }

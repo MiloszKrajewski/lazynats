@@ -262,7 +262,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     // otherwise the nearest remaining item by sort order - per "Identity-Preserving Replace".
     // `selectIdentity` overrides that fallback (e.g. after a create, to highlight the newly added
     // item instead of whatever was selected before it existed).
-    public void ReplaceItems(IReadOnlyList<T> items, string? selectIdentity = null)
+    public void ReplaceItems(IEnumerable<T> items, string? selectIdentity = null)
     {
         var previousIdentity = selectIdentity ?? (SelectedItem is { } current ? GetIdentity(current) : null);
 

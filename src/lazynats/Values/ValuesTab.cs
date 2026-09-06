@@ -19,15 +19,14 @@ namespace lazynats.Values;
 // level.
 internal sealed class ValuesTab: View, IShortcutSource
 {
-    // A filtered fetch stops once this many matches are collected, regardless of how many more an
-    // over-approximated native filter (e.g. one collapsing to `>`) could still return from a huge
-    // bucket - see openspec/changes/add-kv-filter-language/design.md Decision 4. Unfiltered
-    // fetches are never capped.
+    // Every key-list fetch stops once this many matches are collected - including an unfiltered
+    // one, which compiles down to native filter `>` (matches everything) - regardless of how many
+    // more an over-approximated native filter could still return from a huge bucket.
     private const int KeyFilterCap = 10_000;
 
     private readonly INatsKVContext _kv;
 
-    private readonly ObservableCollection<NatsKVStatus> _items = [];
+    private readonly ObservableCollection<KvBucketItem> _items = [];
     private readonly BucketListView _listView;
     private readonly FilterBox _bucketFilterBox;
     private readonly EditFrame _bucketListFrame;
@@ -159,10 +158,10 @@ internal sealed class ValuesTab: View, IShortcutSource
         else _keyDetails.SetActive(newHasFocus);
     }
 
-    private void OnBucketHighlightChanged(NatsKVStatus? status)
+    private void OnBucketHighlightChanged(KvBucketItem? item)
     {
-        _details.SetTarget(status is null ? null : BucketName.From(status));
-        _details.Show(status);
+        _details.SetTarget(item?.Name);
+        _details.Show(item?.Status);
     }
 
     private void OnKeyHighlightChanged(string? key)
@@ -180,9 +179,9 @@ internal sealed class ValuesTab: View, IShortcutSource
     // never re-fetches the bucket list on the way in.
     private void Descend()
     {
-        if (_listView.SelectedBucket is not { } status) return;
+        if (_listView.SelectedBucket is not { } item) return;
 
-        var name = BucketName.From(status);
+        var name = item.Name;
         _currentBucket = name;
         // A filter never carries over into a (possibly different) bucket entered by a fresh
         // descent - see "Server-Side Key Filter"'s reset-on-descend requirement. Silent: this tab
@@ -264,7 +263,7 @@ internal sealed class ValuesTab: View, IShortcutSource
     // bound at the bucket level (see BucketListView), unreachable from the key level.
     private void OpenEditBucketDialog()
     {
-        if (_listView.SelectedBucket is { } status) OpenEditBucketDialog(status, ToNatsKVConfig(status), null);
+        if (_listView.SelectedBucket is { } item) OpenEditBucketDialog(item, ToNatsKVConfig(item), null);
     }
 
     // `original` is the freshly-fetched NatsKVConfig to merge edits onto later (built once here,
@@ -272,16 +271,16 @@ internal sealed class ValuesTab: View, IShortcutSource
     // against the real server-side config rather than the user's typed values). `seed` reopens
     // with the previously-entered values after a failed edit (design.md Decision 5); omitted on
     // the initial Ctrl+E, where the dialog is seeded straight from `original` instead.
-    private void OpenEditBucketDialog(NatsKVStatus status, NatsKVConfig original, NewBucketOptions? seed)
+    private void OpenEditBucketDialog(KvBucketItem item, NatsKVConfig original, NewBucketOptions? seed)
     {
-        var dialog = new CreateBucketDialog(seed ?? ToNewBucketOptions(status, original), isEdit: true);
+        var dialog = new CreateBucketDialog(seed ?? ToNewBucketOptions(item, original), isEdit: true);
         App!.Run(dialog);
-        if (dialog.Result is { } options) _ = TryEditBucketAsync(status, original, options);
+        if (dialog.Result is { } options) _ = TryEditBucketAsync(item, original, options);
     }
 
-    private static NewBucketOptions ToNewBucketOptions(NatsKVStatus status, NatsKVConfig original) =>
+    private static NewBucketOptions ToNewBucketOptions(KvBucketItem item, NatsKVConfig original) =>
         new(
-            BucketName.From(status),
+            item.Name,
             original.Storage,
             (int)original.History,
             original.MaxAge == TimeSpan.Zero ? null : original.MaxAge,
@@ -296,10 +295,11 @@ internal sealed class ValuesTab: View, IShortcutSource
     // scratch" rule. Storage/Compression need an explicit mapping since NatsKVConfig and
     // StreamConfig use different (but same-shaped) types for them; Placement/Mirror/Sources/
     // Metadata share identical types across both configs, so those are copied as-is.
-    private static NatsKVConfig ToNatsKVConfig(NatsKVStatus status)
+    private static NatsKVConfig ToNatsKVConfig(KvBucketItem item)
     {
+        var status = item.Status;
         var config = status.Info.Config;
-        return new NatsKVConfig(BucketName.From(status)) {
+        return new NatsKVConfig(item.Name) {
             Description = config.Description,
             MaxValueSize = config.MaxMsgSize,
             History = config.MaxMsgsPerSubject,
@@ -322,7 +322,7 @@ internal sealed class ValuesTab: View, IShortcutSource
     // Merges onto `original` rather than calling `edited.ToNatsKVConfig()` - per design.md
     // Decision 2. Goes through the real KV-level `UpdateStoreAsync`, not a raw stream update
     // (unlike ObjectsTab's OBJ-only workaround - see design.md's KV-vs-OBJ asymmetry risk note).
-    private async Task TryEditBucketAsync(NatsKVStatus status, NatsKVConfig original, NewBucketOptions edited)
+    private async Task TryEditBucketAsync(KvBucketItem item, NatsKVConfig original, NewBucketOptions edited)
     {
         try {
             var updated = original with {
@@ -335,7 +335,7 @@ internal sealed class ValuesTab: View, IShortcutSource
         } catch (Exception ex) {
             App?.Invoke(() => {
                 MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
-                OpenEditBucketDialog(status, original, edited);
+                OpenEditBucketDialog(item, original, edited);
             });
         }
     }
@@ -345,8 +345,8 @@ internal sealed class ValuesTab: View, IShortcutSource
     // level. Mirrors StreamsTab.TryDeleteStreamAsync exactly.
     private async Task TryDeleteBucketAsync()
     {
-        if (_listView.SelectedBucket is not { } status) return;
-        var name = BucketName.From(status);
+        if (_listView.SelectedBucket is not { } item) return;
+        var name = item.Name;
 
         var choice = MessageBox.Query(
             App!, DialogText.Pad("Delete Bucket"),
@@ -364,17 +364,31 @@ internal sealed class ValuesTab: View, IShortcutSource
         }
     }
 
+    // GetStatusesAsync() returns every JetStream stream on the server, not just KV buckets - see
+    // BucketName's comment.
+    private async Task<IList<KvBucketItem>> FetchBucketsAsync() =>
+        await _kv.GetStatusesAsync().ToObservable()
+            .Select(status => (Name: BucketName.TryGetKvBucketName(status.Info.Config), Status: status))
+            .Where(x => x.Name is not null)
+            .Select(x => new KvBucketItem(x.Name!, x.Status))
+            .ToList();
+
+    private static async Task<(IList<string> Keys, bool Truncated)> FetchKeysAsync(INatsKVStore store, CompiledFilter filter)
+    {
+        var observable = store.GetKeysAsync([filter.NativeFilter]).ToObservable();
+        if (!filter.NativeFilterIsExact) observable = observable.Where(key => filter.Regex.IsMatch(key));
+        var fetched = await observable.Take(KeyFilterCap + 1).ToList();
+        var truncated = fetched.Count > KeyFilterCap;
+        return (truncated ? fetched.Take(KeyFilterCap).ToList() : fetched, truncated);
+    }
+
     // `selectName` highlights a specific bucket after the refresh (used right after a create, so
     // the new bucket is selected instead of ReplaceItems' default "keep whatever was highlighted
     // before" fallback) - null for a plain Ctrl+R/initial-load refresh.
     private async Task RefreshListAsync(string? selectName = null)
     {
         try {
-            var buckets = new List<NatsKVStatus>();
-            // GetStatusesAsync() returns every JetStream stream on the server, not just KV
-            // buckets - see BucketName's comment.
-            await foreach (var status in _kv.GetStatusesAsync())
-                if (BucketName.IsKvStream(status.Info.Config.Name)) buckets.Add(status);
+            var buckets = await FetchBucketsAsync();
             App?.Invoke(() => _listView.ReplaceItems(buckets, selectName));
         } catch (Exception ex) {
             // Keep whatever the list previously showed rather than clearing it on a transient
@@ -387,37 +401,16 @@ internal sealed class ValuesTab: View, IShortcutSource
     // refresh (used right after a create/edit) instead of ReplaceItems' default "keep whatever was
     // highlighted before" fallback. Reads `_keyListView.ActiveFilter` directly rather than taking
     // it as a parameter, so Ctrl+R and post-create/edit refreshes stay scoped to the active filter
-    // (if any) for free - see openspec/changes/add-kv-key-filter/design.md Decision 3 (now owned
-    // by the shared DrillableListView<T> Filter wiring rather than a tab-local field - see
-    // openspec/changes/unify-list-filtering/design.md Decision 2). Compiles the active filter once
-    // per call - it's always valid NATS syntax, since it can only ever have been set from
-    // PatternDialog's own validator-gated confirmation. The two-phase fetch/filter/cap pipeline is
-    // an Rx chain (fetch-then-filter-then-cap reads best as Where/Take/ToList), per
-    // add-kv-filter-language/design.md Decision 3-4; an unfiltered fetch is untouched - no Take, no
-    // truncation tracking, matching today's behavior exactly. The base class's own in-memory regex
-    // narrowing re-applies the same expression to whatever ReplaceItems receives below - a harmless
-    // no-op here, since `keys` is already exactly-matching by the time it arrives (see design.md
-    // Decision 6 on why this can never reorder/re-widen the result).
+    // (if any) for free. No active filter compiles down to `>` (matches every key) - see
+    // FetchKeysAsync.
     private async Task RefreshKeyListAsync(string? selectName = null)
     {
         if (_currentBucket is not { } bucket) return;
 
         try {
             var store = await _kv.GetStoreAsync(bucket);
-            List<string> keys;
-            var truncated = false;
-
-            if (_keyListView.ActiveFilter is { } filter) {
-                var compiled = FilterExpression.TryCompile(filter);
-                var observable = store.GetKeysAsync([compiled!.NativeFilter]).ToObservable();
-                if (!compiled.NativeFilterIsExact) observable = observable.Where(key => compiled.Regex.IsMatch(key));
-                var fetched = await observable.Take(KeyFilterCap + 1).ToList();
-                truncated = fetched.Count > KeyFilterCap;
-                keys = truncated ? fetched.Take(KeyFilterCap).ToList() : [..fetched];
-            } else {
-                keys = [];
-                await foreach (var key in store.GetKeysAsync()) keys.Add(key);
-            }
+            var filter = FilterExpression.TryCompile(_keyListView.ActiveFilter ?? ">")!;
+            var (keys, truncated) = await FetchKeysAsync(store, filter);
 
             App?.Invoke(() => {
                 // The user may have ascended back out while this was in flight - only apply a
@@ -440,10 +433,11 @@ internal sealed class ValuesTab: View, IShortcutSource
     private void UpdateKeyListTitle()
     {
         if (_currentBucket is not { } bucket) return;
-        _listLabel.Text = _keyListView.ActiveFilter switch {
-            { } pattern when _keyListTruncated => $"Keys of {bucket} (filter: {pattern}, truncated at {KeyFilterCap})",
-            { } pattern => $"Keys of {bucket} (filter: {pattern})",
-            _ => $"Keys of {bucket}",
+        _listLabel.Text = (_keyListView.ActiveFilter, _keyListTruncated) switch {
+            ({ } pattern, true) => $"Keys of {bucket} (filter: {pattern}, truncated at {KeyFilterCap})",
+            ({ } pattern, false) => $"Keys of {bucket} (filter: {pattern})",
+            (null, true) => $"Keys of {bucket} (truncated at {KeyFilterCap})",
+            (null, false) => $"Keys of {bucket}",
         };
     }
 

@@ -1,9 +1,8 @@
 using lazynats.Components;
-using NATS.Client.JetStream.Models;
 
 namespace lazynats.Objects;
 
-internal sealed class BucketNamePresenter: IValuePresenter<StreamInfo>
+internal sealed class BucketNamePresenter: IValuePresenter<ObjBucketItem>
 {
-    public string Format(StreamInfo value) => BucketName.From(value);
+    public string Format(ObjBucketItem value) => value.Name;
 }

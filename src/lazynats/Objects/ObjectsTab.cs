@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
 using lazynats.Components;
+using lazynats.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore;
@@ -20,7 +22,7 @@ internal sealed class ObjectsTab: View, IShortcutSource
     private readonly INatsJSContext _jetStream;
     private readonly INatsObjContext _obj;
 
-    private readonly ObservableCollection<StreamInfo> _items = [];
+    private readonly ObservableCollection<ObjBucketItem> _items = [];
     private readonly BucketListView _listView;
     private readonly FilterBox _bucketFilterBox;
     private readonly EditFrame _bucketListFrame;
@@ -152,9 +154,9 @@ internal sealed class ObjectsTab: View, IShortcutSource
         else _objectDetails.SetActive(newHasFocus);
     }
 
-    private void OnBucketHighlightChanged(StreamInfo? stream)
+    private void OnBucketHighlightChanged(ObjBucketItem? item)
     {
-        _details.SetTarget(stream is null ? null : BucketName.From(stream));
+        _details.SetTarget(item?.Name);
         // Unlike KV (whose bucket list already holds full NatsKVStatus), the OBJ bucket list only
         // carries StreamInfo - there's no cached NatsObjStatus to Show() instantly, so clear first.
         // SetTarget above already schedules a debounced fetch of the new bucket - see
@@ -177,9 +179,9 @@ internal sealed class ObjectsTab: View, IShortcutSource
     // left) and never re-fetches the bucket list on the way in.
     private void Descend()
     {
-        if (_listView.SelectedBucket is not { } stream) return;
+        if (_listView.SelectedBucket is not { } item) return;
 
-        var name = BucketName.From(stream);
+        var name = item.Name;
         _currentBucket = name;
         // A filter never carries over into a (possibly different) bucket entered by a fresh
         // descent - see "Post-Fetch Object Name Filter"'s reset-on-descend requirement. Silent:
@@ -259,7 +261,7 @@ internal sealed class ObjectsTab: View, IShortcutSource
     // bound at the bucket level (see BucketListView), unreachable from the object level.
     private void OpenEditBucketDialog()
     {
-        if (_listView.SelectedBucket is { } stream) OpenEditBucketDialog(stream.Config, ToNewBucketOptions(stream));
+        if (_listView.SelectedBucket is { } item) OpenEditBucketDialog(item.Info.Config, ToNewBucketOptions(item));
     }
 
     // `seed` carries the values to show - the freshly-fetched ones on the initial Ctrl+E, or the
@@ -271,8 +273,8 @@ internal sealed class ObjectsTab: View, IShortcutSource
         if (dialog.Result is { } options) _ = TryEditBucketAsync(original, options);
     }
 
-    private static NewBucketOptions ToNewBucketOptions(StreamInfo stream) =>
-        new(BucketName.From(stream), stream.Config.MaxAge == TimeSpan.Zero ? null : stream.Config.MaxAge);
+    private static NewBucketOptions ToNewBucketOptions(ObjBucketItem item) =>
+        new(item.Name, item.Info.Config.MaxAge == TimeSpan.Zero ? null : item.Info.Config.MaxAge);
 
     // Merges onto `original` rather than calling `edited.ToNatsObjConfig()` - per design.md
     // Decision 2. No bucket-level update call exists on INatsObjContext (v2.8.2) - only
@@ -302,8 +304,8 @@ internal sealed class ObjectsTab: View, IShortcutSource
     // level. Mirrors ValuesTab.TryDeleteBucketAsync exactly.
     private async Task TryDeleteBucketAsync()
     {
-        if (_listView.SelectedBucket is not { } stream) return;
-        var name = BucketName.From(stream);
+        if (_listView.SelectedBucket is not { } item) return;
+        var name = item.Name;
 
         var choice = MessageBox.Query(
             App!, DialogText.Pad("Delete Bucket"),
@@ -321,17 +323,29 @@ internal sealed class ObjectsTab: View, IShortcutSource
         }
     }
 
+    // ListStreamsAsync() returns every JetStream stream on the server, not just OBJ buckets - see
+    // BucketName's comment.
+    private async Task<IList<ObjBucketItem>> FetchBucketsAsync() =>
+        await _jetStream.ListStreamsAsync().ToObservable()
+            .Select(stream => (Name: BucketName.TryGetObjBucketName(stream.Info.Config), stream.Info))
+            .Where(x => x.Name is not null)
+            .Select(x => new ObjBucketItem(x.Name!, x.Info))
+            .ToList();
+
+    // Always fetches every name from the server - unlike KV, there's no server-side filter to
+    // scope this by (see design.md).
+    private static async Task<IList<string>> FetchObjectsAsync(INatsObjStore store) =>
+        await store.ListAsync(new NatsObjListOpts()).ToObservable()
+            .Select(metadata => metadata.Name)
+            .ToList();
+
     // `selectName` highlights a specific bucket after the refresh (used right after a create, so
     // the new bucket is selected instead of ReplaceItems' default "keep whatever was highlighted
     // before" fallback) - null for a plain Ctrl+R/initial-load refresh.
     private async Task RefreshListAsync(string? selectName = null)
     {
         try {
-            var buckets = new List<StreamInfo>();
-            // ListStreamsAsync() returns every JetStream stream on the server, not just OBJ
-            // buckets - see BucketName's comment.
-            await foreach (var stream in _jetStream.ListStreamsAsync())
-                if (BucketName.IsObjStream(stream.Info.Config.Name)) buckets.Add(stream.Info);
+            var buckets = await FetchBucketsAsync();
             App?.Invoke(() => _listView.ReplaceItems(buckets, selectName));
         } catch (Exception ex) {
             // Keep whatever the list previously showed rather than clearing it on a transient
@@ -342,19 +356,17 @@ internal sealed class ObjectsTab: View, IShortcutSource
 
     // `selectName` mirrors ValuesTab.RefreshKeyListAsync's own parameter - highlights a specific
     // object after the refresh (used right after an upload) instead of ReplaceItems' default
-    // "keep whatever was highlighted before" fallback. Always fetches every name from the server -
-    // unlike KV, there's no server-side filter to scope this by (see design.md) - and hands the
-    // full result to ReplaceItems unnarrowed: ObjectListView's own shared Filter wiring (already
-    // active, independent of this tab) narrows `_filtered` from whatever ReplaceItems receives, the
-    // same way quick-search already does, so this tab no longer needs its own filtering step.
+    // "keep whatever was highlighted before" fallback. Hands the full result to ReplaceItems
+    // unnarrowed: ObjectListView's own shared Filter wiring (already active, independent of this
+    // tab) narrows `_filtered` from whatever ReplaceItems receives, the same way quick-search
+    // already does, so this tab no longer needs its own filtering step.
     private async Task RefreshObjectListAsync(string? selectName = null)
     {
         if (_currentBucket is not { } bucket) return;
 
         try {
             var store = await _obj.GetObjectStoreAsync(bucket);
-            var names = new List<string>();
-            await foreach (var metadata in store.ListAsync(new NatsObjListOpts())) names.Add(metadata.Name);
+            var names = await FetchObjectsAsync(store);
             App?.Invoke(() => {
                 // The user may have ascended back out while this was in flight - only apply a
                 // result that's still for the currently-drilled-into bucket.

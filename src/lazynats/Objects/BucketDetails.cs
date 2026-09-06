@@ -28,8 +28,8 @@ internal sealed class BucketDetails: PollingDetailsView<string, NatsObjStatus>
 
         return [
             // status.Bucket is the raw, unstripped stream name (same caveat as NatsKVStatus.Bucket
-            // - see Kv/BucketName.cs's comment), so go through BucketName.From(status.Info) instead.
-            ("Bucket", BucketName.From(status.Info)),
+            // - see Components/BucketName.cs), so go through BucketName.TryGetObjBucketName instead.
+            ("Bucket", BucketName.TryGetObjBucketName(config)!),
             ("Compressed", status.IsCompressed.ToString()),
             (string.Empty, string.Empty),
             // State.Messages counts stream messages, not necessarily distinct live objects - same

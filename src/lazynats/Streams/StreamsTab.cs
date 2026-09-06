@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
 using lazynats.Components;
+using lazynats.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using Terminal.Gui.Input;
@@ -76,7 +78,8 @@ internal sealed class StreamsTab: View, IShortcutSource
         _consumerListView.EditRequested += OpenEditConsumerDialog;
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_streamListFrame) + 1, Y = 0 };
-        _details = new StreamDetails(_jetStream) { X = Pos.Right(_streamListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
+        _details = new StreamDetails(_jetStream)
+            { X = Pos.Right(_streamListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
         _details.Error += message => StatusChanged?.Invoke($"Streams: {message}");
 
         _consumerDetails = new ConsumerDetails(_jetStream) {
@@ -88,7 +91,9 @@ internal sealed class StreamsTab: View, IShortcutSource
         // Tab/Shift+Tab cycles in reading order - ManagementTabs.FindFirstFocusableDescendant
         // separately skips FilterBox for the tab's *default* focus target, so entering/returning
         // to this tab still lands on the list, not the search field, despite that order.
-        Add(_listLabel, _streamFilterBox, _streamListFrame, _consumerFilterBox, _consumerListFrame, _detailsLabel, _details, _consumerDetails);
+        Add(
+            _listLabel, _streamFilterBox, _streamListFrame, _consumerFilterBox, _consumerListFrame, _detailsLabel,
+            _details, _consumerDetails);
 
         SetShortcutSource(_listView);
     }
@@ -110,7 +115,8 @@ internal sealed class StreamsTab: View, IShortcutSource
     // know about it in advance.
     protected override bool OnKeyDownNotHandled(Key key)
     {
-        if (_shortcutSource.TabOperations.FirstOrDefault(h => h.Key == key) is { Action: { } action }) {
+        if (_shortcutSource.TabOperations.FirstOrDefault(h => h.Key == key) is { Action: { } action })
+        {
             action();
             return true;
         }
@@ -129,7 +135,8 @@ internal sealed class StreamsTab: View, IShortcutSource
     {
         base.OnHasFocusChanged(newHasFocus, previousFocusedView, focusedView);
 
-        if (newHasFocus && !_loaded) {
+        if (newHasFocus && !_loaded)
+        {
             _loaded = true;
             _ = RefreshListAsync();
         }
@@ -223,10 +230,13 @@ internal sealed class StreamsTab: View, IShortcutSource
 
     private async Task TryCreateStreamAsync(NewStreamOptions options)
     {
-        try {
+        try
+        {
             await _jetStream.CreateStreamAsync(options.ToStreamConfig());
             _ = RefreshListAsync(options.Name);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             App?.Invoke(() => {
                 MessageBox.ErrorQuery(App!, DialogText.Pad("Create Stream Failed"), DialogText.Pad(ex.Message), "_Ok");
                 OpenCreateStreamDialog(options);
@@ -247,12 +257,16 @@ internal sealed class StreamsTab: View, IShortcutSource
 
     private async Task TryCreateConsumerAsync(string stream, NewConsumerOptions options)
     {
-        try {
+        try
+        {
             await _jetStream.CreateConsumerAsync(stream, options.ToConsumerConfig());
             _ = RefreshConsumerListAsync(options.Name);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, DialogText.Pad("Create Consumer Failed"), DialogText.Pad(ex.Message), "_Ok");
+                MessageBox.ErrorQuery(
+                    App!, DialogText.Pad("Create Consumer Failed"), DialogText.Pad(ex.Message), "_Ok");
                 OpenCreateConsumerDialog(options);
             });
         }
@@ -286,11 +300,16 @@ internal sealed class StreamsTab: View, IShortcutSource
     // count, limits, discard policy, description, metadata, ...) back to Create-time defaults.
     private async Task TryEditStreamAsync(StreamConfig original, NewStreamOptions edited)
     {
-        try {
-            var updated = original with { Subjects = edited.Subjects.ToList(), MaxAge = edited.MaxAge ?? TimeSpan.Zero };
+        try
+        {
+            var updated = original with {
+                Subjects = edited.Subjects.ToList(), MaxAge = edited.MaxAge ?? TimeSpan.Zero
+            };
             await _jetStream.UpdateStreamAsync(updated);
             _ = RefreshListAsync(edited.Name);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             App?.Invoke(() => {
                 MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Stream Failed"), DialogText.Pad(ex.Message), "_Ok");
                 OpenEditStreamDialog(original, edited);
@@ -309,6 +328,7 @@ internal sealed class StreamsTab: View, IShortcutSource
     private void OpenEditConsumerDialog()
     {
         if (_currentStream is not { } stream) return;
+
         if (_consumerListView.SelectedConsumer?.Config is { } original) OpenEditConsumerDialog(stream, original);
     }
 
@@ -321,14 +341,17 @@ internal sealed class StreamsTab: View, IShortcutSource
     // writes the plural field, never the singular one.
     private async Task TryEditConsumerAsync(string stream, ConsumerConfig original, NewConsumerOptions edited)
     {
-        try {
+        try
+        {
             var updated = original with {
                 FilterSubjects = edited.FilterSubjects.Count > 0 ? edited.FilterSubjects.ToList() : null,
                 FilterSubject = null,
             };
             await _jetStream.UpdateConsumerAsync(stream, updated);
             _ = RefreshConsumerListAsync(edited.Name);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             App?.Invoke(() => {
                 MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Consumer Failed"), DialogText.Pad(ex.Message), "_Ok");
                 OpenEditConsumerDialog(stream, original, edited);
@@ -348,11 +371,15 @@ internal sealed class StreamsTab: View, IShortcutSource
 
         var neighborName = _listView.NeighborIdentity(name);
 
-        try {
+        try
+        {
             await _jetStream.DeleteStreamAsync(name);
             _ = RefreshListAsync(neighborName);
-        } catch (Exception ex) {
-            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Stream Failed"), DialogText.Pad(ex.Message), "_Ok"));
+        }
+        catch (Exception ex)
+        {
+            App?.Invoke(() => MessageBox.ErrorQuery(
+                App!, DialogText.Pad("Delete Stream Failed"), DialogText.Pad(ex.Message), "_Ok"));
         }
     }
 
@@ -371,24 +398,47 @@ internal sealed class StreamsTab: View, IShortcutSource
 
         var neighborName = _consumerListView.NeighborIdentity(name);
 
-        try {
+        try
+        {
             await _jetStream.DeleteConsumerAsync(stream, name);
             _ = RefreshConsumerListAsync(neighborName);
-        } catch (Exception ex) {
-            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Consumer Failed"), DialogText.Pad(ex.Message), "_Ok"));
+        }
+        catch (Exception ex)
+        {
+            App?.Invoke(() => MessageBox.ErrorQuery(
+                App!, DialogText.Pad("Delete Consumer Failed"), DialogText.Pad(ex.Message), "_Ok"));
         }
     }
+
+    // Streams backing a KV/Object Store bucket are shown in their own dedicated tabs
+    // (Values/Objects) instead - see nats-streams' "Stream List" requirement.
+    private async Task<IList<StreamInfo>> FetchStreamsAsync() =>
+        await _jetStream.ListStreamsAsync().ToObservable()
+            .Where(IsRegularStream)
+            .Select(stream => stream.Info)
+            .ToList();
+
+    private async Task<IList<ConsumerInfo>> FetchConsumersAsync(string stream) =>
+        await _jetStream.ListConsumersAsync(stream).ToObservable()
+            .Select(consumer => consumer.Info)
+            .ToList();
+
+    private static bool IsRegularStream(INatsJSStream stream) =>
+        BucketName.TryGetKvBucketName(stream.Info.Config) is null &&
+        BucketName.TryGetObjBucketName(stream.Info.Config) is null;
 
     // `selectName` highlights a specific stream after the refresh (used right after a create, so
     // the new stream is selected instead of ReplaceItems' default "keep whatever was highlighted
     // before" fallback) - null for a plain Ctrl+R/initial-load refresh.
     private async Task RefreshListAsync(string? selectName = null)
     {
-        try {
-            var streams = new List<StreamInfo>();
-            await foreach (var stream in _jetStream.ListStreamsAsync()) streams.Add(stream.Info);
+        try
+        {
+            var streams = await FetchStreamsAsync();
             App?.Invoke(() => _listView.ReplaceItems(streams, selectName));
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             // Keep whatever the list previously showed rather than clearing it on a transient
             // error - per the "poll or refresh error" decision in design.md.
             App?.Invoke(() => StatusChanged?.Invoke($"Streams: {ex.Message}"));
@@ -402,15 +452,17 @@ internal sealed class StreamsTab: View, IShortcutSource
     {
         if (_currentStream is not { } stream) return;
 
-        try {
-            var consumers = new List<ConsumerInfo>();
-            await foreach (var consumer in _jetStream.ListConsumersAsync(stream)) consumers.Add(consumer.Info);
+        try
+        {
+            var consumers = await FetchConsumersAsync(stream);
             App?.Invoke(() => {
                 // The user may have ascended back out while this was in flight - only apply a
                 // result that's still for the currently-drilled-into stream.
                 if (_currentStream == stream) _consumerListView.ReplaceItems(consumers, selectName);
             });
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             App?.Invoke(() => StatusChanged?.Invoke($"Streams: {ex.Message}"));
         }
     }

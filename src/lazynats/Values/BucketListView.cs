@@ -4,11 +4,16 @@ using NATS.Client.KeyValueStore;
 
 namespace lazynats.Values;
 
-internal sealed class BucketListView: DrillableListView<NatsKVStatus>
+// Carries the derived bare bucket name alongside the raw NatsKVStatus, computed once per item at
+// refresh time - see openspec/changes/filter-bucket-backed-streams/design.md's "KvBucketItem/
+// ObjBucketItem wrappers" decision.
+internal sealed record KvBucketItem(string Name, NatsKVStatus Status);
+
+internal sealed class BucketListView: DrillableListView<KvBucketItem>
 {
     private static readonly BucketNamePresenter PresenterInstance = new();
 
-    public BucketListView(ObservableCollection<NatsKVStatus> items): base(items)
+    public BucketListView(ObservableCollection<KvBucketItem> items): base(items)
     {
         EnableDescend();
         EnableCreate();
@@ -17,10 +22,10 @@ internal sealed class BucketListView: DrillableListView<NatsKVStatus>
         EnableFilter();
     }
 
-    protected override IValuePresenter<NatsKVStatus> Presenter => PresenterInstance;
+    protected override IValuePresenter<KvBucketItem> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No buckets — Ctrl+R to refresh";
-    protected override string GetIdentity(NatsKVStatus item) => BucketName.From(item);
+    protected override string GetIdentity(KvBucketItem item) => item.Name;
     protected override string FilterDialogTitle => "Filter Buckets";
 
-    public NatsKVStatus? SelectedBucket => SelectedItem;
+    public KvBucketItem? SelectedBucket => SelectedItem;
 }

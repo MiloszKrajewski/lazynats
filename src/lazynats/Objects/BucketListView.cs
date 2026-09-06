@@ -4,11 +4,16 @@ using NATS.Client.JetStream.Models;
 
 namespace lazynats.Objects;
 
-internal sealed class BucketListView: DrillableListView<StreamInfo>
+// Carries the derived bare bucket name alongside the raw StreamInfo, computed once per item at
+// refresh time - see openspec/changes/filter-bucket-backed-streams/design.md's "KvBucketItem/
+// ObjBucketItem wrappers" decision.
+internal sealed record ObjBucketItem(string Name, StreamInfo Info);
+
+internal sealed class BucketListView: DrillableListView<ObjBucketItem>
 {
     private static readonly BucketNamePresenter PresenterInstance = new();
 
-    public BucketListView(ObservableCollection<StreamInfo> items): base(items)
+    public BucketListView(ObservableCollection<ObjBucketItem> items): base(items)
     {
         EnableDescend();
         EnableCreate();
@@ -17,10 +22,10 @@ internal sealed class BucketListView: DrillableListView<StreamInfo>
         EnableFilter();
     }
 
-    protected override IValuePresenter<StreamInfo> Presenter => PresenterInstance;
+    protected override IValuePresenter<ObjBucketItem> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No buckets — Ctrl+R to refresh";
-    protected override string GetIdentity(StreamInfo item) => BucketName.From(item);
+    protected override string GetIdentity(ObjBucketItem item) => item.Name;
     protected override string FilterDialogTitle => "Filter Buckets";
 
-    public StreamInfo? SelectedBucket => SelectedItem;
+    public ObjBucketItem? SelectedBucket => SelectedItem;
 }

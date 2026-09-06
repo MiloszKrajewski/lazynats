@@ -6,7 +6,10 @@ TBD - created by syncing change add-kv-tab. Update Purpose after archive.
 ## Requirements
 ### Requirement: Bucket List
 The system SHALL provide a KV management tab listing the names of all Key/Value store buckets
-currently present on the connected server.
+currently present on the connected server. A stream counts as a KV bucket only when its name
+matches the `KV_<name>` convention AND its subjects include one rooted at `$KV.<name>.` for that
+same, stripped name — a stream whose name merely resembles the convention without the matching
+subject binding is not treated as a bucket.
 
 #### Scenario: Existing buckets are listed
 - **WHEN** one or more KV buckets exist on the server
@@ -15,6 +18,11 @@ currently present on the connected server.
 #### Scenario: No buckets exist
 - **WHEN** no KV buckets exist on the server
 - **THEN** the Values tab shows a non-interactive hint in place of the list, rather than a blank list
+
+#### Scenario: A stream matching only the name convention is not listed as a bucket
+- **WHEN** a JetStream stream's name starts with `KV_` but its subjects do not include one rooted
+  at `$KV.<name>.` for the stripped name
+- **THEN** that stream does not appear in the Values tab's bucket list
 
 ### Requirement: Bucket Detail Panel
 The system SHALL show, alongside the bucket list, a detail panel for the currently highlighted
@@ -160,9 +168,9 @@ client-side regex applied to the fetch's results — which phase(s) actually ran
 from the key list beyond the final matching set it shows. This is independent of the existing
 in-memory quick-search (`/`): the server-side filter narrows what is fetched from the server, the
 quick-search narrows what is displayed from whatever was fetched, and both may be active at once.
-A fetch scoped by an active filter SHALL stop after collecting 10,000 matching keys, regardless of
-how many more the native-filter-scoped fetch could have returned; an unfiltered fetch (no active
-filter) is not capped.
+Every key-list fetch SHALL stop after collecting 10,000 matching keys, regardless of how many more
+the native-filter-scoped fetch could have returned — including an unfiltered fetch, which is
+scoped by the same mechanism using a native filter that matches every key.
 
 #### Scenario: Ctrl+F opens the filter dialog
 - **WHEN** the user presses Ctrl+F while the key-level list holds focus
@@ -218,10 +226,11 @@ filter) is not capped.
 - **THEN** the key-list fetch stops after collecting 10,000 matches, rather than continuing to
   collect every match in the bucket
 
-#### Scenario: An unfiltered fetch is never capped
-- **WHEN** no filter is active for the currently drilled-into bucket, even if the bucket holds more
+#### Scenario: An unfiltered fetch is capped the same way
+- **WHEN** no filter is active for the currently drilled-into bucket, and the bucket holds more
   than 10,000 keys
-- **THEN** the key-list fetch is not stopped early
+- **THEN** the key-list fetch stops after collecting 10,000 keys, the same as a filtered fetch that
+  hits the cap
 
 #### Scenario: An active filter is shown in the key list's title
 - **WHEN** a filter is active for the currently drilled-into bucket and its matches did not hit the
@@ -230,12 +239,14 @@ filter) is not capped.
   "showing every key"
 
 #### Scenario: A capped fetch is indicated in the key list's title
-- **WHEN** an active filter's fetch stops at the 10,000-key cap
-- **THEN** the key list's title indicates that the shown keys are a truncated subset of the
-  filter's full matches, distinct from the plain "filter applied" indication
+- **WHEN** a fetch (filtered or unfiltered) stops at the 10,000-key cap
+- **THEN** the key list's title indicates that the shown keys are a truncated subset, distinct from
+  the plain "filter applied" indication - even with no active filter, so a capped unfiltered view
+  is never mistaken for a complete one
 
-#### Scenario: No filter active leaves the title as today
-- **WHEN** no filter is active for the currently drilled-into bucket
+#### Scenario: No filter active and no cap hit leaves the title as today
+- **WHEN** no filter is active for the currently drilled-into bucket and its key count does not hit
+  the 10,000-key cap
 - **THEN** the key list's title matches its existing unfiltered form
 
 #### Scenario: A server-side fetch failure is reported
