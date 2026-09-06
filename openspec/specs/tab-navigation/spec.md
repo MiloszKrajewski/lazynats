@@ -6,10 +6,11 @@ TBD - created by syncing change tab-navigation-and-shortcuts. Update Purpose aft
 ## Requirements
 
 ### Requirement: Tab Titles
-The system SHALL title the live-monitoring management tab "Subscribe" and the message-composition
-management tab "Publish", presenting them as a matched verb pair, and SHALL prefix each tab's
-title with its 1-based position among the management tabs in `N:Title` format (no space around
-the colon), reflecting the Alt+digit shortcut that switches to it.
+The system SHALL title the live-monitoring management tab "Subscribe", the message-composition
+management tab "Publish", and the JetStream-stream-browsing management tab "Streams", presenting
+Subscribe/Publish as a matched verb pair, and SHALL prefix each tab's title with its 1-based
+position among the management tabs in `N:Title` format (no space around the colon), reflecting
+the Alt+digit shortcut that switches to it.
 
 #### Scenario: Monitoring tab is titled with its position number
 - **WHEN** the management tab area is displayed and Subscribe is the first (leftmost) tab
@@ -19,11 +20,15 @@ the colon), reflecting the Alt+digit shortcut that switches to it.
 - **WHEN** the management tab area is displayed and Publish is the second tab
 - **THEN** the tab is titled "2:Publish"
 
+#### Scenario: Streams tab is titled with its position number
+- **WHEN** the management tab area is displayed and Streams is the third tab
+- **THEN** the tab is titled "3:Streams"
+
 ### Requirement: Alt+Digit Tab Switching
 The system SHALL allow the user to switch directly to a management tab from anywhere in the
 application via a dedicated Alt+digit shortcut, where the digit is the tab's 1-based position
 among the management tabs in left-to-right display order: Alt+1 for the first tab (Subscribe),
-Alt+2 for the second tab (Publish).
+Alt+2 for the second tab (Publish), Alt+3 for the third tab (Streams).
 
 #### Scenario: Alt+1 switches to Subscribe from anywhere
 - **WHEN** the user presses Alt+1 while focus is anywhere in the application, including inside
@@ -34,6 +39,11 @@ Alt+2 for the second tab (Publish).
 - **WHEN** the user presses Alt+2 while focus is anywhere in the application, including inside
   another tab's content
 - **THEN** the Publish tab becomes the selected tab
+
+#### Scenario: Alt+3 switches to Streams from anywhere
+- **WHEN** the user presses Alt+3 while focus is anywhere in the application, including inside
+  another tab's content
+- **THEN** the Streams tab becomes the selected tab
 
 ### Requirement: Up Climbs From Content to the Current Tab's Header
 The system SHALL, when keyboard focus is within a tab's content and an Up key press is left

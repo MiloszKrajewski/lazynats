@@ -4,6 +4,7 @@ using lazynats.LiveFeed;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
+using NATS.Net;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
@@ -14,6 +15,7 @@ await connection.ConnectAsync();
 
 var channel = Channel.CreateUnbounded<FeedEnvelope>();
 var registry = new SubscriptionRegistry(connection, channel.Writer);
+var jetStream = connection.CreateJetStreamContext();
 
 // Application.Create() must run before Services.Configure() - ShortcutTracker needs a live
 // IApplication at construction time (to subscribe to Navigation.FocusedChanged), and unlike every
@@ -25,6 +27,7 @@ ApplyColorTheme();
 var services = new ServiceCollection();
 services.AddSingleton(connection);
 services.AddSingleton(registry);
+services.AddSingleton(jetStream);
 services.AddSingleton(channel.Reader);
 services.AddSingleton(new MessageDeduplicator(TimeSpan.FromMilliseconds(50)));
 services.AddSingleton<IApplication>(app);

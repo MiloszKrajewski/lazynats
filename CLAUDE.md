@@ -19,6 +19,12 @@ exists today.
 - `NATS.Client.Core` / `.JetStream` / `.KeyValueStore` / `.ObjectStore` for the NATS side.
 - `Microsoft.Extensions.DependencyInjection` via the static `Services` provider in
   `Services.cs` (`Services.Root.GetRequiredService<T>()`), not constructor-injected app-wide.
+- For API surface not already covered by `doc/terminal-gui-howto.md` (exact method signatures,
+  event args, optional params), check the context7 MCP server first —
+  [`nats-io/nats.net`](https://context7.com/nats-io/nats.net) and
+  [`websites/gui-cs_github_io_terminal_gui`](https://context7.com/websites/gui-cs_github_io_terminal_gui)
+  — before falling back to grepping the installed package's shipped XML docs
+  (`~/.nuget/packages/<package>/<version>/lib/*/*.xml`).
 
 ## UI conventions
 
@@ -88,6 +94,11 @@ app non-interactively: launch it in a detached session (`tmux new-session -d -s 
 for Alt+1), and read the rendered screen with `tmux capture-pane -t <name> -p` (text only — colors
 and attributes don't come through, so use status-bar text or dialog appearance as a proxy for
 focus state). Needs a real NATS server reachable at `nats://localhost:4222`.
+
+For inspecting server-side state directly (streams, consumers, KV/OBJ stores, ...) rather than
+through the app, check `.bin/` for a `nats` CLI executable (`nats.exe`/`nats.sh`/`nats`) before
+falling back to raw `$JS.API...` subjects or the monitoring HTTP endpoint — it may already be
+sitting there for exactly this.
 
 ## Change workflow
 

@@ -1,8 +1,10 @@
 ﻿using System.Threading.Channels;
 using lazynats.LiveFeed;
+using lazynats.Streams;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
+using NATS.Client.JetStream;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -21,14 +23,16 @@ internal sealed class MainWindow: Runnable
     {
         var registry = Services.Root.GetRequiredService<SubscriptionRegistry>();
         var connection = Services.Root.GetRequiredService<NatsConnection>();
+        var jetStream = Services.Root.GetRequiredService<INatsJSContext>();
         var feedReader = Services.Root.GetRequiredService<ChannelReader<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
         _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
 
         var subscribeTab = new SubscribeTab(registry) { Title = " 1:Subscribe ", Padding = { Thickness = new Thickness(1) } };
         var publishTab = new PublishTab(connection, _shortcutTracker) { Title = " 2:Publish ", Padding = { Thickness = new Thickness(1) } };
+        var streamsTab = new StreamsTab(jetStream) { Title = " 3:Streams ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
-        tabs.Add(subscribeTab, publishTab);
+        tabs.Add(subscribeTab, publishTab, streamsTab);
         tabs.Value = subscribeTab;
 
         var liveUpdates = new LiveUpdatesView(feedReader, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -47,6 +51,9 @@ internal sealed class MainWindow: Runnable
         var publishTabShortcut = new Shortcut { Text = "Publish", Key = Key.D2.WithAlt, BindKeyToApplication = true };
         publishTabShortcut.Action = () => tabs.Value = publishTab;
 
+        var streamsTabShortcut = new Shortcut { Text = "Streams", Key = Key.D3.WithAlt, BindKeyToApplication = true };
+        streamsTabShortcut.Action = () => tabs.Value = streamsTab;
+
         var clearShortcut = new Shortcut { Text = "Clear", Key = Key.C, Visible = false };
         clearShortcut.Action = liveUpdates.Clear;
         liveUpdates.HasFocusChanged += (_, _) => clearShortcut.Visible = liveUpdates.HasFocus;
@@ -57,7 +64,16 @@ internal sealed class MainWindow: Runnable
             publishStatusShortcut.Visible = true;
         };
 
-        _statusBar = new StatusBar([quitShortcut, subscribeTabShortcut, publishTabShortcut, clearShortcut, publishStatusShortcut]);
+        var streamsStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
+        streamsTab.StatusChanged += message => {
+            streamsStatusShortcut.Text = message;
+            streamsStatusShortcut.Visible = true;
+        };
+
+        _statusBar = new StatusBar([
+            quitShortcut, subscribeTabShortcut, publishTabShortcut, streamsTabShortcut, clearShortcut,
+            publishStatusShortcut, streamsStatusShortcut,
+        ]);
         _staticShortcutCount = _statusBar.SubViews.Count;
 
         // Appends/replaces only the dynamic tail - the fixed shortcuts above and their own

@@ -16,3 +16,4 @@ packages/
 *.bak
 *.user
 /lazynats.exe
+/.bin/nats.exe

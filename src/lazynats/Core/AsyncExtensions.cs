@@ -1,0 +1,28 @@
+using System.Reactive.Linq;
+using Terminal.Gui.App;
+
+namespace lazynats.Core;
+
+// Small, deliberately generic Rx helpers - not streams-specific - so any future poll/async-to-UI
+// need (e.g. the live feed pipeline) can adopt them without redesign. See
+// openspec/changes/add-consumer-drilldown/design.md decisions 3-4 for the rationale.
+internal static class AsyncExtensions
+{
+    // Select + Concat, not SelectMany/Merge: at most one projected async operation runs at a
+    // time, and results are delivered in the order their source elements arrived. A slow
+    // operation makes later ticks queue rather than overlap - this is what lets pollers built on
+    // this drop the "is this response still the one I'm waiting for" staleness guard they'd
+    // otherwise need with concurrent (SelectMany) semantics.
+    public static IObservable<TResult> SelectAsync<TSource, TResult>(
+        this IObservable<TSource> source, Func<TSource, Task<TResult>> selector) =>
+        source.Select(item => Observable.FromAsync(() => selector(item))).Concat();
+
+    // Terminal.Gui has no SynchronizationContext to hook a standard ObserveOn into - IApplication
+    // exposes Invoke(Action) instead, so this wraps the observer to dispatch every notification
+    // (value, error, completion) through it before it reaches downstream subscribers.
+    public static IObservable<T> ObserveOnApp<T>(this IObservable<T> source, IApplication app) =>
+        Observable.Create<T>(observer => source.Subscribe(
+            value => app.Invoke(() => observer.OnNext(value)),
+            ex => app.Invoke(() => observer.OnError(ex)),
+            () => app.Invoke(() => observer.OnCompleted())));
+}
