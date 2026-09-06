@@ -5,21 +5,22 @@ for now is 70/30, but I will need to see it live to decide.
 
 # Management part
 
-Management has tabs, each with a dedicated Alt+letter shortcut to switch to it directly from
-anywhere in the app (only Subscribe and Publish exist today; the rest are reserved for when their
-tabs are built, so future additions don't collide):
+Management has tabs, each titled with its 1-based position (`N:Title`) and switchable directly
+from anywhere in the app via Alt+N, where N is that position (only Subscribe and Publish exist
+today; the rest are reserved for when their tabs are built):
 
 | Tab | Title | Shortcut |
 |---|---|---|
-| Subscribe (live NATS monitoring) | `Su[b]scribe` | Alt+B |
-| Publish | `[P]ublish` | Alt+P |
-| Streams (durable streams) | `[S]treams` | Alt+S |
-| Consumers (durable consumers on streams) | `[C]onsumers` | Alt+C |
-| KV stores (key/value stores) | `[K]V` | Alt+K |
-| OBJ stores (object stores) | `[O]BJ` | Alt+O |
+| Subscribe (live NATS monitoring) | `1:Subscribe` | Alt+1 |
+| Publish | `2:Publish` | Alt+2 |
+| Streams (durable streams) | `3:Streams` | Alt+3 |
+| Consumers (durable consumers on streams) | `4:Consumers` | Alt+4 |
+| KV stores (key/value stores) | `5:KV` | Alt+5 |
+| OBJ stores (object stores) | `6:OBJ` | Alt+6 |
 
 "Subscribe"/"Publish" are a matched verb pair (NATS's own `nats sub`/`nats pub` vocabulary).
-Subscribe uses Alt+B rather than Alt+S so it doesn't collide with Streams.
+Tab shortcuts use Alt+digit rather than Alt+letter so they never collide with a tab's own
+mnemonic buttons (e.g. Publish's `_Send`), which Terminal.Gui also binds via Alt+letter.
 
 Not decided: do consumers have their own tab or are part os streams tab
 

@@ -25,8 +25,8 @@ internal sealed class MainWindow: Runnable
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
         _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
 
-        var subscribeTab = new SubscribeTab(registry) { Title = " Subscribe ", Padding = { Thickness = new Thickness(1) } };
-        var publishTab = new PublishTab(connection, _shortcutTracker) { Title = " Publish ", Padding = { Thickness = new Thickness(1) } };
+        var subscribeTab = new SubscribeTab(registry) { Title = " 1:Subscribe ", Padding = { Thickness = new Thickness(1) } };
+        var publishTab = new PublishTab(connection, _shortcutTracker) { Title = " 2:Publish ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
         tabs.Add(subscribeTab, publishTab);
         tabs.Value = subscribeTab;
@@ -41,10 +41,10 @@ internal sealed class MainWindow: Runnable
         var quitShortcut = new Shortcut { Text = "Quit", Key = Key.Q.WithAlt, BindKeyToApplication = true };
         quitShortcut.Action = () => App!.RequestStop();
 
-        var subscribeTabShortcut = new Shortcut { Text = "Subscribe", Key = Key.B.WithAlt, BindKeyToApplication = true };
+        var subscribeTabShortcut = new Shortcut { Text = "Subscribe", Key = Key.D1.WithAlt, BindKeyToApplication = true };
         subscribeTabShortcut.Action = () => tabs.Value = subscribeTab;
 
-        var publishTabShortcut = new Shortcut { Text = "Publish", Key = Key.P.WithAlt, BindKeyToApplication = true };
+        var publishTabShortcut = new Shortcut { Text = "Publish", Key = Key.D2.WithAlt, BindKeyToApplication = true };
         publishTabShortcut.Action = () => tabs.Value = publishTab;
 
         var clearShortcut = new Shortcut { Text = "Clear", Key = Key.C, Visible = false };

@@ -82,6 +82,13 @@ There is no automated test project yet. `.nuke/build/Program.cs` defines the CI/
 pipeline (`Clean`, `Restore`, `Build`, `Test`, `Release`, `ReleaseDocker`, ...), invoked via
 `./build.ps1 <target>`; day-to-day development uses the plain `dotnet` commands above instead.
 
+For verifying keyboard-driven UI changes without asking for manual testing, `tmux` can drive the
+app non-interactively: launch it in a detached session (`tmux new-session -d -s <name>
+'dotnet run --project src/lazynats'`), drive it with `tmux send-keys -t <name> <key>` (e.g. `M-1`
+for Alt+1), and read the rendered screen with `tmux capture-pane -t <name> -p` (text only — colors
+and attributes don't come through, so use status-bar text or dialog appearance as a proxy for
+focus state). Needs a real NATS server reachable at `nats://localhost:4222`.
+
 ## Change workflow
 
 Non-trivial features go through OpenSpec (`openspec/`) before implementation: a proposal +
