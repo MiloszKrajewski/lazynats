@@ -18,19 +18,26 @@ internal sealed class PatternDialog: Dialog<string>
     private readonly TextField _patternField;
     private readonly EditFrame _patternFrame;
     private readonly bool _allowEmpty;
+    private readonly Func<string, bool>? _validator;
 
-    public PatternDialog(string title, string initialPattern, bool allowEmpty = false)
+    // `validator`, when supplied, is only consulted for non-empty text - an empty field's
+    // validity is still governed solely by `allowEmpty`, so a grammar-aware validator (e.g.
+    // KeyFilterExpression.TryCompile, which rejects an empty expression as an empty segment)
+    // never has to special-case "field is empty" itself. Default null preserves today's
+    // non-empty-only behavior for SubscriptionsView's plain-NATS-subject use.
+    public PatternDialog(string title, string initialPattern, bool allowEmpty = false, Func<string, bool>? validator = null)
     {
         Title = DialogText.Pad(title);
         Padding.Thickness = new Thickness(1, 0, 1, 0);
         _allowEmpty = allowEmpty;
+        _validator = validator;
 
         var patternLabel = new Label { Text = "Pattern", X = 0, Y = 0 };
         _patternField = new TextField { Text = initialPattern };
         _patternField.ValueChanged += (_, _) => UpdateValidity();
         _patternField.Accepting += (_, e) => {
             e.Handled = true;
-            if (_patternField.Text.Trim().Length == 0 && !_allowEmpty) return;
+            if (!IsValid()) return;
             Result = _patternField.Text.Trim();
             RequestStop();
         };
@@ -50,11 +57,18 @@ internal sealed class PatternDialog: Dialog<string>
 
     private void UpdateValidity()
     {
-        var valid = _allowEmpty || _patternField.Text.Trim().Length > 0;
+        var valid = IsValid();
         // new Scheme(Attribute)'s single-value constructor derives Editable independently and
         // silently drops our background (defaults it to Black) - re-set Editable explicitly so
         // invalid state only changes the foreground, never the background (EditFrame's own
         // background is never touched here either, for the same reason).
         _patternField.SetScheme(valid ? null : new Scheme(InvalidPatternAttribute) { Editable = InvalidPatternAttribute });
+    }
+
+    private bool IsValid()
+    {
+        var trimmed = _patternField.Text.Trim();
+        if (trimmed.Length == 0) return _allowEmpty;
+        return _validator?.Invoke(trimmed) ?? true;
     }
 }

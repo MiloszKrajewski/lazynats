@@ -25,4 +25,15 @@ internal static class AsyncExtensions
             ov => app.Invoke(ov, observer.OnNext),
             ex => app.Invoke(ex, observer.OnError),
             () => app.Invoke(observer.OnCompleted)));
+
+    // System.Reactive 6.1.0's only ToObservable overload targets IEnumerable<T>, not
+    // IAsyncEnumerable<T> - verified directly, it fails to compile against an async source. This
+    // hand-rolled bridge avoids pulling in System.Linq.Async (Ix.NET) just for this one operator,
+    // per openspec/changes/add-kv-filter-language/design.md Decision 3.
+    public static IObservable<T> ToObservable<T>(this IAsyncEnumerable<T> source) =>
+        Observable.Create<T>(async (observer, cancellationToken) => {
+            await foreach (var item in source.WithCancellation(cancellationToken))
+                observer.OnNext(item);
+            observer.OnCompleted();
+        });
 }
