@@ -9,6 +9,7 @@ using NATS.Net;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 
@@ -84,4 +85,9 @@ static void ApplyColorTheme()
         Focus = new Attribute(ColorName16.Black, ColorName16.White),
         Editable = editable,
     });
+
+    // Both of Terminal.Gui's shadow styles read badly at the edges of Theme.EditableBackground's
+    // near-black grey panels (Transparent darkens toward black from a color already close to
+    // black; Opaque's block glyphs don't blend with it either) - simplest fix is no shadow.
+    Dialog.DefaultShadow = ShadowStyles.None;
 }
