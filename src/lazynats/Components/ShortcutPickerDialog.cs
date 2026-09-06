@@ -35,7 +35,19 @@ internal sealed class ShortcutPickerDialog: Dialog<ShortcutHint?>
             return;
         }
 
-        var rows = sorted.Select(hint => $"{hint.Text} ({hint.Key})").ToList();
+        // Key first, then action name - reversed from the old "Action (Key)" order - so the part
+        // that answers "which key do I press" reads first and stands out, matching the live
+        // feed's pattern of coloring the part of a row that identifies it (see Theme.ShortcutKeyColor).
+        // keyColumnWidth is recomputed fresh from this open's own entry set (never hardcoded), so
+        // no key chord - however long - is ever truncated.
+        var keyTexts = sorted.Select(hint => hint.Key.ToString()).ToList();
+        var keyColumnWidth = keyTexts.Max(text => text.Length);
+        var rows = sorted.Zip(
+            keyTexts, (hint, keyText) => new ColoredRow(
+                [
+                    new RowSegment(Theme.ShortcutKeyColor, keyText.PadRight(keyColumnWidth)),
+                    new RowSegment(null, $"  {hint.Text}"),
+                ])).ToList();
         var width = Math.Clamp(rows.Max(row => row.Length) + 4, 30, 60);
         var height = Math.Clamp(rows.Count, 1, 15);
 
@@ -49,7 +61,7 @@ internal sealed class ShortcutPickerDialog: Dialog<ShortcutHint?>
         // There's nothing else in this dialog to Tab to anyway, so opting out of the Tab-stop
         // protocol costs nothing.
         var listView = new ListView { X = 0, Y = 0, Width = width, Height = height, TabStop = TabBehavior.NoStop };
-        listView.SetSource(new ObservableCollection<string>(rows));
+        listView.Source = new ColoredRowListDataSource(new ObservableCollection<ColoredRow>(rows));
         // A fresh ListView starts with no selection (SelectedItem null) - without this, Enter
         // pressed before ever navigating invokes nothing, per the same reasoning as
         // ListEditorView.EnsureValidSelection/DrillableListView's initial selection setup.

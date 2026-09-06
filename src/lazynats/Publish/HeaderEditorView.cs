@@ -11,7 +11,7 @@ internal readonly record struct HeaderPair(string Key, string Value);
 // keep in sync with, PublishDialog only reads the collection at Send time.
 //
 // No filter/search (no EnableFilter, no attached FilterBox anywhere this is used) - a handful of
-// headers (realistically well under 10) is never worth "/"-search/Ctrl+F chrome, so that vertical
+// headers (realistically well under 10) is never worth "/"-search/F-filter chrome, so that vertical
 // space is given back to the header list itself instead (see PublishDialog/TemplateDialog).
 internal sealed class HeaderEditorView: ListEditorView<HeaderPair>
 {
@@ -19,7 +19,7 @@ internal sealed class HeaderEditorView: ListEditorView<HeaderPair>
 
     public HeaderEditorView(ObservableCollection<HeaderPair> items): base(items, Presenter) { }
 
-    protected override string EmptyHint => "No headers — Ctrl+N to add one";
+    protected override string EmptyHint => "No headers — N to add one";
 
     protected override bool TryCreate(out HeaderPair result) =>
         TryEditHeader("New Header", string.Empty, out result);

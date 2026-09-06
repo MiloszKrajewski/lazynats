@@ -35,6 +35,12 @@ internal static class Theme
     // from both SubjectColor and HeaderColor so the type indicator is scannable while skimming.
     public static readonly Color PayloadTypeColor = new(ColorName16.White);
 
+    // ShortcutPickerDialog's key column - not a reuse of HeaderColor (CSS LimeGreen), which
+    // already means "this is a message header" in the live feed; a separate named constant keeps
+    // that meaning from being conflated with "this is a keyboard shortcut" just because both are
+    // green. BrightGreen reads as unambiguously "green" on a 16-color terminal fallback too.
+    public static readonly Color ShortcutKeyColor = new(ColorName16.BrightGreen);
+
     private static readonly Attribute EditableAttribute = new(ColorName16.White, EditableBackground);
 
     // Dimmed foreground, same EditableBackground - explicit rather than left to derive from

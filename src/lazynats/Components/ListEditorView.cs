@@ -44,7 +44,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
     private string _quickSearchQuery = string.Empty;
 
     // `bindSharedKeys` defaults true for standalone/modal usage (e.g. HeaderEditorView inside
-    // PublishDialog), where there is no owning tab to hoist Ctrl+N/E/D up to. A tab-hosted instance
+    // PublishDialog), where there is no owning tab to hoist N/E/D up to. A tab-hosted instance
     // (e.g. SubscriptionsView inside SubscribeTab) passes false and exposes TabOperations instead -
     // see openspec/specs/tab-scoped-list-shortcuts/spec.md.
     public ListEditorView(ObservableCollection<T> items, IValuePresenter<T> presenter, bool bindSharedKeys = true)
@@ -61,9 +61,9 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         _listView.Source = _dataSource;
 
         // A separate overlay, not a fake row in _dataSource - stays outside the list's selection
-        // model entirely, so SelectedIndex/Ctrl+N/E/D need no special-casing for it. Left
+        // model entirely, so SelectedIndex/N/E/D need no special-casing for it. Left
         // CanFocus = false (its default): a Terminal.Gui Label that actually holds keyboard focus
-        // swallows all subsequent key input, which would break Ctrl+N/E/D and arrow-key tab
+        // swallows all subsequent key input, which would break N/E/D and arrow-key tab
         // navigation while the list is empty. So focus highlighting is driven manually below
         // (UpdateEmptyHintScheme/OnHasFocusChanged) rather than via the framework's normal
         // per-view Normal/Focus role switching.
@@ -72,7 +72,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         };
         UpdateEmptyHintScheme();
 
-        // Bound here (on the whole component), not on the list, so Ctrl+N/E/D work no matter
+        // Bound here (on the whole component), not on the list, so N/E/D work no matter
         // which child currently has focus - same rationale as PublishDialog's header editor. Only
         // when bindSharedKeys is true (standalone/modal usage); a tab-hosted instance leaves these
         // unbound and exposes TabOperations instead for its owning tab to bind/dispatch.
@@ -80,18 +80,20 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         AddCommand(Command.Edit, TryEditItem);
         AddCommand(Command.DeleteAll, TryDeleteItem);
         if (_bindSharedKeys) {
-            KeyBindings.Add(Key.N.WithCtrl, Command.New);
-            KeyBindings.Add(Key.E.WithCtrl, Command.Edit);
-            KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
+            KeyBindings.Add(Key.N, Command.New);
+            KeyBindings.Add(Key.E, Command.Edit);
+            KeyBindings.Add(Key.D, Command.DeleteAll);
+        }
 
-            // Ctrl+F for the shared filter wiring (see EnableFilter) - only needed in the
-            // standalone/modal case, mirroring Ctrl+N/E/D above: a tab-hosted instance has no
+        if (_bindSharedKeys && _filterEnabled) {
+            // F for the shared filter wiring (see EnableFilter) - only needed in the
+            // standalone/modal case, mirroring N/E/D above: a tab-hosted instance has no
             // direct key binding for Filter either (see DrillableListView<T>.EnableFilter), relying
             // entirely on its owning tab's TabOperations-based dispatch instead. Command.FindNext
             // is unused elsewhere on this view - repurposed here, the same way ObjectListView
             // repurposes Command.Save for Ctrl+S.
             AddCommand(Command.FindNext, () => { OpenFilterDialog(); return true; });
-            KeyBindings.Add(Key.F.WithCtrl, Command.FindNext);
+            KeyBindings.Add(Key.F, Command.FindNext);
         }
 
         Add(_listView, _emptyHintLabel);
@@ -110,7 +112,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
     // Overridden per item type so the hint reads naturally (e.g. "No subscriptions..." vs a
     // generic message); defaulted rather than abstract so a forgotten override still shows
     // something useful instead of nothing.
-    protected virtual string EmptyHint => "No items — Ctrl+N to add one";
+    protected virtual string EmptyHint => "No items — N to add one";
 
     private Color? _background;
 
@@ -331,12 +333,12 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         {
             IEnumerable<ShortcutHint> hints = _bindSharedKeys
                 ? [
-                    new ShortcutHint(Key.N.WithCtrl, "New", TryCreateItem),
-                    new ShortcutHint(Key.E.WithCtrl, "Edit", TryEditItem),
-                    new ShortcutHint(Key.D.WithCtrl, "Delete", TryDeleteItem),
+                    new ShortcutHint(Key.N, "New", TryCreateItem),
+                    new ShortcutHint(Key.E, "Edit", TryEditItem),
+                    new ShortcutHint(Key.D, "Delete", TryDeleteItem),
                 ]
                 : [];
-            if (_bindSharedKeys && _filterEnabled) hints = hints.Append(new ShortcutHint(Key.F.WithCtrl, "Filter", OpenFilterDialog));
+            if (_bindSharedKeys && _filterEnabled) hints = hints.Append(new ShortcutHint(Key.F, "Filter", OpenFilterDialog));
             if (_filterBox is { } box) hints = hints.Append(new ShortcutHint(new Key('/'), "Search", box.Activate));
             return hints;
         }
