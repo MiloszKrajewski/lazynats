@@ -56,6 +56,28 @@ internal sealed class MainWindow : Window   // bordered root; use `Runnable` for
 | `LayoutStyle.Computed` | removed — layout is always declarative via `Pos`/`Dim` |
 | `new RadioGroup (…)` | `new OptionSelector { … }` |
 | `Colors.ColorSchemes["x"]` | `Schemes.Resolve ("x")` |
+| `TabView` / `Tab { DisplayText = … }` | `Terminal.Gui.Views.Tabs` — see below, this is **not** the v1 `TabView` shape either |
+
+## Tabs (verified against Terminal.Gui 2.4.10, `Terminal.Gui.Views.Tabs`)
+There is no `TabView`/`Tab` pair in this installed version — don't guess at that API even from
+recent memory. Instead:
+- `Tabs` is a `View`. Add any `View` to it via the normal `Add(view)` — each added SubView
+  automatically becomes a tab, with that view's own `Title` used as the tab header caption.
+- The **focused** SubView is the selected (front-most) tab; set `tabs.Value = someView` to select
+  a tab programmatically. `TabCollection` gives tabs in logical (not draw) order；
+  `InsertTab(index, view)` inserts at a specific logical position.
+- `TabDepth`, `TabSpacing`, `TabLineStyle` (a `LineStyle`, e.g. `LineStyle.None` for minimal
+  chrome), and `TabSide` (`Side.Top/Bottom/Left/Right`) control header appearance/placement.
+- Each tab's `Title`/border is drawn by `Border` with `BorderSettings.Tab`, not a `FrameView`.
+
+## Per-view color overrides (verified against 2.4.10)
+- `view.SetScheme(new Scheme(new Attribute(fg, bg)))` sets an explicit `Scheme` directly on a
+  view (no global registration needed) — pass `null` to `SetScheme` to revert to inheriting from
+  `SuperView`. Use this for one-off banding/highlighting; use `Schemes.Resolve("x")` + `SchemeName`
+  only when you actually want a named, reusable theme.
+- `Attribute` has many constructors — `new Attribute(Color, Color)` (fg, bg) and
+  `new Attribute(ColorName16, ColorName16)` (16-color palette names) are the simplest for ad hoc
+  colors.
 
 ## Layout: `Pos` / `Dim` (don't hardcode coordinates)
 - `X`/`Y`: `Pos.Center ()`, `Pos.Right (otherView)`, `Pos.Percent (25)`, `Pos.AnchorEnd ()`, or an `int`.

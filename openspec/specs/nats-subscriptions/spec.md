@@ -2,9 +2,7 @@
 
 ## Purpose
 Manage the set of active NATS subject-pattern subscriptions that feed the live message feed: listing what's currently active, adding new subject-pattern subscriptions, and deleting them.
-
 ## Requirements
-
 ### Requirement: Subscription List Management
 The system SHALL provide a Subscriptions screen listing the currently active subject-pattern subscriptions (e.g. `invoices.>`), so the user can see at a glance which patterns are currently being monitored.
 
@@ -31,8 +29,25 @@ The system SHALL allow the user to delete an active subscription, which SHALL st
 - **THEN** its background reader task and NATS subscription are cancelled/disposed, and messages published afterward on subjects matching `invoices.>` (and not matched by any other still-active pattern) no longer appear in the feed
 
 ### Requirement: Modifying a Subscription Pattern
-The system SHALL NOT provide a distinct "edit" action for an existing subscription; changing a pattern SHALL be performed as deleting the existing subscription and adding a new one with the desired pattern.
+The system SHALL provide a Ctrl+E convenience for changing an active subscription's pattern: it SHALL
+load the selected subscription's pattern into the input for editing, and on commit SHALL remove the
+existing subscription and add a new one with the edited pattern. This SHALL NOT preserve the
+subscription's identity — the new subscription SHALL be assigned a different `Guid` than the one it
+replaces — since a NATS subscription cannot be altered in place. The same effect SHALL also remain
+achievable via separate delete and add actions, without using Ctrl+E.
+
+#### Scenario: Ctrl+E loads a pattern for editing
+- **WHEN** the user selects an active subscription and presses Ctrl+E
+- **THEN** that subscription's pattern is loaded into the input for editing
+
+#### Scenario: Committing an edit replaces the subscription with a new identity
+- **WHEN** the user has loaded a subscription's pattern via Ctrl+E, changes the pattern text, and
+  commits it
+- **THEN** the original subscription is removed, a new subscription is added for the edited pattern,
+  and the new subscription is assigned a different identity than the one it replaced
 
 #### Scenario: Changing a pattern is delete-then-add
-- **WHEN** the user wants to change an active subscription's pattern
-- **THEN** the user deletes the existing subscription and adds a new one with the new pattern, with the same effect as if a dedicated edit action existed
+- **WHEN** the user wants to change an active subscription's pattern without using Ctrl+E
+- **THEN** the user can delete the existing subscription and add a new one with the new pattern, with
+  the same effect as using Ctrl+E
+

@@ -26,9 +26,24 @@ messages are shown line per message, to get deeper you need to select it and "go
 
 # Sending messages
 
-I would like ability to send a message: subject, headers, payload. Editing all 3 should be possible with a modal window. Initially payload as text only (enables JSON and UTF8), but loading a binary file might be considered later. 
+I would like ability to send a message: subject, headers, payload. This lives in its own
+"Publish" management tab (inserted right after Subscriptions), not a modal window: subject as a
+single field, headers as an editable list of key/value pairs, payload as a multi-line text area.
 
-Editing binary payloads may be disabled depending on availability/amount of work needed for hex editor.
+Headers are edited keyboard-only: a key/value input row adds a pair on Enter, Delete removes the
+selected pair from the list below it. No mouse-only affordances (no decorative or per-row
+buttons) for this.
+
+The Send button is disabled whenever the current entry is invalid (e.g. empty subject), with
+invalid fields flagged visually (e.g. red text/icon) rather than via a popup. Sending gives
+feedback in the status bar and keeps the form filled in, so the same message can be tweaked and
+resent.
+
+Initially payload as text only (enables JSON and UTF8), but loading a binary file might be
+considered later.
+
+Editing binary payloads may be disabled depending on availability/amount of work needed for hex
+editor.
 
 # Message templates
 
