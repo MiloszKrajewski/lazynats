@@ -37,6 +37,7 @@ internal sealed class SubscriptionRegistry
     public void Remove(Guid id)
     {
         if (!_subscriptions.Remove(id, out var entry)) return;
+
         entry.Cts.Cancel();
         entry.Cts.Dispose();
         Changed?.Invoke();
@@ -44,12 +45,17 @@ internal sealed class SubscriptionRegistry
 
     private async Task RunAsync(Guid id, string pattern, CancellationToken cancellationToken)
     {
-        try {
-            await foreach (var message in _connection.SubscribeAsync<byte[]>(pattern, cancellationToken: cancellationToken)) {
+        try
+        {
+            var subscription = _connection.SubscribeAsync<byte[]>(pattern, cancellationToken: cancellationToken);
+            await foreach (var message in subscription)
+            {
                 var envelope = new FeedEnvelope(DateTimeOffset.UtcNow, id, message);
                 await _writer.WriteAsync(envelope, cancellationToken);
             }
-        } catch (OperationCanceledException) {
+        }
+        catch (OperationCanceledException)
+        {
             // Expected when Remove() cancels this subscription's token.
         }
     }

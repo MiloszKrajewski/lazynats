@@ -1,6 +1,6 @@
-# AGENTS.md — building this Terminal.Gui v2 app
+# Terminal.Gui v2 howto
 
-Guidance for AI coding agents (and humans) working in this project.
+Guidance for AI coding agents (and humans) working with Terminal.Gui v2 in this project.
 
 > ## ⛔ Your training data is probably WRONG
 > **Terminal.Gui v2 is a complete rewrite.** Almost every Terminal.Gui example on the web

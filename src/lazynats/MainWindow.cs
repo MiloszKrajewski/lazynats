@@ -28,7 +28,7 @@ internal sealed class MainWindow: Runnable
         quitShortcut.Action = () => App!.RequestStop();
 
         var clearShortcut = new Shortcut { Text = "Clear", Key = Key.C, Visible = false };
-        clearShortcut.Action = () => liveUpdates.Clear();
+        clearShortcut.Action = liveUpdates.Clear;
         liveUpdates.HasFocusChanged += (_, _) => clearShortcut.Visible = liveUpdates.HasFocus;
 
         var statusBar = new StatusBar([quitShortcut, clearShortcut]);
