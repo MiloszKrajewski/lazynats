@@ -11,6 +11,7 @@ internal sealed class ConsumerListView: DrillableListView<ConsumerInfo>
 
     public event Action? AscendRequested;
     public event Action? CreateRequested;
+    public event Action? DeleteRequested;
 
     public ConsumerListView(ObservableCollection<ConsumerInfo> items): base(items)
     {
@@ -28,6 +29,9 @@ internal sealed class ConsumerListView: DrillableListView<ConsumerInfo>
 
         AddCommand(Command.New, () => { CreateRequested?.Invoke(); return true; });
         KeyBindings.Add(Key.N.WithCtrl, Command.New);
+
+        AddCommand(Command.DeleteAll, () => { DeleteRequested?.Invoke(); return true; });
+        KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
     }
 
     protected override IValuePresenter<ConsumerInfo> Presenter => PresenterInstance;
@@ -39,5 +43,6 @@ internal sealed class ConsumerListView: DrillableListView<ConsumerInfo>
     public override IEnumerable<ShortcutHint> Shortcuts =>
         base.Shortcuts
             .Append(new ShortcutHint(Key.Esc, "Back", () => AscendRequested?.Invoke()))
-            .Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()));
+            .Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()))
+            .Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
 }

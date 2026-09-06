@@ -64,6 +64,7 @@ internal sealed class StreamsTab: View
         _consumerListView.HighlightChanged += OnConsumerHighlightChanged;
         _consumerListView.AscendRequested += Ascend;
         _consumerListView.CreateRequested += () => OpenCreateConsumerDialog(null);
+        _consumerListView.DeleteRequested += () => _ = TryDeleteConsumerAsync();
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_streamListFrame) + 1, Y = 0 };
         _details = new StreamDetails(_jetStream) { X = Pos.Right(_streamListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -174,7 +175,7 @@ internal sealed class StreamsTab: View
             _ = RefreshListAsync(options.Name);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, "Create Stream Failed", ex.Message, "_Ok");
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Create Stream Failed"), DialogText.Pad(ex.Message), "_Ok");
                 OpenCreateStreamDialog(options);
             });
         }
@@ -198,7 +199,7 @@ internal sealed class StreamsTab: View
             _ = RefreshConsumerListAsync(options.Name);
         } catch (Exception ex) {
             App?.Invoke(() => {
-                MessageBox.ErrorQuery(App!, "Create Consumer Failed", ex.Message, "_Ok");
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Create Consumer Failed"), DialogText.Pad(ex.Message), "_Ok");
                 OpenCreateConsumerDialog(options);
             });
         }
@@ -209,7 +210,8 @@ internal sealed class StreamsTab: View
         if (_listView.SelectedStream?.Config.Name is not { } name) return;
 
         var choice = MessageBox.Query(
-            App!, "Delete Stream", $"Delete stream '{name}'? This cannot be undone.",
+            App!, DialogText.Pad("Delete Stream"),
+            DialogText.Pad($"Delete stream '{name}'? This cannot be undone."),
             "_Delete", "_Cancel");
         if (choice != 0) return;
 
@@ -219,7 +221,7 @@ internal sealed class StreamsTab: View
             await _jetStream.DeleteStreamAsync(name);
             _ = RefreshListAsync(neighborName);
         } catch (Exception ex) {
-            App?.Invoke(() => MessageBox.ErrorQuery(App!, "Delete Stream Failed", ex.Message, "_Ok"));
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Stream Failed"), DialogText.Pad(ex.Message), "_Ok"));
         }
     }
 
@@ -237,6 +239,44 @@ internal sealed class StreamsTab: View
         if (index < 0) return null;
         if (index + 1 < _items.Count) return _items[index + 1].Config.Name;
         return index - 1 >= 0 ? _items[index - 1].Config.Name : null;
+    }
+
+    // Scoped to _currentStream at call time, same as TryCreateConsumerAsync - the consumer-level
+    // list is only reachable once Descend() has set it.
+    private async Task TryDeleteConsumerAsync()
+    {
+        if (_currentStream is not { } stream) return;
+        if (_consumerListView.SelectedConsumer?.Name is not { } name) return;
+
+        var choice = MessageBox.Query(
+            App!, DialogText.Pad("Delete Consumer"),
+            DialogText.Pad($"Delete consumer '{name}'? This cannot be undone."),
+            "_Delete", "_Cancel");
+        if (choice != 0) return;
+
+        var neighborName = NeighborConsumerName(name);
+
+        try {
+            await _jetStream.DeleteConsumerAsync(stream, name);
+            _ = RefreshConsumerListAsync(neighborName);
+        } catch (Exception ex) {
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Consumer Failed"), DialogText.Pad(ex.Message), "_Ok"));
+        }
+    }
+
+    // The consumer below `name` in the current (pre-delete) list, or the one above it if `name` is
+    // last, mirroring NeighborStreamName.
+    private string? NeighborConsumerName(string name)
+    {
+        var index = -1;
+        for (var i = 0; i < _consumerItems.Count; i++) {
+            if (_consumerItems[i].Name != name) continue;
+            index = i;
+            break;
+        }
+        if (index < 0) return null;
+        if (index + 1 < _consumerItems.Count) return _consumerItems[index + 1].Name;
+        return index - 1 >= 0 ? _consumerItems[index - 1].Name : null;
     }
 
     // `selectName` highlights a specific stream after the refresh (used right after a create, so

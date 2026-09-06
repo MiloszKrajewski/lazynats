@@ -20,7 +20,7 @@ internal sealed class PatternDialog: Dialog<string>
 
     public PatternDialog(string title, string initialPattern)
     {
-        Title = title;
+        Title = DialogText.Pad(title);
         Padding.Thickness = new Thickness(1, 0, 1, 0);
 
         var patternLabel = new Label { Text = "Pattern", X = 0, Y = 0 };

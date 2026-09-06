@@ -45,7 +45,7 @@ internal sealed class MainWindow: Runnable
         tabs.Value = subscribeTab;
 
         var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
-        liveUpdates.ItemSelected += envelope => MessageBox.Query(App!, "Selected", envelope.Message.Subject, "_Ok");
+        liveUpdates.ItemSelected += envelope => MessageBox.Query(App!, DialogText.Pad("Selected"), DialogText.Pad(envelope.Message.Subject), "_Ok");
 
         // Dim.Fill(1) leaves the bottom row free for the StatusBar, which sits outside this frame.
         var feedFrame = new FrameView { Title = " Live Feed ", X = 0, Y = Pos.Bottom(tabs), Width = Dim.Fill(), Height = Dim.Fill(1) };

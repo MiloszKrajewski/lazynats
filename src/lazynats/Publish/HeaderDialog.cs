@@ -18,7 +18,7 @@ internal sealed class HeaderDialog: Dialog<string>
 
     public HeaderDialog(string title, string initialText)
     {
-        Title = title;
+        Title = DialogText.Pad(title);
         Padding.Thickness = new Thickness(1, 0, 1, 0);
 
         var headerLabel = new Label { Text = "Header (key: value)", X = 0, Y = 0 };
