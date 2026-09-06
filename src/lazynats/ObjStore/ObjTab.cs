@@ -68,6 +68,9 @@ internal sealed class ObjTab: View
         _objectListView.RefreshRequested += () => _ = RefreshObjectListAsync();
         _objectListView.HighlightChanged += OnObjectHighlightChanged;
         _objectListView.AscendRequested += Ascend;
+        _objectListView.CreateRequested += () => OpenUploadDialog(null);
+        _objectListView.DownloadRequested += OpenDownloadDialog;
+        _objectListView.DeleteRequested += () => _ = TryDeleteObjectAsync();
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_bucketListFrame) + 1, Y = 0 };
         _details = new BucketDetails(_obj) { X = Pos.Right(_bucketListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -275,7 +278,10 @@ internal sealed class ObjTab: View
         }
     }
 
-    private async Task RefreshObjectListAsync()
+    // `selectName` mirrors KvTab.RefreshKeyListAsync's own parameter - highlights a specific
+    // object after the refresh (used right after an upload) instead of ReplaceItems' default
+    // "keep whatever was highlighted before" fallback.
+    private async Task RefreshObjectListAsync(string? selectName = null)
     {
         if (_currentBucket is not { } bucket) return;
 
@@ -286,10 +292,94 @@ internal sealed class ObjTab: View
             App?.Invoke(() => {
                 // The user may have ascended back out while this was in flight - only apply a
                 // result that's still for the currently-drilled-into bucket.
-                if (_currentBucket == bucket) _objectListView.ReplaceItems(names);
+                if (_currentBucket == bucket) _objectListView.ReplaceItems(names, selectName);
             });
         } catch (Exception ex) {
             App?.Invoke(() => StatusChanged?.Invoke($"OBJ: {ex.Message}"));
+        }
+    }
+
+    // Always runs on the UI thread - mirrors OpenCreateBucketDialog exactly. Scoped by
+    // _currentBucket alone since Ctrl+N is only bound at the object level (see ObjectListView),
+    // unreachable from the bucket level.
+    private void OpenUploadDialog(ObjectFileTransfer? seed)
+    {
+        if (_currentBucket is not { } bucket) return;
+
+        var dialog = new ObjectFileDialog(isUpload: true, seed);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryUploadObjectAsync(bucket, options);
+    }
+
+    private async Task TryUploadObjectAsync(string bucket, ObjectFileTransfer options)
+    {
+        try {
+            var store = await _obj.GetObjectStoreAsync(bucket);
+            await using var stream = File.OpenRead(options.Path);
+            await store.PutAsync(options.Key, stream, leaveOpen: false);
+            _ = RefreshObjectListAsync(options.Key);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Upload Object Failed"), DialogText.Pad(ex.Message), "_Ok");
+                OpenUploadDialog(options);
+            });
+        }
+    }
+
+    // Ctrl+S at the object level. Scoped by both _currentBucket and _objectListView.SelectedObject
+    // - unreachable from the bucket level, and a no-op on an empty object list (no highlighted
+    // object to download), per "Ctrl+S with no object highlighted does nothing".
+    private void OpenDownloadDialog()
+    {
+        if (_currentBucket is not { } bucket) return;
+        if (_objectListView.SelectedObject is not { } name) return;
+
+        OpenDownloadDialog(bucket, new ObjectFileTransfer(name, string.Empty));
+    }
+
+    private void OpenDownloadDialog(string bucket, ObjectFileTransfer seed)
+    {
+        var dialog = new ObjectFileDialog(isUpload: false, seed);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryDownloadObjectAsync(bucket, options);
+    }
+
+    private async Task TryDownloadObjectAsync(string bucket, ObjectFileTransfer options)
+    {
+        try {
+            var store = await _obj.GetObjectStoreAsync(bucket);
+            await using var stream = File.Create(options.Path);
+            await store.GetAsync(options.Key, stream, leaveOpen: false);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Download Object Failed"), DialogText.Pad(ex.Message), "_Ok");
+                OpenDownloadDialog(bucket, options);
+            });
+        }
+    }
+
+    // Scoped by _currentBucket and _objectListView.SelectedObject alone - Ctrl+D is only bound at
+    // the object level (see ObjectListView), unreachable from the bucket level. Mirrors
+    // TryDeleteKeyAsync exactly.
+    private async Task TryDeleteObjectAsync()
+    {
+        if (_currentBucket is not { } bucket) return;
+        if (_objectListView.SelectedObject is not { } name) return;
+
+        var choice = MessageBox.Query(
+            App!, DialogText.Pad("Delete Object"),
+            DialogText.Pad($"Delete object '{name}'? This cannot be undone."),
+            "_Delete", "_Cancel");
+        if (choice != 0) return;
+
+        var neighborName = _objectListView.NeighborIdentity(name);
+
+        try {
+            var store = await _obj.GetObjectStoreAsync(bucket);
+            await store.DeleteAsync(name);
+            _ = RefreshObjectListAsync(neighborName);
+        } catch (Exception ex) {
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Object Failed"), DialogText.Pad(ex.Message), "_Ok"));
         }
     }
 }
