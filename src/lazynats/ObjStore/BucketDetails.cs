@@ -37,7 +37,7 @@ internal sealed class BucketDetails: PollingDetailsView<string, NatsObjStatus>
             ("Objects", state.Messages.ToString()),
             ("Bytes", state.Bytes.ToString()),
             ("Replicas", config.NumReplicas.ToString()),
-            ("Max Age", config.MaxAge.ToString()),
+            ("Max Age", LimitFormat.Duration(config.MaxAge)),
         ];
     }
 }

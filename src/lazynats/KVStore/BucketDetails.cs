@@ -35,8 +35,8 @@ internal sealed class BucketDetails: PollingDetailsView<string, NatsKVStatus>
             // "Entries" rather than "Keys" so it isn't read as a live-key count.
             ("Entries", state.Messages.ToString()),
             ("Bytes", state.Bytes.ToString()),
-            ("History", config.MaxMsgsPerSubject.ToString()),
-            ("Max Age", config.MaxAge.ToString()),
+            ("History", LimitFormat.Count(config.MaxMsgsPerSubject)),
+            ("Max Age", LimitFormat.Duration(config.MaxAge)),
         ];
     }
 }

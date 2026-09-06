@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text;
 using lazynats.Components;
 using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
@@ -65,6 +66,9 @@ internal sealed class KvTab: View
         _keyListView.RefreshRequested += () => _ = RefreshKeyListAsync();
         _keyListView.HighlightChanged += OnKeyHighlightChanged;
         _keyListView.AscendRequested += Ascend;
+        _keyListView.CreateRequested += () => OpenCreateKeyDialog(null);
+        _keyListView.DeleteRequested += () => _ = TryDeleteKeyAsync();
+        _keyListView.EditRequested += OpenEditKeyDialog;
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_bucketListFrame) + 1, Y = 0 };
         _details = new BucketDetails(_kv) { X = Pos.Right(_bucketListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -306,7 +310,10 @@ internal sealed class KvTab: View
         }
     }
 
-    private async Task RefreshKeyListAsync()
+    // `selectName` mirrors RefreshListAsync's own parameter - highlights a specific key after the
+    // refresh (used right after a create/edit) instead of ReplaceItems' default "keep whatever was
+    // highlighted before" fallback.
+    private async Task RefreshKeyListAsync(string? selectName = null)
     {
         if (_currentBucket is not { } bucket) return;
 
@@ -317,10 +324,119 @@ internal sealed class KvTab: View
             App?.Invoke(() => {
                 // The user may have ascended back out while this was in flight - only apply a
                 // result that's still for the currently-drilled-into bucket.
-                if (_currentBucket == bucket) _keyListView.ReplaceItems(keys);
+                if (_currentBucket == bucket) _keyListView.ReplaceItems(keys, selectName);
             });
         } catch (Exception ex) {
             App?.Invoke(() => StatusChanged?.Invoke($"KV: {ex.Message}"));
+        }
+    }
+
+    // Always runs on the UI thread - mirrors OpenCreateBucketDialog exactly. Scoped by
+    // _currentBucket alone since Ctrl+N is only bound at the key level (see KeyListView),
+    // unreachable from the bucket level.
+    private void OpenCreateKeyDialog(NewKeyOptions? seed)
+    {
+        if (_currentBucket is not { } bucket) return;
+
+        var dialog = new CreateKeyDialog(seed);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryCreateKeyAsync(bucket, options);
+    }
+
+    private async Task TryCreateKeyAsync(string bucket, NewKeyOptions options)
+    {
+        try {
+            var store = await _kv.GetStoreAsync(bucket);
+            await store.PutAsync(options.Name, Encoding.UTF8.GetBytes(options.Value));
+            _ = RefreshKeyListAsync(options.Name);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Create Key Failed"), DialogText.Pad(ex.Message), "_Ok");
+                OpenCreateKeyDialog(options);
+            });
+        }
+    }
+
+    // Ctrl+E at the key level. Per design.md's "Printable-text guard" decision, this always
+    // re-fetches the key's current entry - never reuses whatever KeyDetails last polled - and
+    // refuses to open the dialog for a missing or non-printable-text value.
+    private void OpenEditKeyDialog()
+    {
+        if (_currentBucket is not { } bucket) return;
+        if (_keyListView.SelectedKey is not { } key) return;
+
+        _ = TryOpenEditKeyDialogAsync(bucket, key);
+    }
+
+    private async Task TryOpenEditKeyDialogAsync(string bucket, string key)
+    {
+        try {
+            var store = await _kv.GetStoreAsync(bucket);
+            var result = await store.TryGetEntryAsync<byte[]>(key);
+            if (!result.Success) {
+                App?.Invoke(() => StatusChanged?.Invoke($"KV: Key '{key}' no longer exists"));
+                return;
+            }
+
+            if (!ValueText.TryDecode(result.Value.Value ?? [], out var text)) {
+                App?.Invoke(() => StatusChanged?.Invoke($"KV: Cannot edit '{key}' — value is not printable text"));
+                return;
+            }
+
+            App?.Invoke(() => OpenEditKeyDialog(bucket, key, new NewKeyOptions(key, text)));
+        } catch (Exception ex) {
+            App?.Invoke(() => StatusChanged?.Invoke($"KV: {ex.Message}"));
+        }
+    }
+
+    // `options` reopens with the previously-entered Value after a failed edit (mirrors
+    // OpenEditBucketDialog(status, original, seed)) - never re-fetches or re-checks
+    // printability on a retry, since `options` is already known-good typed text.
+    private void OpenEditKeyDialog(string bucket, string key, NewKeyOptions options)
+    {
+        var dialog = new CreateKeyDialog(options, isEdit: true);
+        App!.Run(dialog);
+        if (dialog.Result is { } edited) _ = TryEditKeyAsync(bucket, key, edited);
+    }
+
+    private async Task TryEditKeyAsync(string bucket, string key, NewKeyOptions edited)
+    {
+        try {
+            var store = await _kv.GetStoreAsync(bucket);
+            await store.PutAsync(key, Encoding.UTF8.GetBytes(edited.Value));
+            _ = RefreshKeyListAsync(key);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Key Failed"), DialogText.Pad(ex.Message), "_Ok");
+                OpenEditKeyDialog(bucket, key, edited);
+            });
+        }
+    }
+
+    // Scoped by _currentBucket and _keyListView.SelectedKey alone - Ctrl+D is only bound at the
+    // key level (see KeyListView), unreachable from the bucket level. Mirrors
+    // TryDeleteBucketAsync exactly, including the "cannot be undone" wording, even though the
+    // underlying DeleteAsync is a tombstoning delete rather than a history-purging one - see
+    // design.md's "Delete uses DeleteAsync" decision.
+    private async Task TryDeleteKeyAsync()
+    {
+        if (_currentBucket is not { } bucket) return;
+        if (_keyListView.SelectedKey is not { } key) return;
+
+        var choice = MessageBox.Query(
+            App!, DialogText.Pad("Delete Key"),
+            DialogText.Pad($"Delete key '{key}'? This cannot be undone."),
+            "_Delete", "_Cancel");
+        if (choice != 0) return;
+
+        var neighborKey = _keyListView.NeighborIdentity(key);
+
+        try {
+            var store = await _kv.GetStoreAsync(bucket);
+            await store.DeleteAsync(key);
+            _ = RefreshKeyListAsync(neighborKey);
+        } catch (Exception ex) {
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Key Failed"), DialogText.Pad(ex.Message), "_Ok"));
         }
     }
 }

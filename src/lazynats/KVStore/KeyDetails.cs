@@ -5,8 +5,11 @@ using NATS.Client.KeyValueStore;
 namespace lazynats.KVStore;
 
 // Read-only readout of a single key's metadata + value, per nats-kv's "Key Detail Panel"
-// requirement - never focusable, never edits anything. A key that's vanished by poll time
-// (deleted, purged, or otherwise not retrievable) is treated identically to no target being set:
+// requirement - this pane is never itself focusable or editable (same as BucketDetails).
+// Creating/editing/deleting a key is triggered from KeyListView's Ctrl+N/E/D instead (see KvTab),
+// which does its own fresh fetch rather than reusing whatever this pane last polled - see
+// design.md's "Printable-text guard" decision in add-kv-key-crud. A key that's vanished by poll
+// time (deleted, purged, or otherwise not retrievable) is treated identically to no target being set:
 // FetchAsync returns null, which Show(null) already renders as an empty panel - see design.md's
 // "Deleted/missing key" decision.
 internal sealed class KeyDetails: PollingDetailsView<(string Bucket, string Key), KeyDetails.Entry>
