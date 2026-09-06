@@ -1,17 +1,4 @@
-# list-editor Specification
-
-## Purpose
-TBD - created by archiving change add-list-editor-shortcuts. Update Purpose after archive.
-## Requirements
-### Requirement: List-Only Layout
-The list editor SHALL present a selectable list of items and no other permanently visible editable
-control, where the list displays each item's text representation as produced by an injected
-presenter.
-
-#### Scenario: Only the list is present
-- **WHEN** the list editor is displayed with existing items
-- **THEN** the list shows each item's presenter-formatted text and no other input control is
-  present within the list editor
+## MODIFIED Requirements
 
 ### Requirement: Create via Modal Callback
 The list editor SHALL, when the user invokes create (Ctrl+N standalone, N when tab-hosted — see
@@ -86,20 +73,8 @@ anywhere within the owning tab — not only within the list editor's own bounds.
 #### Scenario: Tab-hosted list editor responds regardless of focus elsewhere in the tab
 - **WHEN** a list editor is hosted within a management tab, keyboard focus is on a different view
   within that same tab (not the list editor itself), an item is selected in the list editor, and
-  the user presses Ctrl+D
+  the user presses D
 - **THEN** the selected item is removed from the item collection, via the owning tab's dispatch
-
-### Requirement: Presenter-Driven Conversion
-The list editor SHALL delegate formatting an item's value into its list-row text representation to
-an injected presenter, supporting any item type without requiring a subclass of the list editor
-solely to change that formatting.
-
-#### Scenario: Two list editors with different item types share the same editor type
-- **WHEN** one list editor is constructed with a presenter for one item type and another is
-  constructed with a presenter for a different item type
-- **THEN** both behave identically with respect to list-row rendering and create/edit/delete
-  mechanics, differing only in how items are formatted for display and in what their create/edit
-  callbacks do
 
 ### Requirement: Overridable Core Operations
 The list editor's create and edit callbacks SHALL be abstract, requiring every subclass to define
@@ -122,28 +97,6 @@ their values are obtained.
   item collection asynchronously on its own
 - **THEN** the list editor does not also mutate the item collection directly for that create/edit,
   avoiding a duplicate entry
-
-### Requirement: Selection Recovers When the Item Collection Changes
-The list editor SHALL ensure its list has a valid selected item whenever its item collection is
-non-empty. If the underlying list view's selection is absent or refers to an index no longer
-present after the item collection changes, the list editor SHALL select the first item.
-
-#### Scenario: The first item added to an empty list becomes selected
-- **WHEN** the item collection transitions from empty to containing one or more items and the list
-  view has no selection
-- **THEN** the first item becomes selected
-
-#### Scenario: A collection rebuild that discards the prior selection re-selects the first item
-- **WHEN** the item collection is replaced wholesale (e.g. cleared and repopulated by a subclass
-  whose true source of truth lives elsewhere) and the list view's selection becomes invalid as a
-  result
-- **THEN** the first item in the rebuilt collection becomes selected, provided the collection is
-  non-empty
-
-#### Scenario: An existing valid selection is left unchanged
-- **WHEN** the item collection changes but the list view's current selection still refers to a
-  valid item
-- **THEN** the selection is not altered
 
 ### Requirement: Empty-State Hint
 The list editor SHALL, while its item collection is empty, display a non-interactive hint line in
@@ -188,34 +141,6 @@ while the list editor holds focus, clearly distinguishing it from the dim unfocu
   and the item collection is empty
 - **THEN** both the focused and unfocused hint styles are rendered against that configured
   background, consistent with how the unfocused hint already honors it
-
-### Requirement: Per-Subclass Hint Text
-The list editor SHALL obtain its empty-state hint text from an overridable source, so each
-subclass can supply wording appropriate to its item type; subclasses that do not override it SHALL
-still display a generic, non-empty hint rather than no hint at all.
-
-#### Scenario: A subclass overrides the hint text
-- **WHEN** a derived list editor overrides its hint-text source with a message specific to its item
-  type
-- **THEN** the empty-state hint displays that message
-
-#### Scenario: A subclass does not override the hint text
-- **WHEN** a derived list editor does not override its hint-text source
-- **THEN** the empty-state hint displays a generic, non-empty default message
-
-### Requirement: Configurable Background
-The list editor SHALL expose an explicit background color, independent of any implicitly
-inherited scheme, so it can be visually paired consistently with other edit controls (e.g. when
-wrapped in a padded `EditFrame`).
-
-#### Scenario: Setting a background applies it to the list's fill
-- **WHEN** a background color is set on the list editor
-- **THEN** the list's fill is rendered using that color rather than an inherited scheme color
-
-#### Scenario: Background left unset falls back to inherited behavior
-- **WHEN** no explicit background is set on the list editor
-- **THEN** the list editor renders using its previously inherited scheme background, unchanged
-  from prior behavior
 
 ### Requirement: Shared Quick-Search Wiring
 The list editor SHALL offer the same shared, opt-in quick-search shape `drillable-list` specifies

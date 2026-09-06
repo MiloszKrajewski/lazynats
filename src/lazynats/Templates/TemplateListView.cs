@@ -22,7 +22,7 @@ internal sealed class TemplateListView: DrillableListView<Template>
     }
 
     protected override IValuePresenter<Template> Presenter => PresenterInstance;
-    protected override string EmptyHintText => "No templates — Ctrl+N to add one";
+    protected override string EmptyHintText => "No templates — N to add one";
     protected override string GetIdentity(Template item) => item.Name;
     protected override string FilterDialogTitle => "Filter Templates";
 

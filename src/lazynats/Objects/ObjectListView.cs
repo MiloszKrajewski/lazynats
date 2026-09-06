@@ -25,19 +25,19 @@ internal sealed class ObjectListView: DrillableListView<string>
         // place. See openspec/changes/unify-list-filtering/design.md Decision 3.
         EnableFilter();
 
-        // Command.Save is unused elsewhere on this view - repurposed here for Ctrl+S download,
-        // which stays list-bound (out of scope for tab-scoped-list-shortcuts, unlike Ctrl+F).
+        // Command.Save is unused elsewhere on this view - repurposed here for bare-S download,
+        // which stays list-bound (out of scope for tab-scoped-list-shortcuts, unlike Ctrl+F/bare F).
         AddCommand(Command.Save, () => { DownloadRequested?.Invoke(); return true; });
-        KeyBindings.Add(Key.S.WithCtrl, Command.Save);
+        KeyBindings.Add(Key.S, Command.Save);
     }
 
     protected override IValuePresenter<string> Presenter => PresenterInstance;
-    protected override string EmptyHintText => "No objects — Ctrl+R to refresh";
+    protected override string EmptyHintText => "No objects — R to refresh";
     protected override string GetIdentity(string item) => item;
     protected override string FilterDialogTitle => "Filter Objects";
 
     public string? SelectedObject => SelectedItem;
 
     public override IEnumerable<ShortcutHint> Shortcuts =>
-        base.Shortcuts.Append(new ShortcutHint(Key.S.WithCtrl, "Download", () => DownloadRequested?.Invoke()));
+        base.Shortcuts.Append(new ShortcutHint(Key.S, "Download", () => DownloadRequested?.Invoke()));
 }

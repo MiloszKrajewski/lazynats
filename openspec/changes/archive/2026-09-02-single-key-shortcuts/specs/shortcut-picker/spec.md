@@ -1,8 +1,5 @@
-# shortcut-picker Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-shortcut-picker. Update Purpose after archive.
-## Requirements
 ### Requirement: Global Shortcut Picker Invocation
 The system SHALL provide a global `?` shortcut, available regardless of which management tab
 or the live feed has focus, that opens a modal shortcut picker dialog.
@@ -31,21 +28,6 @@ chord. It SHALL NOT list the application's hardcoded top-level shortcuts (`Alt-1
 - **WHEN** the picker is opened while the focused view (and its ancestors) advertise no
   shortcuts at all
 - **THEN** the picker shows an empty-state message instead of a blank list
-
-### Requirement: Selecting an Entry Runs It
-Selecting an entry and pressing Enter SHALL close the picker and then invoke that entry's
-action, in that order.
-
-#### Scenario: Enter runs the selected shortcut
-- **WHEN** the user highlights an entry in the picker and presses Enter
-- **THEN** the picker closes, and only after it has closed is the entry's action invoked
-
-### Requirement: Escape Cancels Without Action
-Pressing Esc while the picker is open SHALL close it without invoking any shortcut's action.
-
-#### Scenario: Esc closes without running anything
-- **WHEN** the user presses Esc while the picker is open
-- **THEN** the picker closes and no shortcut action is invoked
 
 ### Requirement: Picker Suppresses Underlying Shortcut Keys While Open
 While the picker is open, pressing a key combination that would normally trigger a shortcut in

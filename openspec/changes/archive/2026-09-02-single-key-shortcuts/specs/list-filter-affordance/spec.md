@@ -1,9 +1,4 @@
-# list-filter-affordance Specification
-
-## Purpose
-TBD - created by syncing change unify-list-filtering. Update Purpose after archive.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: One Filter-Expression Grammar Governs Every Pattern Filter
 Every F pattern filter in the application, regardless of which list it's attached to, SHALL
@@ -34,19 +29,6 @@ involvement at all.
   Streams, Consumers, Buckets, Objects, or the Publish header list) has an active F filter
 - **THEN** the list shows exactly the currently-loaded items matching the compiled expression, with
   no fetch narrower or wider than an unfiltered fetch ever attempted
-
-### Requirement: Server-Side Fetch Scoping Is an Additive Optimization, Not a Prerequisite
-Where a list's backing store does support a server-side subject-wildcard-scoped fetch (currently:
-KV keys), the owning component MAY additionally use the compiled expression's native filter to
-narrow what is requested from the server. This SHALL never change the resulting set of items shown
-relative to an equivalent in-memory-only application of the same expression — it only changes how
-much data crosses the network to arrive at that same result.
-
-#### Scenario: Native scoping and in-memory matching agree
-- **WHEN** the same filter expression is applied once via a server-side-scoped fetch plus in-memory
-  matching (KV keys) and once via in-memory matching alone (any other list, hypothetically fetching
-  the same item names)
-- **THEN** both approaches select the identical set of matching item names
 
 ### Requirement: Quick-Search and Pattern Filter Are Offered as a Pair
 Any list-bearing view this capability applies to SHALL offer both the fuzzy quick-search (`/`) and

@@ -82,15 +82,20 @@ internal sealed class MainWindow: Runnable
         // iteration after this shortcut was pressed - focus can't have moved in between) rather
         // than continuously tracking it, per design.md's "compute on demand" decision.
         //
-        // Key is Alt-K, not Ctrl-/, Alt-/, or F1: the first two were confirmed dead on the user's
-        // real Windows terminal (Ctrl+/ is explicitly excluded from Terminal.Gui's own default
-        // Windows key bindings - e.g. their built-in Undo binding is
-        // `Bind.AllPlus("Ctrl+Z", nonWindows: ["Ctrl+/"])" - and Alt+/ fared no better); F1
-        // worked but function keys are unreliable on some laptop keyboards (Fn-lock). Alt+<letter>
-        // matches the rest of this top-level set and has been reliable throughout.
+        // Key is bare `?`, not Ctrl-/, Alt-/, F1, or the originally-shipped Alt-K: the first two
+        // were confirmed dead on the user's real Windows terminal (Ctrl+/ is explicitly excluded
+        // from Terminal.Gui's own default Windows key bindings - e.g. their built-in Undo binding
+        // is `Bind.AllPlus("Ctrl+Z", nonWindows: ["Ctrl+/"])" - and Alt+/ fared no better); F1
+        // worked but function keys are unreliable on some laptop keyboards (Fn-lock). `?` is safe
+        // for the same reason bare-letter list shortcuts are (see tab-scoped-list-shortcuts):
+        // Terminal.Gui's key dispatch is strictly depth-first, so a focused text field (FilterBox,
+        // any dialog field) always gets first refusal at a keystroke and consumes a literal `?`
+        // as text before MainWindow's own KeyDown subscriber below ever sees it - this handler
+        // only fires once nothing more specific already claimed the key. It also echoes `/`'s
+        // existing role as a punctuation-key global shortcut and reads naturally as "help".
         topLevelShortcuts.Add(
             new ShortcutHint(
-                Key.K.WithAlt, "Shortcuts", () => App!.AddTimeout(
+                new Key('?'), "Shortcuts", () => App!.AddTimeout(
                     TimeSpan.Zero, () => {
                         // Deliberately excludes topLevelShortcuts: those are already permanently
                         // visible in the status bar, unlike the per-view ones this picker exists

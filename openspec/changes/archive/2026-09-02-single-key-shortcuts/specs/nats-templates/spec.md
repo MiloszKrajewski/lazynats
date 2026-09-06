@@ -1,92 +1,4 @@
-# nats-templates Specification
-
-## Purpose
-Provide a fifth management tab, `5:Templates`, for saving and reusing NATS message templates
-(Subject, Headers, Payload Type, Payload) so the user doesn't have to retype common messages when
-publishing. Templates are stored server-side in a dedicated KV bucket (`lazynats-templates`) so
-they persist across sessions and are shared with other `lazynats` clients against the same server.
-
-## Requirements
-### Requirement: Templates Tab
-The system SHALL provide a fifth management tab, titled `5:Templates` and reachable from anywhere
-via Alt+5, presenting a single flat list of message templates (no drill-down levels) alongside a
-detail panel for the currently highlighted template, the same list/details split every other
-management tab already uses.
-
-#### Scenario: Alt+5 selects the Templates tab
-- **WHEN** the user presses Alt+5 from anywhere in the application
-- **THEN** the Templates tab becomes the selected management tab
-
-### Requirement: Template Detail Panel
-The system SHALL show, alongside the template list, a detail panel for the currently highlighted
-template, presenting its Name, Subject, and Payload Type, followed by a blank line, its Headers
-(one `key: value` line per header), a further blank line, and finally its Payload text.
-
-#### Scenario: Highlighting a template shows its details
-- **WHEN** the user moves the highlight to a template in the list
-- **THEN** the detail panel shows that template's Name, Subject, Payload Type, Headers, and
-  Payload, in that fixed layout
-
-#### Scenario: No template highlighted
-- **WHEN** the template list is empty and no template is highlighted
-- **THEN** the detail panel shows no template's details
-
-#### Scenario: A template with no headers still shows the blank line before Payload
-- **WHEN** the highlighted template has no headers
-- **THEN** the detail panel's layout is unchanged (Name/Subject/Payload Type, a blank line, no
-  header lines, a further blank line, then Payload) rather than collapsing the empty Headers
-  section away
-
-### Requirement: Template Storage
-The system SHALL store each template as a JSON document in a dedicated NATS KV bucket named
-`lazynats-templates`, one entry per template, keyed by the template's Name. The document SHALL
-capture the template's Subject, Headers, Payload Type, and Payload; Name SHALL NOT be duplicated
-inside the document since it is already the KV key. When Payload Type is `Json`, the document's
-Payload SHALL be stored as a native JSON value (object, array, string, number, boolean, or null),
-not as a JSON-encoded string; for every other Payload Type, Payload SHALL be stored as a JSON
-string, as today. Reading a document whose Payload was written as a JSON-encoded string under a
-`Json` Payload Type (the shape used before this requirement changed) SHALL still succeed, treating
-that string as the template's payload text.
-
-#### Scenario: A saved template is stored as a KV entry
-- **WHEN** a template named `get-invoice` with Subject `invoices.get` is created
-- **THEN** the `lazynats-templates` bucket contains an entry keyed `get-invoice` whose value is a
-  JSON document carrying that template's Subject, Headers, Payload Type, and Payload
-
-#### Scenario: A Json-typed template's payload is stored as a native JSON value
-- **WHEN** a template with Payload Type `Json` and Payload text `{"id":1}` is created
-- **THEN** the stored document's `payload` field is the native JSON value `{"id":1}`, not the
-  JSON string `"{\"id\":1}"`
-
-#### Scenario: A pre-existing string-encoded Json payload still reads correctly
-- **WHEN** the `lazynats-templates` bucket contains an entry with Payload Type `Json` whose
-  `payload` field is the JSON string `"{\"id\":1}"` (written before this requirement changed)
-- **THEN** the system reads that template's Payload as the text `{"id":1}`, the same as it would
-  for the native-JSON-value shape
-
-### Requirement: Template List
-The system SHALL list the names of all templates currently present in the `lazynats-templates`
-bucket, fetched when the Templates tab is first activated (given keyboard focus).
-
-#### Scenario: Existing templates are listed
-- **WHEN** the Templates tab is activated and one or more templates exist in the bucket
-- **THEN** the list shows each template's name
-
-#### Scenario: No templates exist
-- **WHEN** the Templates tab is activated and the `lazynats-templates` bucket either contains no
-  entries or does not exist yet
-- **THEN** the list shows the same non-interactive empty-state hint in both cases, with no visible
-  distinction between "bucket exists but is empty" and "bucket does not exist yet"
-
-### Requirement: Bucket Is Never Created On Read
-The system SHALL NOT create the `lazynats-templates` bucket as a side effect of listing or
-refreshing templates. The bucket SHALL only come into existence as a side effect of a successful
-Create or Edit (see "Create Template" and "Edit Template").
-
-#### Scenario: Viewing an empty Templates tab creates nothing
-- **WHEN** the `lazynats-templates` bucket does not exist and the user activates or refreshes the
-  Templates tab without creating a template
-- **THEN** the bucket still does not exist afterward
+## MODIFIED Requirements
 
 ### Requirement: Manual Template List Refresh
 The system SHALL NOT automatically refresh the template list on a timer. The system SHALL allow
@@ -143,42 +55,6 @@ write the new entry, and refresh the template list so the new template is shown 
   after the user dismisses it the create-template dialog reopens with the previously entered
   values still filled in
 
-### Requirement: Create Template Field Validation
-The create-template dialog SHALL validate Name, Subject, and Payload before allowing confirmation,
-and SHALL visually flag an invalid field rather than allowing a request that will fail or produce
-an unusable template.
-
-#### Scenario: Empty name blocks creation
-- **WHEN** the Name field is empty or whitespace-only
-- **THEN** the Create action is unavailable and the Name field is flagged invalid
-
-#### Scenario: Empty subject blocks creation
-- **WHEN** the Subject field is empty
-- **THEN** the Create action is unavailable and the Subject field is flagged invalid
-
-#### Scenario: Invalid JSON blocks creation when Payload Type is Json
-- **WHEN** Payload Type is `Json` and the Payload field's text does not parse as valid JSON
-- **THEN** the Create action is unavailable and the Payload field is flagged invalid
-
-#### Scenario: Invalid Base64 blocks creation when Payload Type is Base64
-- **WHEN** Payload Type is `Base64` and the Payload field's text does not decode as valid base64
-- **THEN** the Create action is unavailable and the Payload field is flagged invalid
-
-#### Scenario: Invalid hex blocks creation when Payload Type is Hex
-- **WHEN** Payload Type is `Hex` and the Payload field's text does not decode as a valid
-  hex-encoded byte sequence
-- **THEN** the Create action is unavailable and the Payload field is flagged invalid
-
-#### Scenario: Any text is valid when Payload Type is Text
-- **WHEN** Payload Type is `Text`
-- **THEN** the Payload field's text is never flagged invalid, including when it is empty
-
-#### Scenario: Switching Payload Type re-validates the current Payload text
-- **WHEN** the Payload field already contains text that is invalid for the newly selected Payload
-  Type (e.g. non-JSON text left over after switching from `Text` to `Json`)
-- **THEN** the Create action becomes unavailable and the Payload field is flagged invalid without
-  requiring the user to re-type the Payload text
-
 ### Requirement: Edit Template
 The system SHALL allow the user to edit the highlighted template via E, opening the same
 modal dialog used for "Create Template" in edit mode: the title and confirm action read "Edit
@@ -217,19 +93,6 @@ any changed content.
 - **WHEN** the user presses E while the Templates list holds focus and the list is empty (no
   template highlighted)
 - **THEN** no edit-template dialog opens
-
-### Requirement: Edit Template Field Validation
-The edit-template dialog SHALL apply the same Subject and Payload validation as "Create Template
-Field Validation" to the fields it leaves editable. Name, being disabled, is exempt.
-
-#### Scenario: Empty subject blocks saving
-- **WHEN** the Subject field is empty
-- **THEN** the Save action is unavailable and the Subject field is flagged invalid
-
-#### Scenario: Invalid Payload for the selected Payload Type blocks saving
-- **WHEN** the Payload field's text is invalid for the currently selected Payload Type (per
-  "Create Template Field Validation")
-- **THEN** the Save action is unavailable and the Payload field is flagged invalid
 
 ### Requirement: Delete Template
 The system SHALL allow the user to delete the highlighted template via D. Before deleting,

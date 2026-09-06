@@ -1,95 +1,4 @@
-# nats-streams Specification
-
-## Purpose
-Provide a "Streams" management tab that lists JetStream streams on the connected server, lets
-the user create new streams, and shows configuration/state detail for the highlighted stream,
-and lets the user drill down from a stream into its consumers to inspect their configuration and
-delivery/ack state (read-only at the consumer level), so the user can manage and inspect
-JetStream state without leaving the terminal.
-
-## Requirements
-
-### Requirement: Stream List
-The system SHALL provide a Streams management tab listing the names of all JetStream streams
-currently present on the connected server, excluding any stream that backs a Key/Value or Object
-Store bucket (see the `nats-kv` and `nats-obj` capabilities' "Bucket List" requirements for the
-bucket definition) — those are shown in their own dedicated tabs instead.
-
-#### Scenario: Existing streams are listed
-- **WHEN** one or more JetStream streams exist on the server
-- **THEN** the Streams tab's list shows each stream's name
-
-#### Scenario: No streams exist
-- **WHEN** no JetStream streams exist on the server (or JetStream is not enabled)
-- **THEN** the Streams tab shows a non-interactive hint in place of the list, rather than a blank
-  list
-
-#### Scenario: KV bucket-backing streams are excluded
-- **WHEN** a KV bucket exists on the server
-- **THEN** the stream backing that bucket does not appear in the Streams tab's list
-
-#### Scenario: Object Store bucket-backing streams are excluded
-- **WHEN** an Object Store bucket exists on the server
-- **THEN** the stream backing that bucket does not appear in the Streams tab's list
-
-#### Scenario: A plain stream that merely resembles a bucket name is still listed
-- **WHEN** a JetStream stream's name starts with `KV_` or `OBJ_` but its subjects do not include
-  one rooted at the corresponding bucket's reserved subject (`$KV.<name>.` or `$O.<name>.`, using
-  the name with the prefix stripped)
-- **THEN** that stream still appears in the Streams tab's list, since it is not actually backing a
-  bucket
-
-#### Scenario: Only bucket-backing streams exist
-- **WHEN** every JetStream stream on the server backs a KV or Object Store bucket
-- **THEN** the Streams tab shows the same non-interactive hint as when no streams exist at all
-
-### Requirement: Stream Detail Panel
-The system SHALL show, alongside the stream list, a detail panel for the currently highlighted
-stream, presenting at least its configuration (subjects, retention policy, limits, replica count)
-and current state (message count, byte size, first/last sequence number, consumer count). Limit
-fields that carry a server "no limit" sentinel value SHALL render as `(unlimited)` rather than
-their raw sentinel.
-
-#### Scenario: Highlighting a stream shows its details
-- **WHEN** the user moves the highlight to a stream in the list
-- **THEN** the detail panel shows that stream's configuration and current state
-
-#### Scenario: No stream highlighted
-- **WHEN** the stream list is empty and no stream is highlighted
-- **THEN** the detail panel shows no stream's details
-
-#### Scenario: Unlimited Max Messages renders as unlimited
-- **WHEN** the highlighted stream's `MaxMsgs` is `-1` (the server's "no limit" sentinel)
-- **THEN** the Max Messages row shows `(unlimited)` rather than `-1`
-
-#### Scenario: Unlimited Max Bytes renders as unlimited
-- **WHEN** the highlighted stream's `MaxBytes` is `-1` (the server's "no limit" sentinel)
-- **THEN** the Max Bytes row shows `(unlimited)` rather than `-1`
-
-#### Scenario: Unlimited Max Age renders as unlimited
-- **WHEN** the highlighted stream's `MaxAge` is zero (the server's "no limit" sentinel)
-- **THEN** the Max Age row shows `(unlimited)` rather than `00:00:00`
-
-#### Scenario: A configured limit still renders as its value
-- **WHEN** the highlighted stream's Max Messages, Max Bytes, or Max Age is set to an actual
-  positive limit rather than the unlimited sentinel
-- **THEN** that row shows the configured value, unchanged from today's rendering
-
-### Requirement: Periodic Detail Refresh
-The system SHALL refresh the highlighted stream's detail panel periodically while the Streams tab
-is the selected tab, independent of any selection change, so that state changes made outside the
-application (e.g. via another NATS client) become visible without user interaction. This
-refresh SHALL apply only to the detail panel, not to the stream list.
-
-#### Scenario: Detail panel reflects a change made outside the app
-- **WHEN** the Streams tab is selected, a stream is highlighted, and that stream's message count
-  changes on the server (e.g. a message is published to it) without any selection change in the
-  app
-- **THEN** the detail panel's shown message count updates within one refresh cycle
-
-#### Scenario: Refresh does not run while the tab is not selected
-- **WHEN** the Streams tab is not the currently selected management tab
-- **THEN** the system does not poll the server for detail updates
+## MODIFIED Requirements
 
 ### Requirement: Manual List Refresh
 The system SHALL NOT automatically refresh the stream list on a timer. The system SHALL allow the
@@ -148,100 +57,6 @@ quick-search (`/`); both may be active at once.
 #### Scenario: The filter persists across a refresh
 - **WHEN** a filter is active and the user presses R
 - **THEN** the refreshed stream list is immediately narrowed by the still-active filter
-
-### Requirement: Navigation Between Stream and Consumer Levels
-The system SHALL allow the user to descend from the stream list into the highlighted stream's
-consumer list, and climb back up to the stream list, with the current level always visually
-obvious.
-
-#### Scenario: Enter descends into a stream's consumers
-- **WHEN** the user presses Enter while a stream is highlighted in the stream list
-- **THEN** the LHS list is replaced with that stream's consumer list, and the RHS switches to
-  tracking the highlighted consumer
-
-#### Scenario: Esc climbs back to the stream list
-- **WHEN** the user presses Esc while viewing a stream's consumer list
-- **THEN** the LHS list is replaced with the stream list, restored to its prior highlight and
-  scroll position, and the RHS switches back to tracking the highlighted stream
-
-#### Scenario: Backspace climbs back to the stream list
-- **WHEN** the user presses Backspace while viewing a stream's consumer list
-- **THEN** the same result as pressing Esc occurs
-
-#### Scenario: Current level is shown in the breadcrumb
-- **WHEN** the user has descended into a stream's consumers
-- **THEN** the LHS and RHS panel titles reflect the consumer level (e.g. naming the stream) rather
-  than the generic stream-level titles
-
-#### Scenario: Descending with no consumers
-- **WHEN** the user descends into a stream that has no consumers
-- **THEN** the consumer list shows a non-interactive hint in place of the list, rather than a
-  blank list
-
-### Requirement: Consumer List
-The system SHALL list the names of all JetStream consumers belonging to the currently
-drilled-into stream, fetched fresh every time the user descends into that level.
-
-#### Scenario: Descending fetches the consumer list
-- **WHEN** the user descends into a stream via Enter
-- **THEN** the system fetches the current set of consumers for that stream from the server and
-  displays them
-
-#### Scenario: Re-descending re-fetches
-- **WHEN** the user ascends from a stream's consumer list and then descends into the same stream
-  again
-- **THEN** the system fetches the consumer list again rather than reusing the previous result
-
-#### Scenario: Ascending does not re-fetch the stream list
-- **WHEN** the user ascends from a stream's consumer list back to the stream list
-- **THEN** the stream list is not re-fetched from the server; it shows whatever it last held
-
-### Requirement: Consumer Detail Panel
-The system SHALL show, alongside the consumer list, a detail panel for the currently highlighted
-consumer, presenting at least its configuration (filter subject, ack policy, deliver policy, max
-deliver, max ack pending) and current state (delivered sequence, ack floor, ack-pending count,
-redelivered count, waiting count, pending count). Limit fields that carry a server "no limit"
-sentinel value SHALL render as `(unlimited)` rather than their raw sentinel.
-
-#### Scenario: Highlighting a consumer shows its details
-- **WHEN** the user moves the highlight to a consumer in the consumer list
-- **THEN** the detail panel shows that consumer's configuration and current state
-
-#### Scenario: No consumer highlighted
-- **WHEN** the consumer list is empty and no consumer is highlighted
-- **THEN** the detail panel shows no consumer's details
-
-#### Scenario: Unlimited Max Deliver renders as unlimited
-- **WHEN** the highlighted consumer's `MaxDeliver` is `-1` (the server's "no limit" sentinel)
-- **THEN** the Max Deliver row shows `(unlimited)` rather than `-1`
-
-#### Scenario: Unlimited Max Ack Pending renders as unlimited
-- **WHEN** the highlighted consumer's `MaxAckPending` is `-1` (the server's "no limit" sentinel)
-- **THEN** the Max Ack Pending row shows `(unlimited)` rather than `-1`
-
-#### Scenario: A configured limit still renders as its value
-- **WHEN** the highlighted consumer's Max Deliver or Max Ack Pending is set to an actual positive
-  limit rather than the unlimited sentinel
-- **THEN** that row shows the configured value, unchanged from today's rendering
-
-### Requirement: Periodic Consumer Detail Refresh
-The system SHALL refresh the highlighted consumer's detail panel periodically while the consumer
-level is shown and the Streams tab is the selected tab, independent of any selection change. This
-refresh SHALL apply only to the detail panel, not to the consumer list.
-
-#### Scenario: Detail panel reflects a change made outside the app
-- **WHEN** the consumer level is shown, a consumer is highlighted, and that consumer's ack-pending
-  count changes on the server without any selection change in the app
-- **THEN** the detail panel's shown ack-pending count updates within one refresh cycle
-
-#### Scenario: Refresh does not run while the stream level is shown
-- **WHEN** the user is viewing the stream list (not drilled into a stream's consumers)
-- **THEN** the system does not poll the server for consumer detail updates
-
-#### Scenario: Refresh does not run while the tab is not selected
-- **WHEN** the Streams tab is not the currently selected management tab
-- **THEN** the system does not poll the server for consumer detail updates, even if the consumer
-  level was the last one shown
 
 ### Requirement: Manual Consumer List Refresh
 The system SHALL NOT automatically refresh the consumer list on a timer. The system SHALL allow
@@ -374,36 +189,6 @@ reachable from the consumer level; N SHALL have no effect at the stream level.
 - **THEN** no create-consumer dialog opens (N at the stream level opens the create-stream
   dialog instead, per "Create Stream")
 
-### Requirement: Create Consumer Field Validation
-The create-consumer dialog SHALL validate Name before allowing confirmation, and SHALL visually
-flag an invalid Name rather than allowing a request that will fail immediately. Filter Subjects is
-optional (empty, or containing only delimiter characters with no actual subject text, is a valid,
-meaningful choice), and Ack Policy and Deliver Policy always have a valid default selection.
-
-#### Scenario: Empty name blocks creation
-- **WHEN** the Name field is empty or whitespace-only
-- **THEN** the Create action is unavailable and the Name field is flagged invalid
-
-#### Scenario: Ack Policy always has a valid selection
-- **WHEN** the create-consumer dialog is opened
-- **THEN** the Ack Policy field already shows a default selection (Explicit) and never blocks
-  Create on its own
-
-#### Scenario: Ack Policy offers only user-facing choices
-- **WHEN** the user opens the Ack Policy field
-- **THEN** the offered choices are limited to Explicit, All, and None — FlowControl (used
-  internally by durable consumers driving mirror or source replication) is not offered
-
-#### Scenario: Deliver Policy always has a valid selection
-- **WHEN** the create-consumer dialog is opened
-- **THEN** the Deliver Policy field already shows a default selection (All) and never blocks
-  Create on its own
-
-#### Scenario: Deliver Policy offers only start-position-independent choices
-- **WHEN** the user opens the Deliver Policy field
-- **THEN** the offered choices are limited to All, Last, New, and Last Per Subject — choices that
-  require a companion start position (By Start Sequence, By Start Time) are not offered
-
 ### Requirement: Edit Consumer
 The system SHALL allow the user to edit the highlighted consumer from the consumer-level list via
 E, which opens the same modal dialog used for "Create Consumer" in edit mode: the title and
@@ -460,16 +245,6 @@ consumer's detail panel reflects the new filter.
   (no consumer highlighted)
 - **THEN** no edit-consumer dialog opens
 
-### Requirement: Edit Consumer Field Validation
-The edit-consumer dialog SHALL treat Filter Subjects as always valid, the same as when creating
-(empty is a valid "no filter" choice, not an error). Name, Ack Policy, and Deliver Policy, being
-disabled, are exempt from validation.
-
-#### Scenario: Empty Filter Subjects on save means no filter
-- **WHEN** the user clears Filter Subjects entirely and confirms (Save)
-- **THEN** the Save action is available, and after saving the consumer receives messages matching
-  every subject on the stream, not just a filtered subset
-
 ### Requirement: Create Stream
 The system SHALL allow the user to create a new JetStream stream from the stream-level list via
 N, which opens a modal dialog collecting Name, Subjects, Retention, and Max Age. On
@@ -506,38 +281,6 @@ immediately usable.
 - **THEN** the created stream has no message-count or byte-size limit (accepts messages
   indefinitely up to server-wide limits) and at least one replica, rather than a stream that
   rejects messages immediately
-
-### Requirement: Create Stream Field Validation
-The create-stream dialog SHALL validate Name, Subjects, and Max Age before allowing
-confirmation, and SHALL visually flag invalid fields rather than allowing a request that will
-fail immediately.
-
-#### Scenario: Empty name blocks creation
-- **WHEN** the Name field is empty or whitespace-only
-- **THEN** the Create action is unavailable and the Name field is flagged invalid
-
-#### Scenario: Empty subjects blocks creation
-- **WHEN** the Subjects field is empty, or contains only delimiter characters with no actual
-  subject text
-- **THEN** the Create action is unavailable and the Subjects field is flagged invalid
-
-#### Scenario: Subjects field accepts multiple delimiters
-- **WHEN** the user enters subjects separated by any mix of spaces, commas, or semicolons (e.g.
-  `orders.*, orders.new;  orders.cancelled`)
-- **THEN** the system parses each non-empty, delimiter-separated token as a distinct subject
-
-#### Scenario: Empty Max Age means unlimited
-- **WHEN** the Max Age field is left empty and the rest of the dialog is otherwise valid
-- **THEN** the Create action is available and the created stream has no maximum message age
-
-#### Scenario: Unparseable Max Age blocks creation
-- **WHEN** the Max Age field contains text that does not parse as a `TimeSpan`
-- **THEN** the Create action is unavailable and the Max Age field is flagged invalid
-
-#### Scenario: Retention always has a valid selection
-- **WHEN** the create-stream dialog is opened
-- **THEN** the Retention field already shows a default selection (Limits) and never blocks
-  Create on its own
 
 ### Requirement: Edit Stream
 The system SHALL allow the user to edit the highlighted stream from the stream-level list via
@@ -584,24 +327,6 @@ and refresh the stream list so the updated stream's detail panel reflects the ne
 - **WHEN** the user presses E while the stream-level list holds focus and the list is empty
   (no stream highlighted)
 - **THEN** no edit-stream dialog opens
-
-### Requirement: Edit Stream Field Validation
-The edit-stream dialog SHALL apply the same Subjects and Max Age validation as "Create Stream
-Field Validation" to the fields it leaves editable. Name and Retention, being disabled, are exempt
-from validation — their value is unchanged from the stream's current server-side configuration.
-
-#### Scenario: Empty subjects blocks saving
-- **WHEN** the Subjects field is empty, or contains only delimiter characters with no actual
-  subject text
-- **THEN** the Save action is unavailable and the Subjects field is flagged invalid
-
-#### Scenario: Unparseable Max Age blocks saving
-- **WHEN** the Max Age field contains text that does not parse as a `TimeSpan`
-- **THEN** the Save action is unavailable and the Max Age field is flagged invalid
-
-#### Scenario: Empty Max Age means unlimited
-- **WHEN** the Max Age field is cleared and the rest of the dialog is otherwise valid
-- **THEN** the Save action is available and saving removes the stream's maximum message age
 
 ### Requirement: Delete Stream
 The system SHALL allow the user to delete the highlighted stream from the stream-level list via

@@ -71,11 +71,12 @@ internal sealed class ManagementTabs: Tabs
         (FindFirstFocusableDescendant(tab) ?? tab).SetFocus();
     }
 
-    // A list<->FilterBox pairing toggles directly between the two, regardless of direction (there
-    // are only ever the two of them) - walks up from the actually-focused view (not just Value's
-    // immediate child) looking for either half of such a pairing and focuses it. Falls back to
-    // generic forward AdvanceFocus for anything else (a tab with no FilterBox, or focus already
-    // outside any pairing) - unchanged from, and no worse than, Terminal.Gui's own default there.
+    // Tab pressed while focus is already inside a FilterBox exits it safely back to the list it
+    // filters - the only entry point into a FilterBox is "/" (FilterBox.Activate, called from the
+    // attached list's own Command.Find binding), never Tab, so this method only ever needs to
+    // handle the exit direction. Falls back to generic forward AdvanceFocus for anything else (a
+    // tab with no FilterBox, or focus already outside one) - unchanged from, and no worse than,
+    // Terminal.Gui's own default there.
     private bool? AdvanceWithinPage()
     {
         for (var view = App?.Navigation?.GetFocused(); view is not null; view = view.SuperView)
@@ -83,12 +84,6 @@ internal sealed class ManagementTabs: Tabs
             if (view is FilterBox { Target: { } target })
             {
                 target.FocusList();
-                return true;
-            }
-
-            if (view is IFilterable { AttachedFilterBox: { } box })
-            {
-                box.Focus();
                 return true;
             }
         }

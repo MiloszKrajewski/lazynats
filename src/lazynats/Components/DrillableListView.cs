@@ -131,21 +131,15 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         KeyBindings.Add(Key.Backspace, Command.Cancel);
     }
 
-    // Ctrl+N -> CreateRequested, plus a "New" Shortcuts hint. Independent of EnableDelete.
+    // N -> CreateRequested, plus a "New" Shortcuts hint. Independent of EnableDelete.
     protected void EnableCreate()
     {
         _createEnabled = true;
 
-        // The inner ListView's own DefaultKeyBindings alias Ctrl+N to Command.Down (Emacs-style
-        // "next"), on top of the Down arrow key. It's the actual focus target, so left in place it
-        // would consume Ctrl+N before this component's own binding below ever sees it. Down arrow
-        // itself is untouched - only the redundant Ctrl+N alias for the same command is removed.
-        _listView.KeyBindings.Remove(Key.N.WithCtrl);
-
         AddCommand(Command.New, () => { CreateRequested?.Invoke(); return true; });
     }
 
-    // Ctrl+D -> DeleteRequested, plus a "Delete" Shortcuts hint. Independent of EnableCreate.
+    // D -> DeleteRequested, plus a "Delete" Shortcuts hint. Independent of EnableCreate.
     protected void EnableDelete()
     {
         _deleteEnabled = true;
@@ -153,7 +147,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         AddCommand(Command.DeleteAll, () => { DeleteRequested?.Invoke(); return true; });
     }
 
-    // Ctrl+E -> EditRequested, plus an "Edit" Shortcuts hint. Independent of EnableCreate/EnableDelete.
+    // E -> EditRequested, plus an "Edit" Shortcuts hint. Independent of EnableCreate/EnableDelete.
     protected void EnableEdit()
     {
         _editEnabled = true;
@@ -161,7 +155,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         AddCommand(Command.Edit, () => { EditRequested?.Invoke(); return true; });
     }
 
-    // Ctrl+F -> opens a modal PatternDialog and, unlike Create/Delete/Edit, owns the whole
+    // F -> opens a modal PatternDialog and, unlike Create/Delete/Edit, owns the whole
     // non-native filtering case end-to-end: compiling the pattern (shared `* ? >` grammar),
     // narrowing `_filtered` in memory, and persisting the pattern across ReplaceItems (see
     // ClearFilter). A subclass activating this needs no dialog code or event handler of its own -
@@ -225,16 +219,8 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         _filterBox = box;
         box.AttachTo(this);
 
-        AddCommand(Command.Find, () => { box.Focus(); return true; });
+        AddCommand(Command.Find, () => { box.Activate(); return true; });
         KeyBindings.Add(new Key('/'), Command.Find);
-
-        // Up-arrow at the top of the list (declined by the inner ListView itself, which only
-        // handles Up when it can actually move the selection) moves to the attached FilterBox
-        // directly - it sits immediately above the list on screen, so this is what "up" should do,
-        // rather than bubbling out to the tab's own header via Terminal.Gui's generic
-        // TabStop/AdvanceFocus handling. See design.md Decision 7.
-        AddCommand(Command.Up, () => { box.Focus(); return true; });
-        KeyBindings.Add(Key.CursorUp, Command.Up);
     }
 
     void IFilterable.ApplyFilter(string query)
@@ -245,15 +231,20 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         HighlightChanged?.Invoke(SelectedItem);
     }
 
-    void IFilterable.FocusList() => _listView.SetFocus();
+    void IFilterable.FocusList() => FocusList();
+
+    private void FocusList() => _listView.SetFocus();
 
     FilterBox? IFilterable.AttachedFilterBox => _filterBox;
 
     // Esc on the attached FilterBox while it was already empty - the same result as pressing Esc
-    // directly on this list, per "Esc on an already-empty search field falls through to ascend".
+    // directly on this list, per "Esc on an already-empty search field falls through to ascend",
+    // where ascend is wired; otherwise falls back to plain defocus (fixes the pre-existing
+    // stuck-focus bug where neither happened).
     void IFilterable.HandleEmptySearchEscape()
     {
         if (_ascendEnabled) AscendRequested?.Invoke();
+        else FocusList();
     }
 
     public T? SelectedItem =>
@@ -420,23 +411,23 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         {
             IEnumerable<ShortcutHint> hints = [];
             if (_ascendEnabled) hints = hints.Append(new ShortcutHint(Key.Esc, "Back", () => AscendRequested?.Invoke()));
-            if (_filterBox is { } box) hints = hints.Append(new ShortcutHint(new Key('/'), "Search", box.Focus));
+            if (_filterBox is { } box) hints = hints.Append(new ShortcutHint(new Key('/'), "Search", box.Activate));
             return hints;
         }
     }
 
     // Refresh/New/Delete/Edit/Filter - whatever the enabled shared shapes (EnableCreate/
-    // EnableDelete/EnableEdit/EnableFilter) imply, for the owning tab to bind Ctrl+R/N/D/E/F to and
+    // EnableDelete/EnableEdit/EnableFilter) imply, for the owning tab to bind bare R/N/D/E/F to and
     // dispatch through (see openspec/specs/tab-scoped-list-shortcuts/spec.md). A subclass with its
     // own tab-dispatched operation beyond these shapes still appends to this via
     // `base.TabOperations.Append(...)` rather than replacing it.
     public virtual IEnumerable<ShortcutHint> TabOperations =>
         new ShortcutHint?[] {
-            new ShortcutHint(Key.R.WithCtrl, "Refresh", () => RefreshRequested?.Invoke()),
-            _createEnabled ? new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()) : null,
-            _deleteEnabled ? new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()) : null,
-            _editEnabled ? new ShortcutHint(Key.E.WithCtrl, "Edit", () => EditRequested?.Invoke()) : null,
-            _filterEnabled ? new ShortcutHint(Key.F.WithCtrl, "Filter", OpenFilterDialog) : null,
+            new ShortcutHint(Key.R, "Refresh", () => RefreshRequested?.Invoke()),
+            _createEnabled ? new ShortcutHint(Key.N, "New", () => CreateRequested?.Invoke()) : null,
+            _deleteEnabled ? new ShortcutHint(Key.D, "Delete", () => DeleteRequested?.Invoke()) : null,
+            _editEnabled ? new ShortcutHint(Key.E, "Edit", () => EditRequested?.Invoke()) : null,
+            _filterEnabled ? new ShortcutHint(Key.F, "Filter", OpenFilterDialog) : null,
         }.OfType<ShortcutHint>();
 
     protected override void Dispose(bool disposing)

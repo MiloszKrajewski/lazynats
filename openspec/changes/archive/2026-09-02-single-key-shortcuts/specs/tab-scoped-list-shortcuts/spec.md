@@ -1,9 +1,4 @@
-# tab-scoped-list-shortcuts Specification
-
-## Purpose
-TBD - created by syncing change tab-scoped-list-shortcuts. Update Purpose after archive.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Tab-Owned Dispatch
 A management tab that hosts one or more drillable-list/list-editor-based lists SHALL own dispatch
@@ -32,17 +27,6 @@ respond, even though it remains constructed and alive.
 - **WHEN** the user ascends back to a tab's first list level and then presses D
 - **THEN** the delete operation is invoked on the first-level list, not the second-level list
 
-### Requirement: Dispatch Only When the Active List Supports the Operation
-The tab SHALL invoke a tab-owned key's operation only if the currently active list actually
-supports that operation (per its opt-in wiring — see `drillable-list`'s Shared Create/Delete/Edit
-Wiring and `list-editor`'s create/edit/delete requirements). If the active list does not support
-the operation, the key press SHALL be treated as unhandled by the tab, not silently swallowed.
-
-#### Scenario: Pressing an unsupported operation's key falls through
-- **WHEN** the currently active list has not activated the shared wiring for an operation (e.g. it
-  has no delete affordance) and the user presses that operation's key
-- **THEN** the tab does not invoke anything for that key and does not report the key as handled
-
 ### Requirement: Advertised Shortcuts Match What Dispatch Would Do
 A tab that owns these key bindings SHALL implement the shortcut-source contract (per
 `keyboard-shortcut-discovery`), advertising exactly the tab-owned operations its *currently active*
@@ -64,14 +48,3 @@ check SHALL happen before a shortcut is advertised, not only before it is invoke
 #### Scenario: A shortcut is always advertised when dispatch would actually invoke it
 - **WHEN** the currently active list supports a given operation
 - **THEN** a hint for that operation's key is included among the tab's advertised shortcuts
-
-### Requirement: List-Local Operations Stay List-Owned
-Ascend (Esc/Backspace) and quick-search (`/`) SHALL be excluded from tab-owned dispatch. They
-SHALL remain bound directly on the list itself (or its attached search field), and SHALL be
-reachable only while that list or its search field holds keyboard focus, unaffected by this
-capability.
-
-#### Scenario: Esc while focus is elsewhere in the tab does not ascend
-- **WHEN** keyboard focus is on a view within the tab other than the active list or its attached
-  search field, and the user presses Esc
-- **THEN** the tab does not invoke ascend on the active list

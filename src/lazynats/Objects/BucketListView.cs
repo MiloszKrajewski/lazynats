@@ -22,7 +22,7 @@ internal sealed class BucketListView: DrillableListView<ObjBucketItem>
     }
 
     protected override IValuePresenter<ObjBucketItem> Presenter => PresenterInstance;
-    protected override string EmptyHintText => "No buckets — Ctrl+R to refresh";
+    protected override string EmptyHintText => "No buckets — R to refresh";
     protected override string GetIdentity(ObjBucketItem item) => item.Name;
     protected override string FilterDialogTitle => "Filter Buckets";
 

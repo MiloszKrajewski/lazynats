@@ -1,65 +1,4 @@
-# nats-obj Specification
-
-## Purpose
-TBD - created by syncing change add-obj-store-tab. Update Purpose after archive.
-
-## Requirements
-### Requirement: Bucket List
-The system SHALL provide an OBJ management tab listing the names of all Object Store buckets
-currently present on the connected server. A stream counts as an Object Store bucket only when its
-name matches the `OBJ_<name>` convention AND its subjects include one rooted at `$O.<name>.` for
-that same, stripped name — a stream whose name merely resembles the convention without the
-matching subject binding is not treated as a bucket.
-
-#### Scenario: Existing buckets are listed
-- **WHEN** one or more OBJ buckets exist on the server
-- **THEN** the Objects tab's list shows each bucket's name
-
-#### Scenario: No buckets exist
-- **WHEN** no OBJ buckets exist on the server
-- **THEN** the Objects tab shows a non-interactive hint in place of the list, rather than a blank list
-
-#### Scenario: A stream matching only the name convention is not listed as a bucket
-- **WHEN** a JetStream stream's name starts with `OBJ_` but its subjects do not include one rooted
-  at `$O.<name>.` for the stripped name
-- **THEN** that stream does not appear in the Objects tab's bucket list
-
-### Requirement: Bucket Detail Panel
-The system SHALL show, alongside the bucket list, a detail panel for the currently highlighted
-bucket, presenting at least its compression setting, object/message count, byte size, replica
-count, and max age. Limit fields that carry a server "no limit" sentinel value SHALL render as
-`(unlimited)` rather than their raw sentinel.
-
-#### Scenario: Highlighting a bucket shows its details
-- **WHEN** the user moves the highlight to a bucket in the list
-- **THEN** the detail panel shows that bucket's stats
-
-#### Scenario: No bucket highlighted
-- **WHEN** the bucket list is empty and no bucket is highlighted
-- **THEN** the detail panel shows no bucket's details
-
-#### Scenario: Unlimited Max Age renders as unlimited
-- **WHEN** the highlighted bucket's `MaxAge` is zero (the server's "no limit" sentinel)
-- **THEN** the Max Age row shows `(unlimited)` rather than `00:00:00`
-
-#### Scenario: A configured limit still renders as its value
-- **WHEN** the highlighted bucket's Max Age is set to an actual positive limit rather than the
-  unlimited sentinel
-- **THEN** that row shows the configured value, unchanged from today's rendering
-
-### Requirement: Periodic Bucket Detail Refresh
-The system SHALL refresh the highlighted bucket's detail panel periodically while the Objects tab is
-the selected tab and the bucket level is shown, independent of any selection change. This refresh
-SHALL apply only to the detail panel, not to the bucket list.
-
-#### Scenario: Detail panel reflects a change made outside the app
-- **WHEN** the Objects tab is selected, a bucket is highlighted, and that bucket's object count changes
-  on the server without any selection change in the app
-- **THEN** the detail panel's shown object count updates within one refresh cycle
-
-#### Scenario: Refresh does not run while the tab is not selected
-- **WHEN** the Objects tab is not the currently selected management tab
-- **THEN** the system does not poll the server for bucket detail updates
+## MODIFIED Requirements
 
 ### Requirement: Manual Bucket List Refresh
 The system SHALL NOT automatically refresh the bucket list on a timer. The system SHALL allow the
@@ -76,65 +15,6 @@ remain highlighted; otherwise the first item in the refreshed list SHALL become 
 - **WHEN** the user presses R while the bucket list holds focus
 - **THEN** the bucket list is re-fetched from the server and the displayed list reflects any
   buckets created or deleted since the last fetch
-
-### Requirement: Navigation Between Bucket and Object Levels
-The system SHALL allow the user to descend from the bucket list into the highlighted bucket's
-object list, and climb back up to the bucket list, with the current level always visually obvious.
-
-#### Scenario: Enter descends into a bucket's objects
-- **WHEN** the user presses Enter while a bucket is highlighted in the bucket list
-- **THEN** the LHS list is replaced with that bucket's object list, and the RHS switches to
-  tracking the highlighted object
-
-#### Scenario: Esc climbs back to the bucket list
-- **WHEN** the user presses Esc while viewing a bucket's object list
-- **THEN** the LHS list is replaced with the bucket list, restored to its prior highlight and
-  scroll position, and the RHS switches back to tracking the highlighted bucket
-
-#### Scenario: Backspace climbs back to the bucket list
-- **WHEN** the user presses Backspace while viewing a bucket's object list
-- **THEN** the same result as pressing Esc occurs
-
-#### Scenario: Current level is shown in the breadcrumb
-- **WHEN** the user has descended into a bucket's objects
-- **THEN** the LHS and RHS panel titles reflect the object level (e.g. naming the bucket) rather
-  than the generic bucket-level titles
-
-#### Scenario: Descending with no objects
-- **WHEN** the user descends into a bucket that has no objects
-- **THEN** the object list shows a non-interactive hint in place of the list, rather than a blank
-  list
-
-### Requirement: Object List
-The system SHALL list the names of all non-deleted objects in the currently drilled-into bucket,
-fetched fresh every time the user descends into that level. Unlike the KV key list's server-side
-filter, this fetch always retrieves every non-deleted object name from the server; if a
-post-fetch name filter is active for that bucket (see "Post-Fetch Object Name Filter"), the
-fetched names SHALL be filtered down to matches before being shown, but the fetch itself is not
-scoped.
-
-#### Scenario: Descending fetches the object list
-- **WHEN** the user descends into a bucket via Enter
-- **THEN** the system fetches the current set of object names for that bucket from the server and
-  displays them
-
-#### Scenario: Re-descending re-fetches
-- **WHEN** the user ascends from a bucket's object list and then descends into the same bucket
-  again
-- **THEN** the system fetches the object list again rather than reusing the previous result
-
-#### Scenario: Ascending does not re-fetch the bucket list
-- **WHEN** the user ascends from a bucket's object list back to the bucket list
-- **THEN** the bucket list is not re-fetched from the server; it shows whatever it last held
-
-#### Scenario: Deleted objects are excluded
-- **WHEN** a bucket contains an object that has been deleted (tombstoned) on the server
-- **THEN** that object does not appear in the object list
-
-#### Scenario: Descending with an active filter still fetches every name, then narrows
-- **WHEN** the user descends into a bucket for which a post-fetch name filter is currently active
-- **THEN** the system fetches every non-deleted object name from the server as usual, then
-  displays only the names matching the active filter
 
 ### Requirement: Manual Object List Refresh
 The system SHALL NOT automatically refresh the object list on a timer. The system SHALL allow the
@@ -264,62 +144,6 @@ until cleared or explicitly changed.
 - **WHEN** a bucket-list filter is active and the user presses R
 - **THEN** the refreshed bucket list is immediately narrowed by the still-active filter
 
-### Requirement: Object Detail Panel Shows Metadata Only, Never Content
-The system SHALL show, alongside the object list, a detail panel for the currently highlighted
-object, presenting its description, size, chunk count, digest, and modified time. The system SHALL
-NOT fetch, decode, or render the object's underlying content/bytes anywhere in this panel or
-elsewhere in the Objects tab.
-
-#### Scenario: Highlighting an object shows its metadata
-- **WHEN** the user moves the highlight to an object in the object list
-- **THEN** the detail panel shows that object's description, size, chunk count, digest, and
-  modified time
-
-#### Scenario: Object content is never fetched
-- **WHEN** an object is highlighted and its detail panel is shown or refreshed
-- **THEN** the system does not issue any request to retrieve that object's content/bytes
-
-#### Scenario: Highlighting an object fetches its details immediately, not on the next poll tick
-- **WHEN** the user moves the highlight to an object in the object list
-- **THEN** the system fetches that object's current metadata right away, rather than waiting for
-  the periodic detail refresh interval to elapse — matching the immediacy of the bucket detail
-  panel and the Values tab's key detail panel on their own highlight changes
-
-#### Scenario: No object highlighted
-- **WHEN** the object list is empty and no object is highlighted
-- **THEN** the detail panel shows no object's details
-
-### Requirement: Periodic Object Detail Refresh
-The system SHALL refresh the highlighted object's detail panel periodically while the object level
-is shown and the Objects tab is the selected tab, independent of any selection change. This refresh
-SHALL apply only to the detail panel, not to the object list.
-
-#### Scenario: Detail panel reflects a change made outside the app
-- **WHEN** the object level is shown, an object is highlighted, and that object's metadata changes
-  on the server without any selection change in the app
-- **THEN** the detail panel's shown metadata updates within one refresh cycle
-
-#### Scenario: Refresh does not run while the bucket level is shown
-- **WHEN** the user is viewing the bucket list (not drilled into a bucket's objects)
-- **THEN** the system does not poll the server for object detail updates
-
-#### Scenario: Refresh does not run while the tab is not selected
-- **WHEN** the Objects tab is not the currently selected management tab
-- **THEN** the system does not poll the server for object detail updates, even if the object level
-  was the last one shown
-
-### Requirement: A Deleted Object Renders As No Selection
-The system SHALL, when the highlighted object's detail panel refresh finds the object no longer
-present on the server (deleted or otherwise not retrievable), render the detail panel identically
-to how it renders when nothing is highlighted, without any distinct indication that the object
-previously existed.
-
-#### Scenario: An object deleted by another client while highlighted
-- **WHEN** an object is highlighted in the object list, its details are shown, and that object is
-  deleted on the server by another client before the next detail refresh
-- **THEN** the next detail refresh clears the panel to the same empty state used when no object is
-  highlighted
-
 ### Requirement: Upload Object
 The system SHALL allow the user to upload a local file as a new object in the currently
 drilled-into bucket from the object-level list via N, which opens a modal dialog collecting
@@ -359,43 +183,6 @@ shown and highlighted.
 - **THEN** the upload dialog does not open (N instead opens the create-bucket dialog, per
   "Create Bucket")
 
-### Requirement: Upload Object Field Validation
-The upload dialog SHALL validate Key and Path before allowing confirmation, and SHALL visually
-flag an invalid field rather than allowing a request that will fail immediately.
-
-#### Scenario: Empty Key blocks upload
-- **WHEN** the Key field is empty or whitespace-only
-- **THEN** the Upload action is unavailable and the Key field is flagged invalid
-
-#### Scenario: Empty or non-existent Path blocks upload
-- **WHEN** the Path field is empty, or names a local path that doesn't exist or isn't a readable
-  file
-- **THEN** the Upload action is unavailable and the Path field is flagged invalid
-
-### Requirement: Browse For A Local File
-The upload and download dialogs SHALL let the user populate the Path field by browsing rather than
-typing, via a dedicated in-dialog keybinding that opens a native file-picker view. On a
-non-cancelled pick, the chosen path SHALL replace the Path field's current content and validation
-SHALL re-run immediately.
-
-#### Scenario: Browsing in the upload dialog opens a file-open picker
-- **WHEN** the user triggers Browse while the upload dialog is open
-- **THEN** a modal file-picker restricted to selecting an existing file opens
-
-#### Scenario: Browsing in the download dialog opens a file-save picker
-- **WHEN** the user triggers Browse while the download dialog is open
-- **THEN** a modal file-picker for choosing a destination path (not required to already exist)
-  opens
-
-#### Scenario: Picking a file fills in the Path field
-- **WHEN** the user selects a path in the file-picker and confirms it
-- **THEN** the Path field is set to the selected path and the dialog's field validation re-runs
-  against it
-
-#### Scenario: Cancelling the file-picker leaves the Path field unchanged
-- **WHEN** the user cancels the file-picker instead of selecting a path
-- **THEN** the Path field keeps whatever it held before Browse was triggered
-
 ### Requirement: Download Object
 The system SHALL allow the user to download the highlighted object's content to a local file from
 the object-level list via S, which opens a modal dialog collecting the object's Key (shown but
@@ -432,15 +219,6 @@ stream the object's content from the server to the given local path.
 - **WHEN** the user presses S while the object-level list holds focus and the list is empty
   (no object highlighted)
 - **THEN** no download dialog opens
-
-### Requirement: Download Object Field Validation
-The download dialog SHALL validate Path before allowing confirmation, and SHALL visually flag an
-invalid Path rather than allowing a request that will fail immediately. Key, being disabled, is
-exempt from validation.
-
-#### Scenario: Empty Path blocks download
-- **WHEN** the Path field is empty or whitespace-only
-- **THEN** the Download action is unavailable and the Path field is flagged invalid
 
 ### Requirement: Delete Object
 The system SHALL allow the user to delete the highlighted object from the object-level list via
@@ -523,22 +301,6 @@ way to choose memory-backed storage.
 - **WHEN** a bucket is created via this dialog with an explicit Max Age value
 - **THEN** the created bucket's maximum object age matches the entered value
 
-### Requirement: Create Bucket Field Validation
-The create-bucket dialog SHALL validate Name and Max Age before allowing confirmation, and SHALL
-visually flag invalid fields rather than allowing a request that will fail immediately.
-
-#### Scenario: Empty name blocks creation
-- **WHEN** the Name field is empty or whitespace-only
-- **THEN** the Create action is unavailable and the Name field is flagged invalid
-
-#### Scenario: Empty Max Age means unlimited
-- **WHEN** the Max Age field is left empty and the rest of the dialog is otherwise valid
-- **THEN** the Create action is available and the created bucket has no maximum object age
-
-#### Scenario: Unparseable Max Age blocks creation
-- **WHEN** the Max Age field contains text that does not parse as a `TimeSpan`
-- **THEN** the Create action is unavailable and the Max Age field is flagged invalid
-
 ### Requirement: Delete Bucket
 The system SHALL allow the user to delete the highlighted bucket from the bucket-level list via
 D. Before deleting, the system SHALL prompt the user to confirm, naming the bucket to be
@@ -618,15 +380,3 @@ panel reflects the new value.
 - **WHEN** the user presses E while the bucket-level list holds focus and the list is empty
   (no bucket highlighted)
 - **THEN** no edit-bucket dialog opens
-
-### Requirement: Edit Bucket Field Validation
-The edit-bucket dialog SHALL apply the same Max Age validation as "Create Bucket Field Validation"
-to the field it leaves editable. Name, being disabled, is exempt from validation.
-
-#### Scenario: Unparseable Max Age blocks saving
-- **WHEN** the Max Age field contains text that does not parse as a `TimeSpan`
-- **THEN** the Save action is unavailable and the Max Age field is flagged invalid
-
-#### Scenario: Empty Max Age on save means unlimited
-- **WHEN** the Max Age field is cleared and confirmed (Save)
-- **THEN** the Save action is available, and saving removes the bucket's maximum object age

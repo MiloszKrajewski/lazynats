@@ -30,19 +30,19 @@ no mutation affordance at all.
 
 ### Requirement: Manual Refresh via Ctrl+R
 A drillable list SHALL expose a refresh affordance — raising a refresh-requested event that the
-owning component (which performs the actual fetch) subscribes to — without itself binding Ctrl+R
-as a `KeyBindings` entry. When hosted within a management tab, the owning tab binds Ctrl+R and
-invokes this affordance only while this list is the tab's currently active list, per
-`tab-scoped-list-shortcuts`. The list SHALL NOT refresh itself on a timer.
+owning component (which performs the actual fetch) subscribes to — without itself binding R as a
+`KeyBindings` entry. When hosted within a management tab, the owning tab binds R and invokes this
+affordance only while this list is the tab's currently active list, per `tab-scoped-list-shortcuts`.
+The list SHALL NOT refresh itself on a timer.
 
-#### Scenario: Ctrl+R raises a refresh request
-- **WHEN** the user presses Ctrl+R while a drillable list is the currently active list within its
+#### Scenario: R raises a refresh request
+- **WHEN** the user presses R while a drillable list is the currently active list within its
   owning tab
 - **THEN** the list's refresh-requested event is raised and the list does not itself alter its
   contents
 
 #### Scenario: The list does not change on its own
-- **WHEN** time passes without the user pressing Ctrl+R and without the owning component calling
+- **WHEN** time passes without the user pressing R and without the owning component calling
   `ReplaceItems`
 - **THEN** the list's displayed contents are unchanged
 
@@ -225,14 +225,14 @@ without the subclass needing to bind either key, the event, or the hint itself.
 ### Requirement: Shared Create Wiring
 A drillable list SHALL offer a shared, opt-in implementation of a "create" affordance: when
 activated by a subclass, the list exposes a create operation — raising a create-requested event
-when invoked, with a "New" label — among the operations its owning tab can dispatch Ctrl+N to per
+when invoked, with a "New" label — among the operations its owning tab can dispatch N to per
 `tab-scoped-list-shortcuts`, without the subclass needing to bind the key, the event, or the
 operation's own advertisement itself. This wiring SHALL be activatable independently of the shared
 delete wiring — a subclass MAY activate create without delete, delete without create, both, or
 neither.
 
-#### Scenario: Activating create wiring raises the event on Ctrl+N
-- **WHEN** a subclass activates the shared create wiring and the user presses Ctrl+N while this
+#### Scenario: Activating create wiring raises the event on N
+- **WHEN** a subclass activates the shared create wiring and the user presses N while this
   list is the active list within its owning tab
 - **THEN** the create-requested event is raised
 
@@ -242,21 +242,21 @@ neither.
 
 #### Scenario: Create wiring without delete wiring has no delete affordance
 - **WHEN** a subclass activates the shared create wiring but not the shared delete wiring
-- **THEN** Ctrl+D has no effect while this list is the active list, and no "Delete" operation is
+- **THEN** D has no effect while this list is the active list, and no "Delete" operation is
   present among the operations this list exposes to its owning tab
 
 ### Requirement: Shared Delete Wiring
 A drillable list SHALL offer a shared, opt-in implementation of a "delete" affordance: when
 activated by a subclass, the list exposes a delete operation — raising a delete-requested event
-when invoked, with a "Delete" label — among the operations its owning tab can dispatch Ctrl+D to
+when invoked, with a "Delete" label — among the operations its owning tab can dispatch D to
 per `tab-scoped-list-shortcuts`, without the subclass needing to bind the key, the event, or the
 operation's own advertisement itself. This wiring SHALL be activatable independently of the shared
 create wiring — a subclass MAY activate delete without create, create without delete, both, or
 neither.
 
-#### Scenario: Activating delete wiring raises the event on Ctrl+D
-- **WHEN** a subclass activates the shared delete wiring and the user presses Ctrl+D while this
-  list is the active list within its owning tab
+#### Scenario: Activating delete wiring raises the event on D
+- **WHEN** a subclass activates the shared delete wiring and the user presses D while this list is
+  the active list within its owning tab
 - **THEN** the delete-requested event is raised
 
 #### Scenario: Activating delete wiring surfaces a Delete operation
@@ -266,25 +266,25 @@ neither.
 
 #### Scenario: Delete wiring without create wiring has no create affordance
 - **WHEN** a subclass activates the shared delete wiring but not the shared create wiring
-- **THEN** Ctrl+N has no effect while this list is the active list, and no "New" operation is
+- **THEN** N has no effect while this list is the active list, and no "New" operation is
   present among the operations this list exposes to its owning tab
 
 #### Scenario: A subclass that activates neither wiring has neither affordance
 - **WHEN** a subclass activates neither the shared create wiring nor the shared delete wiring
-- **THEN** Ctrl+N and Ctrl+D have no effect while this list is the active list, and no "New"/
+- **THEN** N and D have no effect while this list is the active list, and no "New"/
   "Delete" operations are present among the operations this list exposes to its owning tab
 
 ### Requirement: Shared Edit Wiring
 A drillable list SHALL offer a shared, opt-in implementation of an "edit" affordance: when
 activated by a subclass, the list exposes an edit operation — raising an edit-requested event when
-invoked, with an "Edit" label — among the operations its owning tab can dispatch Ctrl+E to per
+invoked, with an "Edit" label — among the operations its owning tab can dispatch E to per
 `tab-scoped-list-shortcuts`, without the subclass needing to bind the key, the event, or the
 operation's own advertisement itself. This wiring SHALL be activatable independently of the shared
 create and delete wirings — a subclass MAY activate edit alone, alongside either or both of
 create/delete, or none at all.
 
-#### Scenario: Activating edit wiring raises the event on Ctrl+E
-- **WHEN** a subclass activates the shared edit wiring and the user presses Ctrl+E while this list
+#### Scenario: Activating edit wiring raises the event on E
+- **WHEN** a subclass activates the shared edit wiring and the user presses E while this list
   is the active list within its owning tab
 - **THEN** the edit-requested event is raised
 
@@ -295,20 +295,34 @@ create/delete, or none at all.
 #### Scenario: Edit wiring is independent of create/delete wiring
 - **WHEN** a subclass activates the shared edit wiring but activates neither the shared create nor
   the shared delete wiring
-- **THEN** Ctrl+N and Ctrl+D have no effect while this list is the active list and no "New"/
-  "Delete" operations are exposed, while Ctrl+E and its "Edit" operation behave normally
+- **THEN** N and D have no effect while this list is the active list and no "New"/
+  "Delete" operations are exposed, while E and its "Edit" operation behave normally
 
 ### Requirement: Shared Quick-Search Wiring
-A drillable list SHALL offer a shared, opt-in quick-search shape: when activated by a subclass,
-pressing `/` while the list holds focus SHALL focus a persistent, always-visible search field
-associated with that list, and a "Search" hint SHALL appear among the list's shortcut hints. Text
-entered into the field SHALL filter the currently-loaded items live, in memory, without issuing any
-fetch or raising `RefreshRequested`. Filtering SHALL use case-insensitive fuzzy-subsequence
-matching against each item's identity: query text `q` matches an item whose identity contains every
-character of `q`, in the same relative order, with any (including zero) characters in between —
-equivalently, `q` behaves as if a wildcard were inserted between each of its characters (e.g. `oce`
-matches as `*o*c*e*`). A filtered result set SHALL remain in the same ascending alphabetical order
-as the unfiltered list, since matching is a pass/fail predicate, not a relevance ranking.
+A drillable list SHALL offer a shared, opt-in quick-search shape: when activated by a subclass, `/`
+is the *only* way to focus a persistent search field associated with that list — the field's
+`CanFocus` is `false` except while active, so no other keyboard path (Tab/Shift+Tab, an arrow key)
+or a mouse click reaches it — and a "Search" hint SHALL appear among the list's shortcut hints. On
+activation, the field SHALL snapshot its current text. Text entered into the field SHALL filter the
+currently-loaded items live, in memory, without issuing any fetch or raising `RefreshRequested`.
+Filtering SHALL use case-insensitive fuzzy-subsequence matching against each item's identity: query
+text `q` matches an item whose identity contains every character of `q`, in the same relative
+order, with any (including zero) characters in between — equivalently, `q` behaves as if a wildcard
+were inserted between each of its characters (e.g. `oce` matches as `*o*c*e*`). A filtered result
+set SHALL remain in the same ascending alphabetical order as the unfiltered list, since matching is
+a pass/fail predicate, not a relevance ranking.
+
+Leaving the field — via Enter, Esc, Tab/Shift+Tab, an arrow key, or a mouse click elsewhere — SHALL
+always move keyboard focus to the list and make the field unfocusable again (`CanFocus` reverts to
+`false`), through one generic focus-lost mechanism rather than bespoke handling per exit path.
+Enter, Tab/Shift+Tab, an arrow key, and a mouse click elsewhere SHALL leave the field's text and the
+filtered view exactly as they were at that moment (quick-search is already live, so nothing further
+needs to be "applied"). Esc on a non-empty field SHALL instead revert the field's text and the
+filtered view to the snapshot taken on activation, discarding whatever was typed during that
+activation. Esc on an already-empty field SHALL raise the ascend-requested event on a list that has
+also activated the shared ascend wiring; on a list that has not, it SHALL behave the same as Esc on
+a non-empty field (revert to the snapshot — which degenerates to remaining empty — then return focus
+to the list), rather than leaving focus in the field.
 
 #### Scenario: Activating quick-search wiring raises no effect until the field is used
 - **WHEN** a subclass activates the shared quick-search wiring and the user has not yet entered any
@@ -345,23 +359,47 @@ as the unfiltered list, since matching is a pass/fail predicate, not a relevance
 - **THEN** the list does not raise `RefreshRequested` and no data is re-fetched from the server —
   only the already-loaded items are filtered
 
-#### Scenario: Esc clears non-empty search text before affecting anything else
-- **WHEN** the search field holds focus, contains non-empty text, and the user presses Esc
-- **THEN** the search field's text is cleared, the full (unfiltered) list is restored, and focus
-  returns to the list
+#### Scenario: `/` is the only way to focus the search field
+- **WHEN** a subclass activates the shared quick-search wiring and the search field is not
+  currently active
+- **THEN** the field's `CanFocus` is `false`, so Tab/Shift+Tab, an arrow key, and a mouse click
+  cannot focus it — only pressing `/` while the list holds focus can
+
+#### Scenario: The field snapshots its text on activation
+- **WHEN** the user presses `/` to focus the search field
+- **THEN** the field's current text (which may be non-empty, left over from a prior activation) is
+  captured as the snapshot for this activation
+
+#### Scenario: Esc on non-empty text reverts to the pre-activation snapshot, not to empty
+- **WHEN** the search field holds focus, its text differs from the snapshot taken on activation
+  (whether or not it is currently empty), and the user presses Esc
+- **THEN** the field's text and the filtered view are restored to that snapshot, and focus returns
+  to the list
 
 #### Scenario: Esc on an already-empty search field falls through to ascend
 - **WHEN** the search field holds focus, is already empty, and the user presses Esc, on a list that
   has also activated the shared ascend wiring
 - **THEN** the same result as pressing Esc directly on the list (ascend) occurs
 
+#### Scenario: Esc on an already-empty search field defocuses when ascend isn't available
+- **WHEN** the search field holds focus, is already empty, the user presses Esc, and the list has
+  not activated the shared ascend wiring
+- **THEN** focus returns to the list and the field becomes unfocusable again, rather than remaining
+  focused with nothing having happened
+
 #### Scenario: Enter moves focus from the search field into the list
 - **WHEN** the search field holds focus and the user presses Enter
-- **THEN** focus moves to the list, and the search field's text and the filtered view are left
-  unchanged
+- **THEN** focus moves to the list, the field becomes unfocusable again, and the search field's
+  text and the filtered view are left unchanged
+
+#### Scenario: Tab, an arrow key, or a mouse click elsewhere also defocuses the field
+- **WHEN** the search field holds focus and the user presses Tab, Shift+Tab, or an arrow key, or
+  clicks elsewhere with the mouse
+- **THEN** focus moves away from the field, the field becomes unfocusable again, and the search
+  field's text and the filtered view are left unchanged
 
 #### Scenario: Search text resets on refresh
-- **WHEN** the item collection is replaced (via `Ctrl+R` or any other refresh)
+- **WHEN** the item collection is replaced (via `R` or any other refresh)
 - **THEN** the search field's text is cleared back to empty and the full, newly-replaced item
   collection is shown
 
@@ -374,7 +412,7 @@ as the unfiltered list, since matching is a pass/fail predicate, not a relevance
 A drillable list SHALL offer a shared, opt-in "Filter" affordance, independent of the shared
 quick-search wiring: when activated by a subclass, the list exposes a filter operation — opening a
 modal pattern dialog when invoked, with a "Filter" label — among the operations its owning tab can
-dispatch Ctrl+F to per `tab-scoped-list-shortcuts`, without the subclass needing to build the
+dispatch F to per `tab-scoped-list-shortcuts`, without the subclass needing to build the
 dialog, compile the pattern, or apply it itself. The dialog SHALL be seeded with the currently
 active filter pattern, or empty if none is active, and SHALL reject an invalid pattern per the
 filter-expression grammar (see `list-filter-affordance`). On a valid, non-empty confirmation the
@@ -385,7 +423,7 @@ lack of one) unchanged.
 #### Scenario: Activating filter wiring surfaces a Filter operation
 - **WHEN** a subclass activates the shared filter wiring
 - **THEN** a "Filter" operation is present among the operations this list exposes to its owning tab,
-  invocable via Ctrl+F while this list is the active list
+  invocable via F while this list is the active list
 
 #### Scenario: Confirming a valid, non-empty pattern narrows the list
 - **WHEN** the user opens the filter dialog, enters a valid, non-empty pattern, and confirms
@@ -408,7 +446,7 @@ lack of one) unchanged.
 
 #### Scenario: A list that does not activate filter wiring has no Filter operation
 - **WHEN** a subclass activates none of the shared shapes including filter wiring
-- **THEN** Ctrl+F has no effect on that list, and no "Filter" operation is present among the
+- **THEN** F has no effect on that list, and no "Filter" operation is present among the
   operations it exposes to its owning tab
 
 ### Requirement: Active Filter Persists Across a Refresh
@@ -420,7 +458,7 @@ purpose — e.g. when the currently-filtered scope itself changes, such as desce
 different bucket or stream.
 
 #### Scenario: The filter persists across a plain refresh
-- **WHEN** a filter is active and the list's item collection is replaced (e.g. via Ctrl+R)
+- **WHEN** a filter is active and the list's item collection is replaced (e.g. via R)
 - **THEN** the refreshed items are immediately narrowed by the still-active filter, rather than the
   filter being reset
 

@@ -35,10 +35,16 @@ internal sealed class FilterBox: View
     private readonly TextField _field;
     private IFilterable? _target;
     private bool _suppressChange;
+    private string _snapshot = string.Empty;
 
     public FilterBox()
     {
-        CanFocus = true;
+        // Not focusable until Activate() (bound to "/" on the attached list) sets this true -
+        // Tab/Shift+Tab, arrow-key navigation, and a mouse click all consult a view's CanFocus
+        // before landing on it, so this one flag closes off every entry path except "/" at once.
+        // See openspec/changes/single-key-shortcuts/design.md's "FilterBox.CanFocus toggles around
+        // activation" decision.
+        CanFocus = false;
         Height = 3;
 
         _field = new TextField();
@@ -62,28 +68,35 @@ internal sealed class FilterBox: View
             _target?.FocusList();
         };
 
-        // Esc: clear-then-return-focus-to-the-list when there's text to clear; otherwise defer to
-        // the attached list's own idea of what an empty-field Esc should do - see
-        // IFilterable.HandleEmptySearchEscape. Esc reaches ordinary key-preprocessing (KeyDown), so
-        // it's handled that way, unlike Tab/Shift+Tab/Down below.
+        // Esc: revert to the pre-activation snapshot (discarding whatever was typed this session)
+        // and return focus to the list - unless the field is already empty AND so was the
+        // snapshot, in which case there's nothing to revert and the attached list's own idea of
+        // an empty-field Esc takes over instead - see IFilterable.HandleEmptySearchEscape. Esc
+        // reaches ordinary key-preprocessing (KeyDown), so it's handled that way, unlike
+        // Tab/Shift+Tab/Up/Down below.
         _field.KeyDown += (_, key) => {
             if (key != Key.Esc) return;
             key.Handled = true;
-            if (_field.Text.Length > 0) {
-                _field.Text = string.Empty;
-                _target?.FocusList();
-            } else {
+            if (_field.Text.Length == 0 && _snapshot.Length == 0) {
                 _target?.HandleEmptySearchEscape();
+            } else {
+                _field.Text = _snapshot;
+                _target?.FocusList();
             }
         };
 
-        // Down moves to the list directly, matching the box's on-screen position immediately above
-        // it. Tab/Shift+Tab do the same conceptually, but Terminal.Gui resolves those through
-        // ManagementTabs (the nearest enclosing TabGroup), never offering them to an ordinary
-        // TabStop view's own KeyBindings first - see ManagementTabs.AdvanceWithinPage, which is
-        // where that pairing is actually implemented. Down has no such special-casing, so it's
-        // handled directly here.
+        // Up/Down both move to the list directly, matching the box's on-screen position
+        // immediately above it - "an arrow key" always exits to the list per
+        // openspec/specs/drillable-list/spec.md's Shared Quick-Search Wiring, never past it (e.g.
+        // straight to the tab header). Left/Right are deliberately left alone - those are the
+        // TextField's own in-field cursor-movement keys. Tab/Shift+Tab do the same conceptually,
+        // but Terminal.Gui resolves those through ManagementTabs (the nearest enclosing TabGroup),
+        // never offering them to an ordinary TabStop view's own KeyBindings first - see
+        // ManagementTabs.AdvanceWithinPage, which is where that pairing is actually implemented.
+        // Up/Down have no such special-casing, so they're handled directly here.
+        AddCommand(Command.Up, () => { _target?.FocusList(); return true; });
         AddCommand(Command.Down, () => { _target?.FocusList(); return true; });
+        KeyBindings.Add(Key.CursorUp, Command.Up);
         KeyBindings.Add(Key.CursorDown, Command.Down);
     }
 
@@ -91,7 +104,27 @@ internal sealed class FilterBox: View
     // it filters.
     public void AttachTo(IFilterable target) => _target = target;
 
-    public void Focus() => _field.SetFocus();
+    // The only entry point that focuses this field - sets CanFocus true first (required by
+    // Terminal.Gui's focus model before SetFocus can land here), snapshots the field's current
+    // text (possibly non-empty, left over from a prior activation) for Esc to revert to, then
+    // focuses it. Called only from "/" on the attached list.
+    public void Activate()
+    {
+        CanFocus = true;
+        _snapshot = _field.Text;
+        _field.SetFocus();
+    }
+
+    // Generic focus-lost hook: whichever way focus leaves this field - Enter/Esc/Tab/Shift+Tab/
+    // arrow calling IFilterable.FocusList(), or a mouse click elsewhere handled entirely by the
+    // framework's own focus machinery - this always fires and is the single place CanFocus flips
+    // back to false, closing the field off again until the next Activate(). See design.md's "One
+    // generic focus-lost hook closes every exit path" decision.
+    protected override void OnHasFocusChanged(bool newHasFocus, View? previousFocusedView, View? focusedView)
+    {
+        base.OnHasFocusChanged(newHasFocus, previousFocusedView, focusedView);
+        if (!newHasFocus) CanFocus = false;
+    }
 
     // This box's attached list, or null if none - used by ManagementTabs.AdvanceWithinPage the
     // same way IFilterable.AttachedFilterBox is.

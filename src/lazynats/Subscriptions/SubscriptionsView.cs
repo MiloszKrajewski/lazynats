@@ -23,7 +23,7 @@ internal sealed class SubscriptionsView: ListEditorView<SubscriptionInfo>
         _registry.Changed += RefreshFromRegistry;
     }
 
-    protected override string EmptyHint => "No subscriptions — Ctrl+N to add one";
+    protected override string EmptyHint => "No subscriptions — N to add one";
 
     protected override bool TryCreate(out SubscriptionInfo result) =>
         TryEditPattern("New Subscription", string.Empty, out result);

@@ -274,11 +274,8 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         _filterBox = box;
         box.AttachTo(this);
 
-        AddCommand(Command.Find, () => { box.Focus(); return true; });
+        AddCommand(Command.Find, () => { box.Activate(); return true; });
         KeyBindings.Add(new Key('/'), Command.Find);
-
-        AddCommand(Command.Up, () => { box.Focus(); return true; });
-        KeyBindings.Add(Key.CursorUp, Command.Up);
     }
 
     void IFilterable.ApplyFilter(string query)
@@ -288,11 +285,16 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         EnsureValidSelection();
     }
 
-    void IFilterable.FocusList() => _listView.SetFocus();
+    void IFilterable.FocusList() => FocusList();
+
+    private void FocusList() => _listView.SetFocus();
 
     FilterBox? IFilterable.AttachedFilterBox => _filterBox;
 
-    void IFilterable.HandleEmptySearchEscape() { }
+    // This base has no ascend concept (it's a flat editor, no drill-down level) - an empty-field
+    // Esc always falls back to plain defocus, fixing the pre-existing stuck-focus bug where
+    // nothing happened here at all.
+    void IFilterable.HandleEmptySearchEscape() => FocusList();
 
     // Opt-in shared "Filter" (Ctrl+F) shape - same sticky, `* ? >`-grammar pattern-filter
     // mechanics as DrillableListView<T>.EnableFilter, adapted to match against each item's
@@ -335,7 +337,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
                 ]
                 : [];
             if (_bindSharedKeys && _filterEnabled) hints = hints.Append(new ShortcutHint(Key.F.WithCtrl, "Filter", OpenFilterDialog));
-            if (_filterBox is { } box) hints = hints.Append(new ShortcutHint(new Key('/'), "Search", box.Focus));
+            if (_filterBox is { } box) hints = hints.Append(new ShortcutHint(new Key('/'), "Search", box.Activate));
             return hints;
         }
     }
@@ -345,11 +347,11 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         get
         {
             IEnumerable<ShortcutHint> hints = [
-                new(Key.N.WithCtrl, "New", TryCreateItem),
-                new(Key.E.WithCtrl, "Edit", TryEditItem),
-                new(Key.D.WithCtrl, "Delete", TryDeleteItem),
+                new(Key.N, "New", TryCreateItem),
+                new(Key.E, "Edit", TryEditItem),
+                new(Key.D, "Delete", TryDeleteItem),
             ];
-            if (_filterEnabled) hints = hints.Append(new ShortcutHint(Key.F.WithCtrl, "Filter", OpenFilterDialog));
+            if (_filterEnabled) hints = hints.Append(new ShortcutHint(Key.F, "Filter", OpenFilterDialog));
             return hints;
         }
     }

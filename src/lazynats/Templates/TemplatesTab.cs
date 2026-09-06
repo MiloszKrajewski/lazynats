@@ -33,11 +33,12 @@ internal sealed class TemplatesTab: View, IShortcutSource
     // Import/Export act on the whole bucket, not the highlighted template, so - unlike Create/
     // Edit/Delete/Refresh (dispatched through _listView.TabOperations) - they're a small fixed
     // table owned directly by this tab, appended to _listView.TabOperations rather than replacing
-    // it. See design.md's "Keyboard: Ctrl+O / Ctrl+X" decision. Import uses Ctrl+O ("Open"), not
-    // Ctrl+I as originally proposed - Ctrl+I is the ASCII Tab character (Ctrl+<letter> is that
-    // letter's code with the top 3 bits masked off; 'I' masks to 0x09, the same byte Tab itself
-    // sends), so no terminal can ever deliver it as a distinct keystroke; discovered and revised
-    // during implementation.
+    // it. See design.md's "Keyboard: Ctrl+O / Ctrl+X" decision (bare O/X since
+    // openspec/changes/single-key-shortcuts). Import uses O ("Open"), not I as originally
+    // proposed for the Ctrl-based scheme - Ctrl+I is the ASCII Tab character (Ctrl+<letter> is
+    // that letter's code with the top 3 bits masked off; 'I' masks to 0x09, the same byte Tab
+    // itself sends), so no terminal could ever have delivered it as a distinct keystroke;
+    // discovered and revised during that earlier implementation.
     private readonly ShortcutHint[] _extraOperations;
 
     // Guards the one-time initial fetch - the list is otherwise load-once + Ctrl+R only, per
@@ -69,8 +70,8 @@ internal sealed class TemplatesTab: View, IShortcutSource
         _details = new TemplateDetails { X = Pos.Right(_listFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
 
         _extraOperations = [
-            new ShortcutHint(Key.X.WithCtrl, "Export", Export),
-            new ShortcutHint(Key.O.WithCtrl, "Import", Import),
+            new ShortcutHint(Key.X, "Export", Export),
+            new ShortcutHint(Key.O, "Import", Import),
         ];
 
         // Add()-order matches spatial top-down layout so Tab/Shift+Tab cycles in reading order -
@@ -181,7 +182,7 @@ internal sealed class TemplatesTab: View, IShortcutSource
         }
     }
 
-    // Ctrl+X. Whole-bucket, not scoped to the highlighted template - no confirmation prompt for an
+    // Bare X. Whole-bucket, not scoped to the highlighted template - no confirmation prompt for an
     // overwritten destination (SaveDialog is expected to prompt for that itself). See design.md's
     // "Export" decision.
     private void Export()
@@ -209,7 +210,7 @@ internal sealed class TemplatesTab: View, IShortcutSource
         }
     }
 
-    // Ctrl+O. Validate-then-write: every entry in the file is checked before any write happens, so
+    // Bare O. Validate-then-write: every entry in the file is checked before any write happens, so
     // a failing entry leaves the bucket untouched - see design.md's "Import" decision.
     private void Import()
     {
