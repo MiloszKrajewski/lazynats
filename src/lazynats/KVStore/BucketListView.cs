@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using lazynats.Components;
 using NATS.Client.KeyValueStore;
 
-namespace lazynats.Kv;
+namespace lazynats.KVStore;
 
 internal sealed class BucketListView: DrillableListView<NatsKVStatus>
 {

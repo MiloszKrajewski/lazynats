@@ -1,10 +1,9 @@
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using lazynats.LiveFeed;
 using Terminal.Gui.Views;
 
-namespace lazynats;
+namespace lazynats.LiveFeed;
 
 // ListView's default data source (ListWrapper<T>, wired up by SetSource) recomputes
 // MaxItemLength by rescanning the whole collection on every single mutation, making
@@ -14,7 +13,6 @@ namespace lazynats;
 internal sealed class LiveLogDataSource: IListDataSource
 {
     private readonly ObservableCollection<FeedEnvelope> _items;
-    private NotifyCollectionChangedEventHandler? _collectionChanged;
 
     public LiveLogDataSource(ObservableCollection<FeedEnvelope> items)
     {
@@ -24,18 +22,15 @@ internal sealed class LiveLogDataSource: IListDataSource
 
     private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (!SuspendCollectionChangedEvent) _collectionChanged?.Invoke(this, e);
+        if (!SuspendCollectionChangedEvent) 
+            CollectionChanged?.Invoke(this, e);
     }
 
     public int Count => _items.Count;
     public int MaxItemLength => 0;
     public bool SuspendCollectionChangedEvent { get; set; }
 
-    public event NotifyCollectionChangedEventHandler? CollectionChanged
-    {
-        add => _collectionChanged += value;
-        remove => _collectionChanged -= value;
-    }
+    public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
     public bool IsMarked(int item) => false;
     public void SetMark(int item, bool value) { }

@@ -1,6 +1,8 @@
-﻿using lazynats.Kv;
+﻿using lazynats.Components;
+using lazynats.KVStore;
 using lazynats.LiveFeed;
 using lazynats.ObjStore;
+using lazynats.Publish;
 using lazynats.Streams;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;

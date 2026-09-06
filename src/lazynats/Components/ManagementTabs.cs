@@ -2,7 +2,7 @@ using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
-namespace lazynats;
+namespace lazynats.Components;
 
 // Tabs' own Command.Up/Down/Left/Right handlers switch tabs from any arrow key left unhandled by
 // a tab's content, not just ones that started on a genuinely-focused header. This scopes
@@ -34,7 +34,8 @@ internal sealed class ManagementTabs: Tabs
 
     private bool? FocusOwnHeader()
     {
-        if (Value?.Border.View is { HasFocus: false } headerView) (headerView as BorderView)?.TitleView?.SetFocus();
+        if (Value?.Border.View is { HasFocus: false } headerView) 
+            (headerView as BorderView)?.TitleView?.SetFocus();
         return true;
     }
 
@@ -49,19 +50,22 @@ internal sealed class ManagementTabs: Tabs
         // focusable descendants (every tab's content today) - an invisible, non-interactive focus
         // target indistinguishable from focus having gone nowhere. Finding and focusing the first
         // focusable descendant explicitly removes that ambiguity.
-        if (Value?.Border.View is { HasFocus: true } headerView) {
-            headerView.HasFocus = false;
-            var target = Value is { } content ? FindFirstFocusableDescendant(content) ?? content : null;
-            target?.SetFocus();
-        }
+        if (Value?.Border.View is not { HasFocus: true } headerView) 
+            return true;
+
+        headerView.HasFocus = false;
+        var target = Value is { } content ? FindFirstFocusableDescendant(content) ?? content : null;
+        target?.SetFocus();
 
         return true;
     }
 
     private static View? FindFirstFocusableDescendant(View view)
     {
-        foreach (var sub in view.SubViews) {
+        foreach (var sub in view.SubViews)
+        {
             if (!sub.Visible || !sub.Enabled) continue;
+
             var deeper = FindFirstFocusableDescendant(sub);
             if (deeper is not null) return deeper;
             if (sub.CanFocus) return sub;
@@ -72,14 +76,16 @@ internal sealed class ManagementTabs: Tabs
 
     private bool? SwitchTab(int direction)
     {
-        if (Value?.Border.View?.HasFocus == true) {
-            var tabs = TabCollection.ToList();
-            var index = tabs.IndexOf(Value);
-            if (index >= 0) {
-                Value = tabs[(index + direction + tabs.Count) % tabs.Count];
-                (Value?.Border.View as BorderView)?.TitleView?.SetFocus();
-            }
-        }
+        if (Value?.Border.View?.HasFocus != true) 
+            return true;
+
+        var tabs = TabCollection.ToList();
+        var index = tabs.IndexOf(Value);
+        if (index < 0) 
+            return true;
+
+        Value = tabs[(index + direction + tabs.Count) % tabs.Count];
+        (Value?.Border.View as BorderView)?.TitleView?.SetFocus();
 
         return true;
     }

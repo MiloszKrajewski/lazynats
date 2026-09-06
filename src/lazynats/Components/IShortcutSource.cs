@@ -1,6 +1,6 @@
 using Terminal.Gui.Input;
 
-namespace lazynats;
+namespace lazynats.Components;
 
 internal readonly record struct ShortcutHint(Key Key, string Text, Action Action);
 

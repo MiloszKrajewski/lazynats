@@ -7,7 +7,7 @@ using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 
-namespace lazynats;
+namespace lazynats.Publish;
 
 internal sealed class PublishTab: View, IShortcutSource
 {

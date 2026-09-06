@@ -1,5 +1,6 @@
 ﻿using System.Reactive.Subjects;
 using lazynats;
+using lazynats.Components;
 using lazynats.LiveFeed;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;

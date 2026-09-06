@@ -1,12 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using lazynats.Core;
-using lazynats.LiveFeed;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
-namespace lazynats;
+namespace lazynats.LiveFeed;
 
 internal sealed class LiveUpdatesView: View
 {

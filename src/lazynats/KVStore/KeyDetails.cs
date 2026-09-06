@@ -2,7 +2,7 @@ using System.Text;
 using lazynats.Components;
 using NATS.Client.KeyValueStore;
 
-namespace lazynats.Kv;
+namespace lazynats.KVStore;
 
 // Read-only readout of a single key's metadata + value, per nats-kv's "Key Detail Panel"
 // requirement - never focusable, never edits anything. A key that's vanished by poll time

@@ -4,7 +4,7 @@ using NATS.Client.KeyValueStore;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
-namespace lazynats.Kv;
+namespace lazynats.KVStore;
 
 // Two levels (bucket list / key list) sharing one screen region: rather than tearing down and
 // rebuilding views on every descend/ascend, both levels' EditFrame+list+details are built once

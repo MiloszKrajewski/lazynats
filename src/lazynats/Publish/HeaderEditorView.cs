@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using lazynats.Components;
 
-namespace lazynats;
+namespace lazynats.Publish;
 
 internal readonly record struct HeaderPair(string Key, string Value);
 

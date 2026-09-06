@@ -3,7 +3,7 @@ using Terminal.Gui.Drawing;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 
-namespace lazynats;
+namespace lazynats.Publish;
 
 // Single-field modal used by both HeaderEditorView.TryCreate and TryEdit, mirroring
 // Subscriptions/PatternDialog.cs. The field holds raw "key: value" text; splitting it into a

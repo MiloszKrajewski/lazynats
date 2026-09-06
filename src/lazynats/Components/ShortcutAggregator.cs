@@ -1,7 +1,7 @@
 using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 
-namespace lazynats;
+namespace lazynats.Components;
 
 // Walks the same ancestor chain Terminal.Gui's own key-event dispatch bubbles along (focused
 // leaf -> SuperView -> ... -> root), collecting shortcuts from every IShortcutSource on the way.

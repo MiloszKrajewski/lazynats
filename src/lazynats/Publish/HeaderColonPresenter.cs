@@ -1,6 +1,6 @@
 using lazynats.Components;
 
-namespace lazynats;
+namespace lazynats.Publish;
 
 // Row/dialog-seed formatting for HeaderEditorView - "key: value" - used by PresenterListDataSource
 // for list rows and by HeaderEditorView to seed HeaderDialog's text on edit.

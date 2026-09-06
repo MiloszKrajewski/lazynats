@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using lazynats.Components;
 using Terminal.Gui.Input;
 
-namespace lazynats.Kv;
+namespace lazynats.KVStore;
 
 internal sealed class KeyListView: DrillableListView<string>
 {
