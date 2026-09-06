@@ -11,6 +11,7 @@ internal sealed class StreamListView: DrillableListView<StreamInfo>
 
     public event Action? DescendRequested;
     public event Action? CreateRequested;
+    public event Action? DeleteRequested;
 
     public StreamListView(ObservableCollection<StreamInfo> items): base(items)
     {
@@ -29,6 +30,9 @@ internal sealed class StreamListView: DrillableListView<StreamInfo>
         // layers its own Esc/Backspace.
         AddCommand(Command.New, () => { CreateRequested?.Invoke(); return true; });
         KeyBindings.Add(Key.N.WithCtrl, Command.New);
+
+        AddCommand(Command.DeleteAll, () => { DeleteRequested?.Invoke(); return true; });
+        KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
     }
 
     protected override IValuePresenter<StreamInfo> Presenter => PresenterInstance;
@@ -38,5 +42,7 @@ internal sealed class StreamListView: DrillableListView<StreamInfo>
     public StreamInfo? SelectedStream => SelectedItem;
 
     public override IEnumerable<ShortcutHint> Shortcuts =>
-        base.Shortcuts.Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()));
+        base.Shortcuts
+            .Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()))
+            .Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
 }

@@ -53,6 +53,7 @@ internal sealed class StreamsTab: View
         _listView.HighlightChanged += OnStreamHighlightChanged;
         _listView.DescendRequested += Descend;
         _listView.CreateRequested += () => OpenCreateStreamDialog(null);
+        _listView.DeleteRequested += () => _ = TryDeleteStreamAsync();
 
         _consumerListView = new ConsumerListView(_consumerItems) { Background = Theme.EditableBackground };
         _consumerListFrame = new EditFrame(_consumerListView) {
@@ -176,6 +177,41 @@ internal sealed class StreamsTab: View
                 OpenCreateStreamDialog(options);
             });
         }
+    }
+
+    private async Task TryDeleteStreamAsync()
+    {
+        if (_listView.SelectedStream?.Config.Name is not { } name) return;
+
+        var choice = MessageBox.Query(
+            App!, "Delete Stream", $"Delete stream '{name}'? This cannot be undone.",
+            "_Delete", "_Cancel");
+        if (choice != 0) return;
+
+        var neighborName = NeighborStreamName(name);
+
+        try {
+            await _jetStream.DeleteStreamAsync(name);
+            _ = RefreshListAsync(neighborName);
+        } catch (Exception ex) {
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, "Delete Stream Failed", ex.Message, "_Ok"));
+        }
+    }
+
+    // The stream below `name` in the current (pre-delete) list, or the one above it if `name` is
+    // last, so deleting keeps the highlight near where it was instead of falling back to
+    // ReplaceItems' default "identity gone -> first item" behavior (see DrillableListView<T>).
+    private string? NeighborStreamName(string name)
+    {
+        var index = -1;
+        for (var i = 0; i < _items.Count; i++) {
+            if (_items[i].Config.Name != name) continue;
+            index = i;
+            break;
+        }
+        if (index < 0) return null;
+        if (index + 1 < _items.Count) return _items[index + 1].Config.Name;
+        return index - 1 >= 0 ? _items[index - 1].Config.Name : null;
     }
 
     // `selectName` highlights a specific stream after the refresh (used right after a create, so
