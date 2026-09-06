@@ -53,13 +53,16 @@ internal sealed class CreateConsumerDialog: Dialog<NewConsumerOptions>
     private readonly DropDownList<ConsumerCreateDeliverPolicy> _deliverPolicyDropDown;
     private readonly Button _createButton;
 
-    public CreateConsumerDialog(NewConsumerOptions? initial = null)
+    public CreateConsumerDialog(NewConsumerOptions? initial = null, bool isEdit = false)
     {
-        Title = DialogText.Pad("New Consumer");
+        Title = DialogText.Pad(isEdit ? "Edit Consumer" : "New Consumer");
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var nameLabel = new Label { Text = "Name", X = 0, Y = 0 };
-        _nameField = new TextField { Text = initial?.Name ?? string.Empty };
+        _nameField = new TextField {
+            Text = initial?.Name ?? string.Empty, Enabled = !isEdit, CanFocus = !isEdit,
+            TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
+        };
         _nameField.ValueChanged += (_, _) => UpdateValidity();
         var nameFrame = WrapField(_nameField, 1);
 
@@ -72,6 +75,8 @@ internal sealed class CreateConsumerDialog: Dialog<NewConsumerOptions>
         var ackPolicyLabel = new Label { Text = "Ack Policy", X = 0, Y = 8 };
         _ackPolicyDropDown = new DropDownList<ConsumerCreateAckPolicy> {
             Value = initial is null ? ConsumerCreateAckPolicy.Explicit : ToCurated(initial.AckPolicy),
+            Enabled = !isEdit, CanFocus = !isEdit,
+            TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
         };
         Theme.ApplyEditableScheme(_ackPolicyDropDown);
         var ackPolicyFrame = WrapField(_ackPolicyDropDown, 9);
@@ -79,6 +84,8 @@ internal sealed class CreateConsumerDialog: Dialog<NewConsumerOptions>
         var deliverPolicyLabel = new Label { Text = "Deliver Policy", X = 0, Y = 12 };
         _deliverPolicyDropDown = new DropDownList<ConsumerCreateDeliverPolicy> {
             Value = initial is null ? ConsumerCreateDeliverPolicy.All : ToCurated(initial.DeliverPolicy),
+            Enabled = !isEdit, CanFocus = !isEdit,
+            TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
         };
         Theme.ApplyEditableScheme(_deliverPolicyDropDown);
         var deliverPolicyFrame = WrapField(_deliverPolicyDropDown, 13);
@@ -97,11 +104,15 @@ internal sealed class CreateConsumerDialog: Dialog<NewConsumerOptions>
         // unhandled, Dialog<T>'s own default "unhandled Accept -> RequestStop" behavior fires
         // regardless of what Commit() decided, closing the dialog even when Create was
         // pressed/activated while Name was still invalid.
-        _createButton = new Button { Text = "_Create" };
+        _createButton = new Button { Text = isEdit ? "_Save" : "_Create" };
         _createButton.Accepting += (_, e) => { e.Handled = true; Commit(); };
         AddButton(_createButton);
 
         UpdateValidity();
+
+        // See CreateStreamDialog's identical block for why: in edit mode Name has CanFocus=false,
+        // and nothing would otherwise be focused until the user's first Tab.
+        if (isEdit) _filterSubjectsField.SetFocus();
     }
 
     // Same reasoning as CreateStreamDialog.OnAccepting: Enter on a plain field bubbles up as an
@@ -117,6 +128,11 @@ internal sealed class CreateConsumerDialog: Dialog<NewConsumerOptions>
         return new EditFrame(field) {
             X = 0, Y = y, Width = 43, Height = 3,
             InnerBackgroundNormal = background, InnerBackgroundFocused = background,
+            // See Streams/CreateStreamDialog's identical WrapField for why: EditFrame's own
+            // CanFocus is hardcoded true unconditionally, so without this a locked field's frame
+            // becomes a "phantom" tab stop - Tab lands on it, drill-down into the unfocusable
+            // field fails, and the frame is left holding focus with no interactive content.
+            CanFocus = field.CanFocus, TabStop = field.TabStop,
         };
     }
 

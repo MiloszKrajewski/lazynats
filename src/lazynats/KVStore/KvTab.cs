@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using lazynats.Components;
+using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -54,6 +55,7 @@ internal sealed class KvTab: View
         _listView.DescendRequested += Descend;
         _listView.CreateRequested += () => OpenCreateBucketDialog(null);
         _listView.DeleteRequested += () => _ = TryDeleteBucketAsync();
+        _listView.EditRequested += OpenEditBucketDialog;
 
         _keyListView = new KeyListView(_keyItems) { Background = Theme.EditableBackground };
         _keyListFrame = new EditFrame(_keyListView) {
@@ -177,6 +179,86 @@ internal sealed class KvTab: View
             App?.Invoke(() => {
                 MessageBox.ErrorQuery(App!, DialogText.Pad("Create Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
                 OpenCreateBucketDialog(options);
+            });
+        }
+    }
+
+    // Scoped by _listView.SelectedBucket alone, same as TryDeleteBucketAsync - Ctrl+E is only
+    // bound at the bucket level (see BucketListView), unreachable from the key level.
+    private void OpenEditBucketDialog()
+    {
+        if (_listView.SelectedBucket is { } status) OpenEditBucketDialog(status, ToNatsKVConfig(status), null);
+    }
+
+    // `original` is the freshly-fetched NatsKVConfig to merge edits onto later (built once here,
+    // not re-derived from `seed` on a reopen-after-failure, so a rejected attempt still merges
+    // against the real server-side config rather than the user's typed values). `seed` reopens
+    // with the previously-entered values after a failed edit (design.md Decision 5); omitted on
+    // the initial Ctrl+E, where the dialog is seeded straight from `original` instead.
+    private void OpenEditBucketDialog(NatsKVStatus status, NatsKVConfig original, NewBucketOptions? seed)
+    {
+        var dialog = new CreateBucketDialog(seed ?? ToNewBucketOptions(status, original), isEdit: true);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryEditBucketAsync(status, original, options);
+    }
+
+    private static NewBucketOptions ToNewBucketOptions(NatsKVStatus status, NatsKVConfig original) =>
+        new(
+            BucketName.From(status),
+            original.Storage,
+            (int)original.History,
+            original.MaxAge == TimeSpan.Zero ? null : original.MaxAge,
+            original.LimitMarkerTTL == TimeSpan.Zero ? null : original.LimitMarkerTTL);
+
+    // NatsKVStatus (v2.8.2) carries no NatsKVConfig of its own - only Info.Config (the underlying
+    // stream's StreamConfig) plus a top-level LimitMarkerTTL. This reconstructs the NatsKVConfig
+    // UpdateStoreAsync needs field-by-field from those two sources, so every field
+    // CreateBucketDialog doesn't expose (description, max value size, max bytes, replica count,
+    // compression, republish, placement, mirror/sources, metadata, ...) round-trips unchanged -
+    // per design.md Decision 2's "merge onto the live-fetched config, never reconstruct from
+    // scratch" rule. Storage/Compression need an explicit mapping since NatsKVConfig and
+    // StreamConfig use different (but same-shaped) types for them; Placement/Mirror/Sources/
+    // Metadata share identical types across both configs, so those are copied as-is.
+    private static NatsKVConfig ToNatsKVConfig(NatsKVStatus status)
+    {
+        var config = status.Info.Config;
+        return new NatsKVConfig(BucketName.From(status)) {
+            Description = config.Description,
+            MaxValueSize = config.MaxMsgSize,
+            History = config.MaxMsgsPerSubject,
+            MaxAge = config.MaxAge,
+            MaxBytes = config.MaxBytes,
+            Storage = config.Storage == StreamConfigStorage.Memory ? NatsKVStorageType.Memory : NatsKVStorageType.File,
+            NumberOfReplicas = config.NumReplicas,
+            Republish = config.Republish is { } republish
+                ? new NatsKVRepublish { Src = republish.Src, Dest = republish.Dest, HeadersOnly = republish.HeadersOnly }
+                : null,
+            Placement = config.Placement,
+            Compression = config.Compression != StreamConfigCompression.None,
+            Mirror = config.Mirror,
+            Sources = config.Sources,
+            Metadata = config.Metadata,
+            LimitMarkerTTL = status.LimitMarkerTTL,
+        };
+    }
+
+    // Merges onto `original` rather than calling `edited.ToNatsKVConfig()` - per design.md
+    // Decision 2. Goes through the real KV-level `UpdateStoreAsync`, not a raw stream update
+    // (unlike ObjTab's OBJ-only workaround - see design.md's KV-vs-OBJ asymmetry risk note).
+    private async Task TryEditBucketAsync(NatsKVStatus status, NatsKVConfig original, NewBucketOptions edited)
+    {
+        try {
+            var updated = original with {
+                History = edited.History ?? 1,
+                MaxAge = edited.MaxAge ?? TimeSpan.Zero,
+                LimitMarkerTTL = edited.LimitMarkerTTL ?? TimeSpan.Zero,
+            };
+            await _kv.UpdateStoreAsync(updated);
+            _ = RefreshListAsync(edited.Name);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
+                OpenEditBucketDialog(status, original, edited);
             });
         }
     }

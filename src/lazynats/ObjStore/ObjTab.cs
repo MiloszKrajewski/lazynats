@@ -58,6 +58,7 @@ internal sealed class ObjTab: View
         _listView.DescendRequested += Descend;
         _listView.CreateRequested += () => OpenCreateBucketDialog(null);
         _listView.DeleteRequested += () => _ = TryDeleteBucketAsync();
+        _listView.EditRequested += OpenEditBucketDialog;
 
         _objectListView = new ObjectListView(_objectItems) { Background = Theme.EditableBackground };
         _objectListFrame = new EditFrame(_objectListView) {
@@ -185,6 +186,48 @@ internal sealed class ObjTab: View
             App?.Invoke(() => {
                 MessageBox.ErrorQuery(App!, DialogText.Pad("Create Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
                 OpenCreateBucketDialog(options);
+            });
+        }
+    }
+
+    // Scoped by _listView.SelectedBucket alone, same as TryDeleteBucketAsync - Ctrl+E is only
+    // bound at the bucket level (see BucketListView), unreachable from the object level.
+    private void OpenEditBucketDialog()
+    {
+        if (_listView.SelectedBucket is { } stream) OpenEditBucketDialog(stream.Config, ToNewBucketOptions(stream));
+    }
+
+    // `seed` carries the values to show - the freshly-fetched ones on the initial Ctrl+E, or the
+    // previously-entered ones on a reopen after a failed edit (design.md Decision 5).
+    private void OpenEditBucketDialog(StreamConfig original, NewBucketOptions seed)
+    {
+        var dialog = new CreateBucketDialog(seed, isEdit: true);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryEditBucketAsync(original, options);
+    }
+
+    private static NewBucketOptions ToNewBucketOptions(StreamInfo stream) =>
+        new(BucketName.From(stream), stream.Config.MaxAge == TimeSpan.Zero ? null : stream.Config.MaxAge);
+
+    // Merges onto `original` rather than calling `edited.ToNatsObjConfig()` - per design.md
+    // Decision 2. No bucket-level update call exists on INatsObjContext (v2.8.2) - only
+    // Create/Get/Delete plus object-level UpdateMetaAsync - so this goes through
+    // INatsJSContext.UpdateStreamAsync directly against the underlying OBJ_<bucket> stream, the
+    // same layer RefreshListAsync already reaches into for listing (design.md Decision 3). Scoped
+    // to exactly the one field this dialog exposes (MaxAge), built from a `with`-copy of the
+    // just-fetched StreamConfig, so every OBJ-internal invariant (subjects shape, discard policy,
+    // rollup/delete-deny flags, ...) is preserved byte-for-byte - see design.md's risk note on
+    // touching an OBJ bucket's backing stream directly.
+    private async Task TryEditBucketAsync(StreamConfig original, NewBucketOptions edited)
+    {
+        try {
+            var updated = original with { MaxAge = edited.MaxAge ?? TimeSpan.Zero };
+            await _jetStream.UpdateStreamAsync(updated);
+            _ = RefreshListAsync(edited.Name);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Bucket Failed"), DialogText.Pad(ex.Message), "_Ok");
+                OpenEditBucketDialog(original, edited);
             });
         }
     }

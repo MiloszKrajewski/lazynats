@@ -13,6 +13,7 @@ internal sealed class ConsumerListView: DrillableListView<ConsumerInfo>
         EnableAscend();
         EnableCreate();
         EnableDelete();
+        EnableEdit();
     }
 
     protected override IValuePresenter<ConsumerInfo> Presenter => PresenterInstance;

@@ -54,6 +54,7 @@ internal sealed class StreamsTab: View
         _listView.DescendRequested += Descend;
         _listView.CreateRequested += () => OpenCreateStreamDialog(null);
         _listView.DeleteRequested += () => _ = TryDeleteStreamAsync();
+        _listView.EditRequested += OpenEditStreamDialog;
 
         _consumerListView = new ConsumerListView(_consumerItems) { Background = Theme.EditableBackground };
         _consumerListFrame = new EditFrame(_consumerListView) {
@@ -65,6 +66,7 @@ internal sealed class StreamsTab: View
         _consumerListView.AscendRequested += Ascend;
         _consumerListView.CreateRequested += () => OpenCreateConsumerDialog(null);
         _consumerListView.DeleteRequested += () => _ = TryDeleteConsumerAsync();
+        _consumerListView.EditRequested += OpenEditConsumerDialog;
 
         _detailsLabel = new Label { Text = "Details", X = Pos.Right(_streamListFrame) + 1, Y = 0 };
         _details = new StreamDetails(_jetStream) { X = Pos.Right(_streamListFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -201,6 +203,84 @@ internal sealed class StreamsTab: View
             App?.Invoke(() => {
                 MessageBox.ErrorQuery(App!, DialogText.Pad("Create Consumer Failed"), DialogText.Pad(ex.Message), "_Ok");
                 OpenCreateConsumerDialog(options);
+            });
+        }
+    }
+
+    // Scoped to the currently-highlighted stream at call time - re-fetching isn't needed since
+    // `_listView.SelectedStream` already carries the full, current StreamInfo/Config. `seed`
+    // reopens with the previously-entered values after a failed edit (design.md Decision 5);
+    // omitted on the initial Ctrl+E, where the dialog is seeded straight from `original` instead.
+    private void OpenEditStreamDialog(StreamConfig original, NewStreamOptions? seed = null)
+    {
+        var dialog = new CreateStreamDialog(seed ?? ToNewStreamOptions(original), isEdit: true);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryEditStreamAsync(original, options);
+    }
+
+    private void OpenEditStreamDialog()
+    {
+        if (_listView.SelectedStream?.Config is { } original) OpenEditStreamDialog(original);
+    }
+
+    private static NewStreamOptions ToNewStreamOptions(StreamConfig config) =>
+        new(
+            config.Name!,
+            (config.Subjects ?? []).ToList(),
+            config.Retention,
+            config.MaxAge == TimeSpan.Zero ? null : config.MaxAge);
+
+    // Merges onto `original` rather than calling `edited.ToStreamConfig()` - per design.md
+    // Decision 2, that would silently reset every field this dialog doesn't expose (replica
+    // count, limits, discard policy, description, metadata, ...) back to Create-time defaults.
+    private async Task TryEditStreamAsync(StreamConfig original, NewStreamOptions edited)
+    {
+        try {
+            var updated = original with { Subjects = edited.Subjects.ToList(), MaxAge = edited.MaxAge ?? TimeSpan.Zero };
+            await _jetStream.UpdateStreamAsync(updated);
+            _ = RefreshListAsync(edited.Name);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Stream Failed"), DialogText.Pad(ex.Message), "_Ok");
+                OpenEditStreamDialog(original, edited);
+            });
+        }
+    }
+
+    // Scoped to _currentStream at call time, same as OpenCreateConsumerDialog.
+    private void OpenEditConsumerDialog(string stream, ConsumerConfig original, NewConsumerOptions? seed = null)
+    {
+        var dialog = new CreateConsumerDialog(seed ?? ToNewConsumerOptions(original), isEdit: true);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryEditConsumerAsync(stream, original, options);
+    }
+
+    private void OpenEditConsumerDialog()
+    {
+        if (_currentStream is not { } stream) return;
+        if (_consumerListView.SelectedConsumer?.Config is { } original) OpenEditConsumerDialog(stream, original);
+    }
+
+    private static NewConsumerOptions ToNewConsumerOptions(ConsumerConfig config) =>
+        new(config.Name!, (config.FilterSubjects ?? []).ToList(), config.AckPolicy, config.DeliverPolicy);
+
+    // Merges onto `original` rather than calling `edited.ToConsumerConfig()` - per design.md
+    // Decision 2. The explicit `FilterSubject = null` clears a singular filter set outside
+    // lazynats (design.md's "FilterSubject/FilterSubjects duality" decision) - this app always
+    // writes the plural field, never the singular one.
+    private async Task TryEditConsumerAsync(string stream, ConsumerConfig original, NewConsumerOptions edited)
+    {
+        try {
+            var updated = original with {
+                FilterSubjects = edited.FilterSubjects.Count > 0 ? edited.FilterSubjects.ToList() : null,
+                FilterSubject = null,
+            };
+            await _jetStream.UpdateConsumerAsync(stream, updated);
+            _ = RefreshConsumerListAsync(edited.Name);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, DialogText.Pad("Edit Consumer Failed"), DialogText.Pad(ex.Message), "_Ok");
+                OpenEditConsumerDialog(stream, original, edited);
             });
         }
     }

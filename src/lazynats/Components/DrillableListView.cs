@@ -29,10 +29,12 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
     public event Action? AscendRequested;
     public event Action? CreateRequested;
     public event Action? DeleteRequested;
+    public event Action? EditRequested;
 
     private bool _ascendEnabled;
     private bool _createEnabled;
     private bool _deleteEnabled;
+    private bool _editEnabled;
 
     protected DrillableListView(ObservableCollection<T> items)
     {
@@ -113,6 +115,15 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
 
         AddCommand(Command.DeleteAll, () => { DeleteRequested?.Invoke(); return true; });
         KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
+    }
+
+    // Ctrl+E -> EditRequested, plus an "Edit" Shortcuts hint. Independent of EnableCreate/EnableDelete.
+    protected void EnableEdit()
+    {
+        _editEnabled = true;
+
+        AddCommand(Command.Edit, () => { EditRequested?.Invoke(); return true; });
+        KeyBindings.Add(Key.E.WithCtrl, Command.Edit);
     }
 
     public T? SelectedItem =>
@@ -210,6 +221,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
             if (_ascendEnabled) hints = hints.Append(new ShortcutHint(Key.Esc, "Back", () => AscendRequested?.Invoke()));
             if (_createEnabled) hints = hints.Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()));
             if (_deleteEnabled) hints = hints.Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
+            if (_editEnabled) hints = hints.Append(new ShortcutHint(Key.E.WithCtrl, "Edit", () => EditRequested?.Invoke()));
             return hints;
         }
     }

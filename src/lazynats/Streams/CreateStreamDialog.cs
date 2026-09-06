@@ -26,13 +26,16 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
     private readonly TextField _maxAgeField;
     private readonly Button _createButton;
 
-    public CreateStreamDialog(NewStreamOptions? initial = null)
+    public CreateStreamDialog(NewStreamOptions? initial = null, bool isEdit = false)
     {
-        Title = DialogText.Pad("New Stream");
+        Title = DialogText.Pad(isEdit ? "Edit Stream" : "New Stream");
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var nameLabel = new Label { Text = "Name", X = 0, Y = 0 };
-        _nameField = new TextField { Text = initial?.Name ?? string.Empty };
+        _nameField = new TextField {
+            Text = initial?.Name ?? string.Empty, Enabled = !isEdit, CanFocus = !isEdit,
+            TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
+        };
         _nameField.ValueChanged += (_, _) => UpdateValidity();
         var nameFrame = WrapField(_nameField, 1);
 
@@ -42,7 +45,10 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
         var subjectsFrame = WrapField(_subjectsField, 5);
 
         var retentionLabel = new Label { Text = "Retention", X = 0, Y = 8 };
-        _retentionDropDown = new DropDownList<StreamConfigRetention> { Value = initial?.Retention ?? StreamConfigRetention.Limits };
+        _retentionDropDown = new DropDownList<StreamConfigRetention> {
+            Value = initial?.Retention ?? StreamConfigRetention.Limits, Enabled = !isEdit, CanFocus = !isEdit,
+            TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
+        };
         Theme.ApplyEditableScheme(_retentionDropDown);
         var retentionFrame = WrapField(_retentionDropDown, 9);
 
@@ -63,11 +69,17 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
         // does: left unhandled, Dialog<T>'s own default "unhandled Accept -> RequestStop"
         // behavior fires regardless of what Commit() decided, closing the dialog even when Create
         // was pressed/activated while a field was still invalid.
-        _createButton = new Button { Text = "_Create" };
+        _createButton = new Button { Text = isEdit ? "_Save" : "_Create" };
         _createButton.Accepting += (_, e) => { e.Handled = true; Commit(); };
         AddButton(_createButton);
 
         UpdateValidity();
+
+        // In edit mode Name (the first Add()-ed field) has CanFocus=false, and Terminal.Gui's
+        // open-time initial-focus assignment doesn't walk forward to the next focusable control -
+        // left alone, nothing would be focused until the user's first Tab. Explicitly focusing the
+        // first editable field skips that dead first keystroke.
+        if (isEdit) _subjectsField.SetFocus();
     }
 
     // Enter pressed on a plain field (Name/Subjects/Max Age, or the Retention dropdown while
@@ -89,6 +101,15 @@ internal sealed class CreateStreamDialog: Dialog<NewStreamOptions>
         return new EditFrame(field) {
             X = 0, Y = y, Width = 43, Height = 3,
             InnerBackgroundNormal = background, InnerBackgroundFocused = background,
+            // EditFrame's own CanFocus is hardcoded true unconditionally (it never holds focus
+            // itself - Tab is meant to drill straight through to `field`, per its own class
+            // comment). When `field` is a locked (CanFocus=false) field, that leaves the frame as
+            // a "phantom" tab stop: Tab lands on the frame, its own drill-down into the
+            // unfocusable field fails, and the frame itself is left holding focus with no
+            // interactive content, wasting a Tab press. Propagating `field`'s CanFocus/TabStop
+            // onto the frame keeps the two in lockstep, so a locked field's frame is excluded from
+            // the dialog's tab order right along with it.
+            CanFocus = field.CanFocus, TabStop = field.TabStop,
         };
     }
 

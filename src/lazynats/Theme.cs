@@ -18,17 +18,28 @@ internal static class Theme
 
     private static readonly Attribute EditableAttribute = new(ColorName16.White, EditableBackground);
 
+    // Dimmed foreground, same EditableBackground - explicit rather than left to derive from
+    // Normal. A disabled (Enabled=false) DropDownList's closed-state text is read via
+    // VisualRole.Editable, which DropDownList's own ReadOnly redirect resolves back through this
+    // Scheme's Normal/Focus rather than Disabled - so Terminal.Gui's normal "Disabled derives
+    // from Normal" inheritance never actually kicks in for it, and it fell through to the
+    // ambient/inherited scheme's own Disabled (a visibly different gray) instead. Setting it here
+    // explicitly closes that gap so a disabled dropdown matches a disabled TextField's black look
+    // (TextField's own Editable-role Disabled redirect already resolves correctly via the ambient
+    // Dialog scheme - only DropDownList needed this).
+    private static readonly Attribute DisabledAttribute = new(ColorName16.DarkGray, EditableBackground);
+
     // DropDownList redirects its VisualRole.Editable lookups to Normal/Focus in its default
     // (read-only) mode (see openspec/changes/dropdown-visual-consistency/design.md), so it never
     // picks up Program.cs's ApplyColorTheme() Editable attribute the way a TextField does. Setting
     // an explicit Scheme directly on the instance gives its closed, unfocused state the same
     // White-on-EditableBackground look as a TextField.
     //
-    // Only Normal is set here (via the single-Attribute Scheme constructor) - Focus is
-    // deliberately left to derive Terminal.Gui's default inverted fg/bg bar, the same mechanism
-    // ListEditorView/DrillableListView rely on for a selected list row's highlight (see
+    // Focus is deliberately left to derive Terminal.Gui's default inverted fg/bg bar, the same
+    // mechanism ListEditorView/DrillableListView rely on for a selected list row's highlight (see
     // ListEditorView.SetBackgroundColor). A TextField gets its focus affordance from its blinking
     // cursor and stays background-stable per the color-theme spec; DropDownList has no cursor
     // (ReadOnly), so without this it was indistinguishable focused vs. unfocused while closed.
-    public static void ApplyEditableScheme(View view) => view.SetScheme(new Scheme(EditableAttribute));
+    public static void ApplyEditableScheme(View view) =>
+        view.SetScheme(new Scheme(EditableAttribute) { Disabled = DisabledAttribute });
 }

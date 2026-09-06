@@ -22,13 +22,16 @@ internal sealed class CreateBucketDialog: Dialog<NewBucketOptions>
     private readonly TextField _maxAgeField;
     private readonly Button _createButton;
 
-    public CreateBucketDialog(NewBucketOptions? initial = null)
+    public CreateBucketDialog(NewBucketOptions? initial = null, bool isEdit = false)
     {
-        Title = DialogText.Pad("New Bucket");
+        Title = DialogText.Pad(isEdit ? "Edit Bucket" : "New Bucket");
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var nameLabel = new Label { Text = "Name", X = 0, Y = 0 };
-        _nameField = new TextField { Text = initial?.Name ?? string.Empty };
+        _nameField = new TextField {
+            Text = initial?.Name ?? string.Empty, Enabled = !isEdit, CanFocus = !isEdit,
+            TabStop = isEdit ? TabBehavior.NoStop : TabBehavior.TabStop,
+        };
         _nameField.ValueChanged += (_, _) => UpdateValidity();
         var nameFrame = WrapField(_nameField, 1);
 
@@ -49,11 +52,15 @@ internal sealed class CreateBucketDialog: Dialog<NewBucketOptions>
         // does: left unhandled, Dialog<T>'s own default "unhandled Accept -> RequestStop"
         // behavior fires regardless of what Commit() decided, closing the dialog even when Create
         // was pressed/activated while a field was still invalid.
-        _createButton = new Button { Text = "_Create" };
+        _createButton = new Button { Text = isEdit ? "_Save" : "_Create" };
         _createButton.Accepting += (_, e) => { e.Handled = true; Commit(); };
         AddButton(_createButton);
 
         UpdateValidity();
+
+        // See Streams/CreateStreamDialog's identical block for why: in edit mode Name has
+        // CanFocus=false, and nothing would otherwise be focused until the user's first Tab.
+        if (isEdit) _maxAgeField.SetFocus();
     }
 
     // Enter pressed on a plain field (Name/Max Age) isn't consumed by that field itself, so it
@@ -71,6 +78,11 @@ internal sealed class CreateBucketDialog: Dialog<NewBucketOptions>
         return new EditFrame(field) {
             X = 0, Y = y, Width = 43, Height = 3,
             InnerBackgroundNormal = background, InnerBackgroundFocused = background,
+            // See Streams/CreateStreamDialog's identical WrapField for why: EditFrame's own
+            // CanFocus is hardcoded true unconditionally, so without this a locked field's frame
+            // becomes a "phantom" tab stop - Tab lands on it, drill-down into the unfocusable
+            // field fails, and the frame is left holding focus with no interactive content.
+            CanFocus = field.CanFocus, TabStop = field.TabStop,
         };
     }
 

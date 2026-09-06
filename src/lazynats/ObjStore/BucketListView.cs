@@ -13,6 +13,7 @@ internal sealed class BucketListView: DrillableListView<StreamInfo>
         EnableDescend();
         EnableCreate();
         EnableDelete();
+        EnableEdit();
     }
 
     protected override IValuePresenter<StreamInfo> Presenter => PresenterInstance;
