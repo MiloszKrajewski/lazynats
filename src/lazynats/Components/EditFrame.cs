@@ -13,7 +13,9 @@ namespace lazynats.Components;
 // full bordered box (see doc/ui-design.md, doc/glyphs.md for the glyph/position naming used here).
 // Never takes focus itself: CanFocus=true but with no focusable content of its own, so Tab/click
 // focus resolves straight through to the wrapped SubView via normal focus drill-down, and the
-// frame just listens to that SubView's own HasFocusChanged to know when to recolor.
+// frame just listens to that SubView's own HasFocusChanged to know when to recolor - both the
+// inner background (InnerBackgroundNormal/InnerBackgroundFocused) and the left-edge accent
+// (EdgeAccent/EdgeAccentFocused) switch based on that focus state.
 internal sealed class EditFrame: View
 {
     // See doc/glyphs.md for the full glyph/position naming reference.
@@ -34,6 +36,7 @@ internal sealed class EditFrame: View
     private Color _innerBackgroundFocused;
     private Color? _innerBackgroundOverride;
     private Color? _edgeAccent;
+    private Color? _edgeAccentFocused;
 
     public EditFrame(View child)
     {
@@ -160,9 +163,10 @@ internal sealed class EditFrame: View
         }
     }
 
-    // Null means "use the default white accent" - the left edge's outermost column (TL/LM/BL) is
-    // inked in this color rather than IBC, to read as a distinct accent line rather than blending
-    // into the field's own color.
+    // Edge accent color (EAC) while the wrapped child does NOT have focus. Null means "use the
+    // default white accent" - the left edge's outermost column (TL/LM/BL) is inked in this color
+    // rather than IBC, to read as a distinct accent line rather than blending into the field's own
+    // color.
     public Color? EdgeAccent
     {
         get => _edgeAccent;
@@ -173,12 +177,29 @@ internal sealed class EditFrame: View
         }
     }
 
+    // Edge accent color while the wrapped child DOES have focus - mirrors the
+    // InnerBackgroundNormal/InnerBackgroundFocused split, but for the accent line instead of the
+    // inner background. Null means "use Theme.EditFrameEdgeAccentFocused", so every EditFrame gets
+    // a focus-driven accent without any caller having to set this explicitly.
+    public Color? EdgeAccentFocused
+    {
+        get => _edgeAccentFocused;
+        set
+        {
+            _edgeAccentFocused = value;
+            SetNeedsDraw();
+        }
+    }
+
     protected override bool OnDrawingContent(DrawContext? context)
     {
         var outer = _outerBackground ?? GetAttributeForRole(VisualRole.Normal).Background;
         var inner = _innerBackgroundOverride ?? (_child.HasFocus ? _innerBackgroundFocused : _innerBackgroundNormal);
         var innerAttribute = new Attribute(inner, outer);
-        var accentAttribute = new Attribute(_edgeAccent ?? DefaultEdgeAccent, outer);
+        var edgeAccent = _child.HasFocus
+            ? _edgeAccentFocused ?? Theme.EditFrameEdgeAccentFocused
+            : _edgeAccent ?? DefaultEdgeAccent;
+        var accentAttribute = new Attribute(edgeAccent, outer);
 
         var width = Viewport.Width;
         var bottom = Viewport.Height - 1;

@@ -376,7 +376,7 @@ internal sealed class ValuesTab: View, IShortcutSource
     private static async Task<(IList<string> Keys, bool Truncated)> FetchKeysAsync(INatsKVStore store, NatsFilter filter)
     {
         var observable = store.GetKeysAsync([filter.Native]).ToObservable();
-        if (!filter.NativeFilterIsExact) observable = observable.Where(key => filter.Regex.IsMatch(key));
+        if (!filter.NativeFilterIsExact) observable = observable.Where(key => filter.Client.IsMatch(key));
         var fetched = await observable.Take(KeyFilterCap + 1).ToList();
         var truncated = fetched.Count > KeyFilterCap;
         return (truncated ? fetched.Take(KeyFilterCap).ToList() : fetched, truncated);

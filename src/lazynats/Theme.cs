@@ -41,6 +41,10 @@ internal static class Theme
     // green. BrightGreen reads as unambiguously "green" on a 16-color terminal fallback too.
     public static readonly Color ShortcutKeyColor = new(ColorName16.BrightGreen);
 
+    // EditFrame's default focused edge accent color (openspec/changes/focused-editframe-accent-color)
+    // - distinct from SubjectColor (Cyan) so the two never read as the same accent.
+    public static readonly Color EditFrameEdgeAccentFocused = new(ColorName16.BrightBlue);
+
     private static readonly Attribute EditableAttribute = new(ColorName16.White, EditableBackground);
 
     // Dimmed foreground, same EditableBackground - explicit rather than left to derive from
