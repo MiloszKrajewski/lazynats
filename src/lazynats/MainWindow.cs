@@ -11,15 +11,21 @@ namespace lazynats;
 
 internal sealed class MainWindow: Runnable
 {
+    private readonly ShortcutTracker _shortcutTracker;
+    private readonly StatusBar _statusBar;
+    private readonly List<Shortcut> _dynamicShortcuts = [];
+    private readonly int _staticShortcutCount;
+
     public MainWindow()
     {
         var registry = Services.Root.GetRequiredService<SubscriptionRegistry>();
         var connection = Services.Root.GetRequiredService<NatsConnection>();
         var feedReader = Services.Root.GetRequiredService<ChannelReader<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
+        _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
 
         var subscribeTab = new SubscribeTab(registry) { Title = " Subscribe ", Padding = { Thickness = new Thickness(1) } };
-        var publishTab = new PublishTab(connection) { Title = " Publish ", Padding = { Thickness = new Thickness(1) } };
+        var publishTab = new PublishTab(connection, _shortcutTracker) { Title = " Publish ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
         tabs.Add(subscribeTab, publishTab);
         tabs.Value = subscribeTab;
@@ -50,8 +56,40 @@ internal sealed class MainWindow: Runnable
             publishStatusShortcut.Visible = true;
         };
 
-        var statusBar = new StatusBar([quitShortcut, subscribeTabShortcut, publishTabShortcut, clearShortcut, publishStatusShortcut]);
+        _statusBar = new StatusBar([quitShortcut, subscribeTabShortcut, publishTabShortcut, clearShortcut, publishStatusShortcut]);
+        _staticShortcutCount = _statusBar.SubViews.Count;
 
-        Add(tabs, feedFrame, statusBar);
+        // Appends/replaces only the dynamic tail - the fixed shortcuts above and their own
+        // visibility wiring (e.g. clearShortcut) are never touched by this.
+        _shortcutTracker.ShortcutsChanged += SyncDynamicShortcuts;
+
+        Add(tabs, feedFrame, _statusBar);
+    }
+
+    private void SyncDynamicShortcuts(IReadOnlyList<ShortcutHint> hints)
+    {
+        while (_statusBar.SubViews.Count > _staticShortcutCount) _statusBar.RemoveShortcut(_staticShortcutCount);
+        _dynamicShortcuts.Clear();
+
+        // Plain Add, not AddShortcutAt: this always appends at the end, and AddShortcutAt's
+        // insert-at-index implementation removes and re-adds every SubView in the Bar (statics
+        // included) to do that, once per hint. Beyond being wasteful, this refresh runs from
+        // ShortcutTracker.Refresh(), which itself can fire from inside Terminal.Gui's own
+        // in-progress focus-change dispatch (SetHasFocusTrue raises FocusedChanged before the
+        // new focus has fully settled) - repeatedly tearing down and rebuilding the StatusBar
+        // while that's happening was observed to leave keyboard Tab navigation one press behind
+        // until it self-corrected.
+        foreach (var hint in hints) {
+            var shortcut = new Shortcut { Text = hint.Text, Key = hint.Key };
+            shortcut.Action = hint.Action;
+            _dynamicShortcuts.Add(shortcut);
+            _statusBar.Add(shortcut);
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) _shortcutTracker.ShortcutsChanged -= SyncDynamicShortcuts;
+        base.Dispose(disposing);
     }
 }

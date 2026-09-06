@@ -14,16 +14,22 @@ await connection.ConnectAsync();
 var channel = Channel.CreateUnbounded<FeedEnvelope>();
 var registry = new SubscriptionRegistry(connection, channel.Writer);
 
+// Application.Create() must run before Services.Configure() - ShortcutTracker needs a live
+// IApplication at construction time (to subscribe to Navigation.FocusedChanged), and unlike every
+// other View.App usage in this codebase (always deferred to a callback), it can't wait for that.
+Application.MaximumIterationsPerSecond = 60;
+var app = Application.Create();
+ApplyColorTheme();
+
 var services = new ServiceCollection();
 services.AddSingleton(connection);
 services.AddSingleton(registry);
 services.AddSingleton(channel.Reader);
 services.AddSingleton(new MessageDeduplicator(TimeSpan.FromMilliseconds(50)));
+services.AddSingleton<IApplication>(app);
+services.AddSingleton(new ShortcutTracker(app));
 Services.Configure(services);
 
-Application.MaximumIterationsPerSecond = 60;
-var app = Application.Create();
-ApplyColorTheme();
 app.Run<MainWindow>().Dispose();
 
 // Overrides Terminal.Gui's stock "Base"/"Dialog" schemes with the app's own dark palette (see

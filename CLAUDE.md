@@ -22,6 +22,10 @@ much of it exists today.
 
 ## UI conventions
 
+- Keyboard-first: the app is designed to be used entirely without a mouse. Mouse input may work
+  incidentally (Terminal.Gui provides it for free in places) but is never the primary way to
+  reach a feature — every interaction needs a keyboard path, and that path is what to design and
+  test first.
 - Bordered containers (`Window`, `FrameView`, `Dialog`) get horizontal breathing room: set
   `Padding.Thickness` rather than letting content butt against the border (e.g.
   `SubscribeTab`/`PublishTab`, set where they're constructed in `MainWindow.cs`, and

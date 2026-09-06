@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using Microsoft.Extensions.DependencyInjection;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 
@@ -20,6 +21,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
     private readonly PresenterListDataSource<T> _dataSource;
     private readonly Terminal.Gui.Views.ListView _listView;
     private readonly Terminal.Gui.Views.Label _emptyHintLabel;
+    private readonly ShortcutTracker _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
 
     public ListEditorView(ObservableCollection<T> items, IValuePresenter<T> presenter)
     {
@@ -150,14 +152,21 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
     protected virtual void Replace(int index, T value) => _items[index] = value;
     protected virtual void Delete(int index) => _items.RemoveAt(index);
 
+    // Refreshed explicitly (not left to FocusedChanged) for the same reason
+    // UpdateEmptyHintVisibility re-syncs its own scheme after a modal: TryCreate/TryEdit's
+    // App!.Run(dialog) doesn't reliably re-raise this component's own HasFocusChanged on close,
+    // so without this, closing the modal can leave the StatusBar showing a stale (e.g. empty)
+    // shortcut set even though this view is still focused.
     private void TryCreateItem()
     {
         if (TryCreate(out var result)) Add(result);
+        _shortcutTracker.Refresh();
     }
 
     private void TryEditItem(int index)
     {
         if (TryEdit(_items[index], out var result)) Replace(index, result);
+        _shortcutTracker.Refresh();
     }
 
     public virtual IEnumerable<ShortcutHint> Shortcuts =>

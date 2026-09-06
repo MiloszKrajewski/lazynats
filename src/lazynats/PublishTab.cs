@@ -2,17 +2,19 @@ using System.Collections.ObjectModel;
 using lazynats.Components;
 using NATS.Client.Core;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 
 namespace lazynats;
 
-internal sealed class PublishTab: View
+internal sealed class PublishTab: View, IShortcutSource
 {
     private static readonly Attribute InvalidSubject = new(ColorName16.Red, Theme.EditableBackground);
 
     private readonly NatsConnection _connection;
+    private readonly ShortcutTracker _shortcutTracker;
     private readonly ObservableCollection<HeaderPair> _headers = [];
     private readonly TextField _subjectField;
     private readonly EditFrame _subjectFrame;
@@ -24,12 +26,20 @@ internal sealed class PublishTab: View
 #pragma warning restore CS0618
     private readonly Button _sendButton;
 
+    // Payload is the only band that's a live, always-editable multiline buffer (Subject is a
+    // single-line TextField, Headers only ever edits via a modal) - that's what traps Tab/arrow
+    // keys inside it instead of letting them bubble to focus navigation. Gate it behind an
+    // explicit Navigate/Edit toggle: Navigate is the default, arrows/Tab move focus like they do
+    // for every other band, and only Ctrl+E/Enter (Edit) hand keys back to TextView unchanged.
+    private bool _payloadEditing;
+
     public event Action<string>? StatusChanged;
 
-    public PublishTab(NatsConnection connection)
+    public PublishTab(NatsConnection connection, ShortcutTracker shortcutTracker)
     {
         CanFocus = true;
         _connection = connection;
+        _shortcutTracker = shortcutTracker;
 
         var subjectBand = new View { X = 0, Y = 0, Width = Dim.Fill(), Height = 4, CanFocus = true };
         var subjectLabel = new Label { Text = "Subject", X = 0, Y = 0 };
@@ -59,6 +69,12 @@ internal sealed class PublishTab: View
 #pragma warning disable CS0618
         _payloadView = new TextView();
 #pragma warning restore CS0618
+        _payloadView.KeyDown += OnPayloadKeyDown;
+        // Tab/Shift-Tab landing here (from Headers or Send) must always start in Navigate, not
+        // carry over a stale Edit state left from a previous visit that didn't go through Esc.
+        _payloadView.HasFocusChanged += (_, _) => {
+            if (_payloadView.HasFocus && _payloadEditing) ExitPayloadEditMode();
+        };
         var payloadBackground = _payloadView.GetAttributeForRole(VisualRole.Editable).Background;
         var payloadFrame = new EditFrame(_payloadView) {
             X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill(),
@@ -73,6 +89,55 @@ internal sealed class PublishTab: View
 
         UpdateValidity();
     }
+
+    // Navigate is the default and swallows everything except the keys below - "typing" must not
+    // leak into Payload's text without the user deliberately entering Edit first. Up/Down and
+    // Tab/Shift-Tab all mirror the exact same focus-advance Tab already performs everywhere else
+    // in the tab; TextView's own handling of them (cursor movement, literal tab insertion) only
+    // ever runs once Edit is entered, so Edit-mode behavior is unchanged from before this gate.
+    private void OnPayloadKeyDown(object? sender, Key key)
+    {
+        if (_payloadEditing) {
+            if (key != Key.Esc) return;
+            ExitPayloadEditMode();
+            key.Handled = true;
+            return;
+        }
+
+        if (key == Key.CursorUp || key == Key.Tab.WithShift) {
+            key.Handled = true;
+            App!.Navigation!.AdvanceFocus(NavigationDirection.Backward, null);
+        } else if (key == Key.CursorDown || key == Key.Tab) {
+            key.Handled = true;
+            App!.Navigation!.AdvanceFocus(NavigationDirection.Forward, null);
+        } else if (key == Key.E.WithCtrl || key == Key.Enter) {
+            EnterPayloadEditMode();
+            key.Handled = true;
+        } else {
+            key.Handled = true;
+        }
+    }
+
+    // Shared by the keyboard path (Ctrl+E/Enter/Esc above) and the StatusBar hint's own Action,
+    // so clicking the advertised shortcut does exactly what pressing its key would.
+    private void EnterPayloadEditMode()
+    {
+        _payloadEditing = true;
+        _shortcutTracker.Refresh();
+    }
+
+    private void ExitPayloadEditMode()
+    {
+        _payloadEditing = false;
+        _shortcutTracker.Refresh();
+    }
+
+    public IEnumerable<ShortcutHint> Shortcuts =>
+        _payloadEditing
+            ? [new ShortcutHint(Key.Esc, "Stop Editing", ExitPayloadEditMode)]
+            : _payloadView.HasFocus
+                ? [new ShortcutHint(Key.E.WithCtrl, "Edit Payload", EnterPayloadEditMode)]
+                : [];
 
     private void UpdateValidity()
     {
