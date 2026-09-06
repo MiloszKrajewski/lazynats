@@ -1,11 +1,13 @@
 ﻿using lazynats.Kv;
 using lazynats.LiveFeed;
+using lazynats.ObjStore;
 using lazynats.Streams;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.KeyValueStore;
+using NATS.Client.ObjectStore;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -26,6 +28,7 @@ internal sealed class MainWindow: Runnable
         var connection = Services.Root.GetRequiredService<NatsConnection>();
         var jetStream = Services.Root.GetRequiredService<INatsJSContext>();
         var kv = Services.Root.GetRequiredService<INatsKVContext>();
+        var obj = Services.Root.GetRequiredService<INatsObjContext>();
         var feed = Services.Root.GetRequiredService<IObservable<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
         _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
@@ -34,8 +37,9 @@ internal sealed class MainWindow: Runnable
         var publishTab = new PublishTab(connection, _shortcutTracker) { Title = " 2:Publish ", Padding = { Thickness = new Thickness(1) } };
         var streamsTab = new StreamsTab(jetStream) { Title = " 3:Streams ", Padding = { Thickness = new Thickness(1) } };
         var kvTab = new KvTab(kv) { Title = " 4:KV ", Padding = { Thickness = new Thickness(1) } };
+        var objTab = new ObjTab(jetStream, obj) { Title = " 5:OBJ ", Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
-        tabs.Add(subscribeTab, publishTab, streamsTab, kvTab);
+        tabs.Add(subscribeTab, publishTab, streamsTab, kvTab, objTab);
         tabs.Value = subscribeTab;
 
         var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -60,6 +64,9 @@ internal sealed class MainWindow: Runnable
         var kvTabShortcut = new Shortcut { Text = "KV", Key = Key.D4.WithAlt, BindKeyToApplication = true };
         kvTabShortcut.Action = () => tabs.Value = kvTab;
 
+        var objTabShortcut = new Shortcut { Text = "OBJ", Key = Key.D5.WithAlt, BindKeyToApplication = true };
+        objTabShortcut.Action = () => tabs.Value = objTab;
+
         var clearShortcut = new Shortcut { Text = "Clear", Key = Key.C, Visible = false };
         clearShortcut.Action = liveUpdates.Clear;
         liveUpdates.HasFocusChanged += (_, _) => clearShortcut.Visible = liveUpdates.HasFocus;
@@ -82,9 +89,15 @@ internal sealed class MainWindow: Runnable
             kvStatusShortcut.Visible = true;
         };
 
+        var objStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
+        objTab.StatusChanged += message => {
+            objStatusShortcut.Text = message;
+            objStatusShortcut.Visible = true;
+        };
+
         _statusBar = new StatusBar([
-            quitShortcut, subscribeTabShortcut, publishTabShortcut, streamsTabShortcut, kvTabShortcut, clearShortcut,
-            publishStatusShortcut, streamsStatusShortcut, kvStatusShortcut,
+            quitShortcut, subscribeTabShortcut, publishTabShortcut, streamsTabShortcut, kvTabShortcut, objTabShortcut, clearShortcut,
+            publishStatusShortcut, streamsStatusShortcut, kvStatusShortcut, objStatusShortcut,
         ]);
         _staticShortcutCount = _statusBar.SubViews.Count;
 

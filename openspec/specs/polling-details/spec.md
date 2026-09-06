@@ -37,7 +37,8 @@ refetches, and this operation SHALL NOT itself trigger a fetch or alter currentl
 #### Scenario: Changing the target does not immediately fetch
 - **WHEN** the panel's target is changed
 - **THEN** no fetch occurs as a direct result of that change, and previously displayed rows remain
-  until a subsequent `Show` call or poll tick changes them
+  until a subsequent `Show` call, the debounced target-change fetch (per "Immediate Fetch On
+  Demand"), or a poll tick changes them
 
 ### Requirement: Active-Gated Lazy Poll Pipeline
 A polling details panel SHALL start its poll pipeline lazily, no earlier than the first time it is
@@ -113,22 +114,36 @@ current behavior).
 - **THEN** no body text is displayed, in addition to no header rows being displayed
 
 ### Requirement: Immediate Fetch On Demand
-A polling details panel SHALL expose an operation that fetches the current target immediately,
-independent of both the active-gate and the poll interval, for a subclass whose paired list has
-no cached data to `Show()` synchronously on a highlight change. This operation SHALL have no
-effect when no target is set, and a result that arrives after the target has since changed SHALL
-NOT be applied.
+A polling details panel SHALL automatically fetch the current target shortly after every target
+change, independent of the active-gate and the poll interval — for every subclass, not only one
+whose paired list has no cached data to `Show()` synchronously on a highlight change. Successive
+target changes within a brief settling window SHALL be debounced so that only the target still
+current once the window elapses is fetched. Clearing the target (no target set) SHALL cancel any
+pending or in-flight fetch immediately, without itself displaying anything — clearing the visible
+content remains the caller's own `Show`-based responsibility, unaffected by this requirement. A
+result that arrives for a target the panel has since moved on from SHALL NOT be applied.
 
-#### Scenario: Immediate fetch shows the result without waiting for the next poll tick
-- **WHEN** the immediate-fetch operation is invoked while a target is set
-- **THEN** the system fetches that target right away and, once the fetch completes
-  successfully, shows the result — without waiting for the poll interval to elapse
+#### Scenario: A target change is fetched without waiting for the next poll tick
+- **WHEN** the panel's target changes and the settling window elapses without a further change
+- **THEN** the system fetches that target and, once the fetch completes successfully, shows the
+  result — without waiting for the poll interval to elapse
 
-#### Scenario: No effect with no target set
-- **WHEN** the immediate-fetch operation is invoked while no target is set
-- **THEN** no fetch occurs
+#### Scenario: Rapid successive target changes fetch only the final target
+- **WHEN** the target changes more than once within the settling window
+- **THEN** only the target that is still current once the window elapses is fetched; no fetch
+  occurs for a target that was superseded before the window elapsed
 
-#### Scenario: A stale result is not applied
-- **WHEN** the immediate-fetch operation is invoked, and before it completes the target changes
-  again (e.g. via a subsequent highlight change)
+#### Scenario: No fetch and no display change when the target is cleared
+- **WHEN** the target is cleared (no target set)
+- **THEN** no fetch occurs as a result of the clear, and the panel's displayed content is
+  unaffected unless the caller separately calls `Show` with no value
+
+#### Scenario: Clearing the target cancels a pending or in-flight fetch
+- **WHEN** the target is cleared while an earlier fetch for the previous target is queued in the
+  settling window or already in flight
+- **THEN** that fetch's result, once it arrives, is not shown
+
+#### Scenario: A stale result from either trigger is not applied
+- **WHEN** a fetch is in flight — whether triggered by a target change or by a poll tick — and the
+  target changes again before that fetch completes
 - **THEN** the now-stale result, once it arrives, is not shown

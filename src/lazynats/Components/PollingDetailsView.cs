@@ -1,5 +1,6 @@
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using lazynats.Core;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
@@ -7,25 +8,33 @@ using Attribute = Terminal.Gui.Drawing.Attribute;
 
 namespace lazynats.Components;
 
-// Shared plumbing behind StreamDetails/ConsumerDetails (and the future KV/OBJ detail panes):
-// Show/SetActive wiring, the lazily-started active-gated poll pipeline, and the label:value
+// Shared plumbing behind StreamDetails/ConsumerDetails/BucketDetails/KeyDetails: Show/SetActive
+// wiring, the lazily-started active-gated poll+target-change pipeline, and the label:value
 // OnDrawingContent renderer. FetchAsync/BuildRows stay abstract - see
 // openspec/changes/extract-drillable-list-base/design.md.
 //
-// Target presence is tracked via a separate bool rather than a nullable TTarget: an unconstrained
-// TTarget? doesn't erase to Nullable<TTarget> for a value-type TTarget (e.g. ConsumerDetails'
-// (string, string) tuple) the way a concrete `(string, string)?` field would, so SetPollTarget/
-// ClearPollTarget stand in for what a single nullable-target setter can't express generically.
-// Each subclass's public SetTarget (whose shape differs - a single name vs. a stream/consumer
-// pair) translates into these.
+// Target state lives in a BehaviorSubject<(bool HasTarget, TTarget Target)> rather than a
+// nullable TTarget: an unconstrained TTarget? doesn't erase to Nullable<TTarget> for a value-type
+// TTarget (e.g. ConsumerDetails'/KeyDetails' tuple targets) the way a concrete nullable field
+// would, so the tuple's HasTarget flag stands in for what a single nullable-target field can't
+// express generically. BehaviorSubject (not a plain Subject) so a target pushed before the
+// lazily-started pipeline has a subscriber is never silently dropped - see
+// openspec/changes/unify-polling-details-refresh/design.md decision 1. Each subclass's public
+// SetTarget (whose shape differs - a single name vs. a stream/consumer pair) translates into
+// SetPollTarget/ClearPollTarget.
 internal abstract class PollingDetailsView<TTarget, TInfo>: View
 {
     private static readonly Color ValueColor = new(255, 255, 255);
 
+    // Debounces rapid successive target changes (e.g. holding an arrow key through a list) so
+    // only the target still current once things settle triggers a fetch. Fixed for every
+    // subclass, deliberately not per-subclass virtual like PollInterval - see design.md decision 5.
+    private static readonly TimeSpan SwitchDebounce = TimeSpan.FromMilliseconds(100);
+
+    private readonly BehaviorSubject<(bool HasTarget, TTarget Target)> _targetChanges = new((false, default!));
+
     private (string Label, string Value)[] _rows = [];
     private string? _body;
-    private TTarget _target = default!;
-    private bool _hasTarget;
     private bool _active;
     private IDisposable? _subscription;
 
@@ -33,10 +42,10 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
 
     protected PollingDetailsView() => CanFocus = false;
 
-    // Both existing subclasses already use 3s. Null means polling is disabled entirely - no
-    // Observable.Interval is ever started, so a subclass that always returns null issues no
-    // outbound calls ever, while still getting the label:value rendering and Show/SetActive
-    // wiring for free.
+    // Both existing subclasses already use 3s. Null means polling (and, per "Polling Can Be
+    // Disabled Entirely", the target-change fetch below) is disabled entirely - no pipeline is
+    // ever started, so a subclass that always returns null issues no outbound calls ever, while
+    // still getting the label:value rendering and Show/SetActive wiring for free.
     protected virtual TimeSpan? PollInterval => TimeSpan.FromSeconds(3);
 
     protected abstract Task<TInfo?> FetchAsync(TTarget target);
@@ -56,44 +65,23 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
         SetNeedsDraw();
     }
 
-    // Re-points which target the poll pipeline refetches; does not itself trigger a fetch or
-    // touch the currently-shown rows - callers pair this with an immediate Show() for instant
-    // feedback on highlight change.
-    protected void SetPollTarget(TTarget target)
-    {
-        _target = target;
-        _hasTarget = true;
-    }
+    // Re-points which target the pipeline tracks. Doesn't itself synchronously fetch or touch
+    // currently-shown rows - callers still pair this with an immediate Show() for instant
+    // feedback on highlight change - but it does schedule a debounced fetch of the new target,
+    // per "Immediate Fetch On Demand".
+    protected void SetPollTarget(TTarget target) => _targetChanges.OnNext((true, target));
 
-    protected void ClearPollTarget()
-    {
-        _target = default!;
-        _hasTarget = false;
-    }
+    // Cancels any pending or in-flight fetch for the previous target immediately (not debounced -
+    // see design.md decision 4) without displaying anything itself; clearing the visible content
+    // stays the caller's own Show(null) responsibility, same as today.
+    protected void ClearPollTarget() => _targetChanges.OnNext((false, default!));
 
-    // Fetches the current target immediately, bypassing both the active gate and the poll
-    // interval - for a subclass whose paired list has nothing to Show() instantly on a highlight
-    // change (e.g. KeyDetails - the key list only carries bare names, unlike Stream/Consumer/
-    // Bucket, which already have full info cached in their list item). No-op with no target set.
-    public void RefreshNow()
-    {
-        if (_hasTarget) _ = FetchAndShowAsync(_target);
-    }
-
-    private async Task FetchAndShowAsync(TTarget target)
-    {
-        if (await FetchInternalAsync(target) is not { } info) return;
-
-        // The target may have moved on while this was in flight (e.g. rapid highlight changes) -
-        // only apply a result that's still current, same staleness guard KvTab's list refreshes
-        // use.
-        if (_hasTarget && EqualityComparer<TTarget>.Default.Equals(_target, target)) Show(info);
-    }
-
-    // Gates the poll pipeline's Where(...) - false means every tick is a genuine no-op (no fetch
-    // issued at all), not just a discarded result. The underlying subscription is created once,
-    // lazily, the first time this is called with true (by which point App is guaranteed to be
-    // available) and is never recreated - only Dispose() tears it down.
+    // Gates the pipeline's poll-tick branch - false means every tick is a genuine no-op (no fetch
+    // issued at all), not just a discarded result. Target-change fetches are NOT gated by this,
+    // matching the old RefreshNow's "independent of the active-gate" contract. The underlying
+    // subscription is created once, lazily, the first time this is called with true (by which
+    // point App is guaranteed to be available) and is never recreated - only Dispose() tears it
+    // down.
     public void SetActive(bool active)
     {
         _active = active;
@@ -104,26 +92,45 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
     {
         if (PollInterval is not { } interval) return Disposable.Empty;
 
-        return Observable.Interval(interval)
-            .Where(_ => _active && _hasTarget)
-            .SelectAsync(_ => FetchInternalAsync(_target))
-            .Where(info => info is not null)
+        // toTarget is throttled (debounced); toClear deliberately isn't - see design.md decision
+        // 4 for why debouncing a clear would let a stale in-flight fetch flash back onto an
+        // already-cleared panel before the throttle window elapsed.
+        var toTarget = _targetChanges.Where(t => t.HasTarget).Throttle(SwitchDebounce);
+        var toClear = _targetChanges.Where(t => !t.HasTarget);
+        var toPoll = Observable.Interval(interval)
+            .Where(_ => _active && _targetChanges.Value.HasTarget)
+            .Select(_ => _targetChanges.Value);
+
+        return Observable.Merge(toTarget, toClear, toPoll)
+            // Empty (not a Return) for the clear case: it reaches Switch() immediately,
+            // cancelling/discarding whatever fetch was in flight, without itself emitting a value
+            // - so no Show(null) happens here (callers already Show(null) themselves on clear).
+            .Select(t => t.HasTarget
+                ? Observable.FromAsync(() => FetchInternalAsync(t.Target))
+                : Observable.Empty<(bool Success, TInfo? Info)>())
+            .Switch()
+            // Only a genuine fetch result reaches Show - including a legitimate "not found" null,
+            // which must still reach Show(null) per "A Deleted Key/Object Renders As No
+            // Selection". An error result (Success: false) is dropped entirely instead, so the
+            // panel keeps showing whatever it last held - see FetchInternalAsync.
+            .Where(result => result.Success)
+            .Select(result => result.Info)
             .ObserveOnApp(App!)
             .Subscribe(Show);
     }
 
     // Catches internally rather than via a downstream Catch operator: an OnError here would
-    // propagate through SelectAsync's Concat and terminate the whole pipeline (including the
-    // Interval timer) permanently after a single failure - see
-    // openspec/changes/add-consumer-drilldown for the write-up. Returning null and filtering it
-    // out keeps the pipeline alive for the next tick.
-    private async Task<TInfo?> FetchInternalAsync(TTarget target)
+    // propagate through Switch and terminate the whole pipeline (including the Interval timer)
+    // permanently after a single failure - see openspec/changes/add-consumer-drilldown for the
+    // write-up. Success: false keeps the pipeline alive for the next tick without touching the
+    // panel; Success: true (even with a null Info) is a real result and must still reach Show.
+    private async Task<(bool Success, TInfo? Info)> FetchInternalAsync(TTarget target)
     {
         try {
-            return await FetchAsync(target);
+            return (true, await FetchAsync(target));
         } catch (Exception ex) {
             Error?.Invoke(ex.Message);
-            return default;
+            return (false, default);
         }
     }
 
@@ -168,7 +175,10 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _subscription?.Dispose();
+        if (disposing) {
+            _subscription?.Dispose();
+            _targetChanges.Dispose();
+        }
         base.Dispose(disposing);
     }
 }

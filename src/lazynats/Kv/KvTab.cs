@@ -102,10 +102,10 @@ internal sealed class KvTab: View
     {
         _keyDetails.SetTarget(_currentBucket, key);
         // Unlike Stream/Consumer/Bucket, the key list only carries bare names - there's no cached
-        // entry to Show() instantly, so clear first (no stale flash of the previous key's value)
-        // then kick off an immediate fetch instead of waiting for the next ~3s poll tick.
+        // entry to Show() instantly, so clear first (no stale flash of the previous key's value).
+        // SetTarget above already schedules a debounced fetch of the new key - see
+        // PollingDetailsView's "Immediate Fetch On Demand".
         _keyDetails.Show(null);
-        _keyDetails.RefreshNow();
     }
 
     // Enter on a highlighted bucket. Always fetches the key list fresh (nats-kv's "Key List"
