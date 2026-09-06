@@ -53,6 +53,7 @@ internal sealed class KvTab: View
         _listView.HighlightChanged += OnBucketHighlightChanged;
         _listView.DescendRequested += Descend;
         _listView.CreateRequested += () => OpenCreateBucketDialog(null);
+        _listView.DeleteRequested += () => _ = TryDeleteBucketAsync();
 
         _keyListView = new KeyListView(_keyItems) { Background = Theme.EditableBackground };
         _keyListFrame = new EditFrame(_keyListView) {
@@ -178,6 +179,45 @@ internal sealed class KvTab: View
                 OpenCreateBucketDialog(options);
             });
         }
+    }
+
+    // Scoped by _listView.SelectedBucket alone - no _currentBucket check needed, since Ctrl+D is
+    // only bound at the bucket level (see BucketListView) and this is unreachable from the key
+    // level. Mirrors StreamsTab.TryDeleteStreamAsync exactly.
+    private async Task TryDeleteBucketAsync()
+    {
+        if (_listView.SelectedBucket is not { } status) return;
+        var name = BucketName.From(status);
+
+        var choice = MessageBox.Query(
+            App!, DialogText.Pad("Delete Bucket"),
+            DialogText.Pad($"Delete bucket '{name}'? This cannot be undone."),
+            "_Delete", "_Cancel");
+        if (choice != 0) return;
+
+        var neighborName = NeighborBucketName(name);
+
+        try {
+            await _kv.DeleteStoreAsync(name);
+            _ = RefreshListAsync(neighborName);
+        } catch (Exception ex) {
+            App?.Invoke(() => MessageBox.ErrorQuery(App!, DialogText.Pad("Delete Bucket Failed"), DialogText.Pad(ex.Message), "_Ok"));
+        }
+    }
+
+    // The bucket below `name` in the current (pre-delete) list, or the one above it if `name` is
+    // last, mirroring StreamsTab.NeighborStreamName.
+    private string? NeighborBucketName(string name)
+    {
+        var index = -1;
+        for (var i = 0; i < _items.Count; i++) {
+            if (BucketName.From(_items[i]) != name) continue;
+            index = i;
+            break;
+        }
+        if (index < 0) return null;
+        if (index + 1 < _items.Count) return BucketName.From(_items[index + 1]);
+        return index - 1 >= 0 ? BucketName.From(_items[index - 1]) : null;
     }
 
     // `selectName` highlights a specific bucket after the refresh (used right after a create, so

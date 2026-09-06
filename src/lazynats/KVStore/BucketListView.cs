@@ -11,6 +11,7 @@ internal sealed class BucketListView: DrillableListView<NatsKVStatus>
 
     public event Action? DescendRequested;
     public event Action? CreateRequested;
+    public event Action? DeleteRequested;
 
     public BucketListView(ObservableCollection<NatsKVStatus> items): base(items)
     {
@@ -29,6 +30,9 @@ internal sealed class BucketListView: DrillableListView<NatsKVStatus>
         // create-less per nats-kv) - Ctrl+N is layered on here, same as StreamListView.
         AddCommand(Command.New, () => { CreateRequested?.Invoke(); return true; });
         KeyBindings.Add(Key.N.WithCtrl, Command.New);
+
+        AddCommand(Command.DeleteAll, () => { DeleteRequested?.Invoke(); return true; });
+        KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
     }
 
     protected override IValuePresenter<NatsKVStatus> Presenter => PresenterInstance;
@@ -38,5 +42,7 @@ internal sealed class BucketListView: DrillableListView<NatsKVStatus>
     public NatsKVStatus? SelectedBucket => SelectedItem;
 
     public override IEnumerable<ShortcutHint> Shortcuts =>
-        base.Shortcuts.Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()));
+        base.Shortcuts
+            .Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()))
+            .Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
 }
