@@ -25,7 +25,7 @@ using static Nuke.Common.Tools.Docker.DockerTasks;
 	GitHubActionsImage.WindowsLatest,
 	On = [GitHubActionsTrigger.Push],
 	InvokedTargets = [nameof(Release)],
-	CacheKeyFiles = [".paket.lock", "Directory.Packages.props", "**/*.csproj"])]
+	CacheKeyFiles = ["Directory.Packages.props", "**/*.csproj"])]
 class Program: NukeBuild
 {
 	public static int Main() => Execute<Program>(x => x.Build);
@@ -56,9 +56,6 @@ class Program: NukeBuild
 	readonly ReleaseNotes[] ReleaseNotes = ChangelogTasks
 		.ReadReleaseNotes(RootDirectory / "CHANGES.md")
 		.ToArray();
-
-	readonly bool HasPaketDependencies = 
-		(RootDirectory / "paket.dependencies").FileExists();
 
 	NuGetVersion PackageVersion =>
 		ReleaseNotes.FirstOrDefault()?.Version ??
@@ -119,7 +116,6 @@ class Program: NukeBuild
             RestoreSecretFile(".signing.snk", "res/.signing.example.snk");
 
 			DotNetToolRestore();
-			if (HasPaketDependencies) DotNet("paket restore");
 			DotNetRestore(s => s.SetProjectFile(Solution));
 		});
 

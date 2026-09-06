@@ -1,11 +1,9 @@
 .vs/
 .vscode/
 .fake/
-.paket/
 .output/
 .idea/
 .ionide/
-paket-files/
 packages/
 .local/
 

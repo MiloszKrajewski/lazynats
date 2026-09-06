@@ -30,7 +30,7 @@ jobs:
           path: |
             .nuke/temp
             ~/.nuget/packages
-          key: ${{ runner.os }}-${{ hashFiles('.paket.lock', 'Directory.Packages.props', '**/*.csproj') }}
+          key: ${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
       - name: 'Run: Release'
         run: ./build.cmd Release
       - name: 'Publish: .output'

@@ -14,9 +14,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".environment", ".environmen
 		..\.env = ..\.env
 		..\global.json = ..\global.json
 		..\nuget.config = ..\nuget.config
-		..\paket.dependencies = ..\paket.dependencies
 		..\PublicAssembly.props = ..\PublicAssembly.props
-		..\paket.lock = ..\paket.lock
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".resources", ".resources", "{3937188F-DEE0-4F31-948C-D74D79E95BD4}"
@@ -32,11 +30,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".resources", ".resources", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "_build", "..\.nuke\build\_build.csproj", "{72D363EA-A909-45D6-974D-FCD8D1AFDE09}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "lazynats", "lazynats\lazynats.csproj", "{E80A3978-1675-4E44-826E-4D92A02434E5}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "lazynats.Tests", "lazynats.Tests\lazynats.Tests.csproj", "{BD4D595A-9D7B-4769-9AFF-F88C6816838B}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "lazynats.App", "lazynats.App\lazynats.App.csproj", "{6FE53D3E-0D77-4655-A934-5F26965869B0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "lazynats", "lazynats\lazynats.csproj", "{6FE53D3E-0D77-4655-A934-5F26965869B0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -44,14 +38,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{E80A3978-1675-4E44-826E-4D92A02434E5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E80A3978-1675-4E44-826E-4D92A02434E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E80A3978-1675-4E44-826E-4D92A02434E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E80A3978-1675-4E44-826E-4D92A02434E5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BD4D595A-9D7B-4769-9AFF-F88C6816838B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BD4D595A-9D7B-4769-9AFF-F88C6816838B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BD4D595A-9D7B-4769-9AFF-F88C6816838B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BD4D595A-9D7B-4769-9AFF-F88C6816838B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6FE53D3E-0D77-4655-A934-5F26965869B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6FE53D3E-0D77-4655-A934-5F26965869B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6FE53D3E-0D77-4655-A934-5F26965869B0}.Release|Any CPU.ActiveCfg = Release|Any CPU

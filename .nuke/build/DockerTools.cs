@@ -42,7 +42,7 @@ public class DockerTools(AbsolutePath dockerDirectory)
 	{
 		var projectName = project.Name;
 		var solutionName = project.Solution.Name;
-		if (solutionName is not null && projectName.StartsWith(solutionName))
+		if (solutionName is not null && projectName.StartsWith(solutionName + "."))
 			projectName = projectName[(solutionName.Length + 1)..];
 		return $"{TargetPrefix}/{GetDockerFriendlyName(projectName)}";
 	}
