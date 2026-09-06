@@ -99,7 +99,7 @@ internal sealed class EditFrame: View
     // real terminal paste, not just tmux's bracketed-paste injection.
     private void WireInitialPasteFocusFix()
     {
-        for (View? ancestor = SuperView; ancestor is not null; ancestor = ancestor.SuperView)
+        for (var ancestor = SuperView; ancestor is not null; ancestor = ancestor.SuperView)
         {
             if (ancestor is not Runnable runnable) 
                 continue;

@@ -317,7 +317,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         if (dialog.Result is not { } pattern) return;
 
         _activeFilterPattern = pattern.Length == 0 ? null : pattern;
-        _activeFilterRegex = _activeFilterPattern is { } p ? FilterExpression.TryCompile(p)!.Regex : null;
+        _activeFilterRegex = _activeFilterPattern is { } p ? FilterExpression.TryCompile(p)!.Client : null;
         RederiveFiltered();
         EnsureValidSelection();
     }

@@ -16,7 +16,7 @@ internal static class AsyncExtensions
     public static IObservable<TResult> SelectAsync<TSource, TResult>(
         this IObservable<TSource> source, Func<TSource, Task<TResult>> selector) =>
         source.Select(item => Observable.FromAsync(() => selector(item))).Concat();
-
+    
     // Terminal.Gui has no SynchronizationContext to hook a standard ObserveOn into - IApplication
     // exposes Invoke(Action) instead, so this wraps the observer to dispatch every notification
     // (value, error, completion) through it before it reaches downstream subscribers.

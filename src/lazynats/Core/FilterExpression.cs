@@ -3,15 +3,11 @@ using System.Text.RegularExpressions;
 
 namespace lazynats.Core;
 
-// Regex is always the exact match for the expression, regardless of whether NativeFilter is also
-// exact - every consumer without a server-side scoped fetch to scope (every list but KV keys)
-// applies Regex alone and never looks at NativeFilter/NativeFilterIsExact at all. NativeFilter is
-// always a valid native NATS subject filter (over-approximating where the expression needs a regex
-// phase) for the one consumer that does have a fetch to scope; NativeFilterIsExact is true exactly
-// when that native filter alone already resolves the same matches Regex would, letting that one
-// consumer skip re-applying Regex afterward as a perf optimization. See
-// openspec/changes/unify-list-filtering/design.md Decision 1.
-internal sealed record CompiledFilter(string NativeFilter, Regex Regex, bool NativeFilterIsExact);
+// Client is the exact matcher for the expression. Native is always a valid NATS subject filter
+// used to scope server-side fetches; it may over-approximate and require client regex filtering.
+// NativeFilterIsExact is true only when Native alone matches exactly, so regex can be skipped.
+// See openspec/changes/unify-list-filtering/design.md Decision 1.
+internal sealed record NatsFilter(string Native, Regex Client, bool NativeFilterIsExact);
 
 // Compiles the shared list-filter grammar (openspec/specs/kv-filter-expression/spec.md) used by
 // every Ctrl+F pattern filter in the app. Deliberately separate from RegexExtensions
@@ -20,22 +16,18 @@ internal sealed record CompiledFilter(string NativeFilter, Regex Regex, bool Nat
 // case-sensitive (no RegexOptions.IgnoreCase) to match NATS subject semantics.
 internal static class FilterExpression
 {
-    public static CompiledFilter? TryCompile(string expression)
+    public static NatsFilter? TryCompile(string expression)
     {
         var segments = expression.Split('.');
         if (segments.Any(s => s.Length == 0))
             return null;
 
-        // Regex is built from every segment unconditionally - including when the expression is
-        // already valid native NATS subject-wildcard syntax (the "fast path" below) - since a
-        // consumer with no native-scoped fetch at all still needs an exact in-memory match to
-        // apply, and this same per-segment translation already produces one correctly for that
-        // case too (a bare `*` -> a single token, a bare terminal `>` -> one or more).
-        var pattern = "^" + string.Join(@"\.", segments.Select(SegmentToRegexFragment)) + "$";
+        // Regex is built from every segment unconditionally
+        var pattern = "^" + string.Join(@"\.", segments.Select(SegmentToRegex)) + "$";
         var regex = new Regex(pattern);
 
         if (IsNativeFastPath(segments))
-            return new CompiledFilter(expression, regex, NativeFilterIsExact: true);
+            return new NatsFilter(expression, regex, NativeFilterIsExact: true);
 
         // Native filter construction stops (and collapses the remainder to '>') the moment a
         // segment's '>' isn't a bare final segment - native syntax has no way to promise a fixed
@@ -69,22 +61,18 @@ internal static class FilterExpression
             nativeTokens.Add(segment);
         }
 
-        return new CompiledFilter(string.Join('.', nativeTokens), regex, NativeFilterIsExact: false);
+        return new NatsFilter(string.Join('.', nativeTokens), regex, NativeFilterIsExact: false);
     }
 
-    // Every segment is exactly one of: a plain literal run, a bare `*`, or (only as the final
-    // segment) a bare `>` - i.e. the expression is already valid native NATS subject-wildcard
-    // syntax, so a native-scoped fetch using it verbatim already resolves the exact same matches
-    // Regex would.
+    // allowed: '*' as whole segment or '>' as final segment, or no wildcards at all
     private static bool IsNativeFastPath(string[] segments)
     {
         for (var i = 0; i < segments.Length; i++)
         {
+            var last = i == segments.Length - 1;
             var segment = segments[i];
-            if (segment == "*") continue;
-            if (segment == ">" && i == segments.Length - 1) continue;
-
-            if (segment.Any(c => c is '*' or '?' or '>')) return false;
+            var valid = segment == "*" || (segment == ">" && last) || !segment.ContainsAny("*?>".AsSpan());
+            if (!valid) return false;
         }
 
         return true;
@@ -97,10 +85,11 @@ internal static class FilterExpression
     // all (a bare terminal `>` alone never does - that's the fast path above), the native filter
     // has already constrained the candidate's token structure, so `.*` and the "one-or-more whole
     // tokens" regex it could otherwise use match identical candidates in practice.
-    private static string SegmentToRegexFragment(string segment)
+    private static string SegmentToRegex(string segment)
     {
         if (segment == "*") return "[^.]+";
-
+        if (segment == ">") return ".*";
+        
         var builder = new StringBuilder();
         foreach (var c in segment)
         {

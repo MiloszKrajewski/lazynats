@@ -373,9 +373,9 @@ internal sealed class ValuesTab: View, IShortcutSource
             .Select(x => new KvBucketItem(x.Name!, x.Status))
             .ToList();
 
-    private static async Task<(IList<string> Keys, bool Truncated)> FetchKeysAsync(INatsKVStore store, CompiledFilter filter)
+    private static async Task<(IList<string> Keys, bool Truncated)> FetchKeysAsync(INatsKVStore store, NatsFilter filter)
     {
-        var observable = store.GetKeysAsync([filter.NativeFilter]).ToObservable();
+        var observable = store.GetKeysAsync([filter.Native]).ToObservable();
         if (!filter.NativeFilterIsExact) observable = observable.Where(key => filter.Regex.IsMatch(key));
         var fetched = await observable.Take(KeyFilterCap + 1).ToList();
         var truncated = fetched.Count > KeyFilterCap;

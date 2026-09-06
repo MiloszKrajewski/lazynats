@@ -200,7 +200,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     private void ApplyActiveFilter(string? pattern)
     {
         _activeFilterPattern = pattern;
-        _activeFilterRegex = pattern is { } p ? FilterExpression.TryCompile(p)!.Regex : null;
+        _activeFilterRegex = pattern is { } p ? FilterExpression.TryCompile(p)!.Client : null;
 
         var previousIdentity = SelectedItem is { } current ? GetIdentity(current) : null;
         ApplyFilterAndSelect(previousIdentity);
