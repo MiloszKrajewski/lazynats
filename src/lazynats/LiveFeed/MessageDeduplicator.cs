@@ -1,3 +1,5 @@
+using System.IO.Hashing;
+using System.Runtime.InteropServices;
 using NATS.Client.Core;
 
 namespace lazynats.LiveFeed;
@@ -6,7 +8,7 @@ namespace lazynats.LiveFeed;
 // called from the single FeedReaderLoop that owns it, so no locking is needed.
 internal sealed class MessageDeduplicator(TimeSpan window)
 {
-    private readonly Dictionary<int, DateTimeOffset> _lastSeen = new();
+    private readonly Dictionary<ulong, DateTimeOffset> _lastSeen = new();
 
     public bool IsDuplicate(FeedEnvelope envelope)
     {
@@ -21,7 +23,7 @@ internal sealed class MessageDeduplicator(TimeSpan window)
 
     private void Prune(DateTimeOffset now)
     {
-        List<int>? expired = null;
+        List<ulong>? expired = null;
         foreach (var (key, seenAt) in _lastSeen)
             if (now - seenAt > window)
                 (expired ??= []).Add(key);
@@ -34,23 +36,39 @@ internal sealed class MessageDeduplicator(TimeSpan window)
     // Subject + headers + payload only. ReceivedAt and SubscriptionId are deliberately
     // excluded - see design.md's "Dedup" decision for why including either would defeat
     // the whole point (one must differ between duplicates, the other never matches core
-    // NATS's actual delivery semantics).
-    private static int ComputeKey(NatsMsg<byte[]> message)
+    // NATS's actual delivery semantics). Strings are hashed via their raw UTF-16 bytes
+    // (not UTF-8-encoded) since the key only needs internal consistency, not real text.
+    private static ulong ComputeKey(NatsMsg<byte[]> message)
     {
-        var hash = new HashCode();
-        hash.Add(message.Subject);
+        var hasher = new XxHash3();
+
+        AppendString(hasher, message.Subject);
 
         if (message.Headers is { Count: > 0 } headers)
-            foreach (var (headerKey, headerValue) in headers)
-            {
-                hash.Add(headerKey);
-                hash.Add(headerValue.ToString());
-            }
+            AppendHeaders(hasher, headers);
 
         if (message.Data is { } data)
-            foreach (var b in data)
-                hash.Add(b);
+            hasher.Append(data);
 
-        return hash.ToHashCode();
+        return hasher.GetCurrentHashAsUInt64();
     }
+
+    private static void AppendHeaders(XxHash3 hasher, NatsHeaders headers)
+    {
+        foreach (var (headerKey, headerValue) in headers)
+        {
+            AppendString(hasher, headerKey);
+            foreach (var value in headerValue)
+                AppendString(hasher, value);
+        }
+    }
+
+    private static void AppendString(XxHash3 hasher, string? text)
+    {
+        if (text is not null)
+            AppendString(hasher, text.AsSpan());
+    }
+
+    private static void AppendString(XxHash3 hasher, ReadOnlySpan<char> span) =>
+        hasher.Append(MemoryMarshal.AsBytes(span));
 }

@@ -5,6 +5,7 @@ var probes = new (string Name, Func<Task> Run)[] {
     ("Rx", RxProbe.Run),
     ("Di", DiProbe.Run),
     ("Editor", EditorProbe.Run),
+    ("XxHash3", XxHash3Probe.Run),
 };
 
 var passed = 0;

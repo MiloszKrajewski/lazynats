@@ -31,7 +31,12 @@ The system SHALL read from the shared channel by awaiting availability once, the
 - **THEN** all of them are drained together and applied to the feed view via a single UI-thread dispatch call, not one dispatch per message
 
 ### Requirement: Duplicate Collapsing for Overlapping Subscriptions
-The system SHALL compute a dedup key as `hash(subject + headers + payload)` from each envelope's inner `NatsMsg<byte[]>`, deliberately excluding the envelope's receipt timestamp and subscription identity, and SHALL suppress a message from being added to the feed again if the same key was already seen within a short trailing time window, so that a message matching more than one active overlapping subscription pattern does not appear as multiple rows.
+The system SHALL compute a dedup key as a 64-bit hash of `subject + headers + payload` from
+each envelope's inner `NatsMsg<byte[]>`, deliberately excluding the envelope's receipt
+timestamp and subscription identity, and SHALL suppress a message from being added to the feed
+again if the same key was already seen within a short trailing time window, so that a message
+matching more than one active overlapping subscription pattern does not appear as multiple
+rows.
 
 #### Scenario: The same message delivered via two overlapping subscriptions appears once
 - **WHEN** subscriptions for `invoices.>` and `invoices.get.*` are both active and a message is published on `invoices.get.123`, causing the server to deliver it once per matching subscription
@@ -48,6 +53,10 @@ The system SHALL compute a dedup key as `hash(subject + headers + payload)` from
 #### Scenario: Distinct messages outside the window are not collapsed
 - **WHEN** two messages with identical subject, headers, and payload are received with a gap larger than the trailing dedup window
 - **THEN** both appear as separate rows in the feed
+
+#### Scenario: Dedup key is 64-bit
+- **WHEN** a dedup key is computed for any envelope
+- **THEN** the key is a 64-bit value, not the previous 32-bit `HashCode`-derived value
 
 ### Requirement: No In-View Header
 The live feed view SHALL NOT render its own heading text or divider line; it SHALL rely on its
