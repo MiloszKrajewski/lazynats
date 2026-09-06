@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 
@@ -18,6 +19,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
     private readonly ObservableCollection<T> _items;
     private readonly PresenterListDataSource<T> _dataSource;
     private readonly Terminal.Gui.Views.ListView _listView;
+    private readonly Terminal.Gui.Views.Label _emptyHintLabel;
 
     public ListEditorView(ObservableCollection<T> items, IValuePresenter<T> presenter)
     {
@@ -29,6 +31,13 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         _listView.KeystrokeNavigator = null;
         _listView.Source = _dataSource;
 
+        // A separate overlay, not a fake row in _dataSource - stays outside the list's selection
+        // model entirely, so SelectedIndex/Ctrl+N/E/D need no special-casing for it.
+        _emptyHintLabel = new Terminal.Gui.Views.Label {
+            X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(), CanFocus = false, Text = EmptyHint,
+        };
+        _emptyHintLabel.SetScheme(new Terminal.Gui.Drawing.Scheme(GetScheme().Disabled));
+
         // Bound here (on the whole component), not on the list, so Ctrl+N/E/D work no matter
         // which child currently has focus - same rationale as PublishView.
         AddCommand(Command.New, () => { TryCreateItem(); return true; });
@@ -38,7 +47,34 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         KeyBindings.Add(Key.E.WithCtrl, Command.Edit);
         KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
 
-        Add(_listView);
+        Add(_listView, _emptyHintLabel);
+        _items.CollectionChanged += OnItemsChanged;
+        UpdateEmptyHintVisibility();
+        EnsureValidSelection();
+    }
+
+    // Overridden per item type so the hint reads naturally (e.g. "No subscriptions..." vs a
+    // generic message); defaulted rather than abstract so a forgotten override still shows
+    // something useful instead of nothing.
+    protected virtual string EmptyHint => "No items — Ctrl+N to add one";
+
+    private void OnItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        UpdateEmptyHintVisibility();
+        EnsureValidSelection();
+    }
+
+    private void UpdateEmptyHintVisibility() => _emptyHintLabel.Visible = _items.Count == 0;
+
+    // A subclass whose true source of truth lives elsewhere (e.g. SubscriptionsView redirecting
+    // into a NATS subscription registry) can rebuild _items wholesale - Terminal.Gui's ListView
+    // resets SelectedItem to null on that kind of change and never re-selects anything on its
+    // own, leaving a non-empty list with nothing highlighted and Ctrl+E/D silently inert.
+    private void EnsureValidSelection()
+    {
+        if (_items.Count == 0) return;
+        var selected = _listView.SelectedItem;
+        if (selected is null || selected < 0 || selected >= _items.Count) _listView.SelectedItem = 0;
     }
 
     private int? SelectedIndex =>
@@ -74,7 +110,10 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _dataSource.Dispose();
+        if (disposing) {
+            _items.CollectionChanged -= OnItemsChanged;
+            _dataSource.Dispose();
+        }
         base.Dispose(disposing);
     }
 }

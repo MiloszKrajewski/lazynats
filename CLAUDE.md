@@ -4,9 +4,9 @@
 
 `lazynats` is a terminal UI for NATS, in the spirit of `lazygit`/`lazydocker`: a fast,
 keyboard-driven client for watching and managing a NATS server without leaving the terminal.
-See [`doc/UI.md`](./doc/UI.md) for the intended UI shape (management tabs for subscriptions,
-streams, consumers, KV/OBJ stores, plus a live feed and message sending) and how much of it
-exists today.
+See [`doc/ui-design.md`](./doc/ui-design.md) for the intended UI shape (management tabs for
+subscriptions, streams, consumers, KV/OBJ stores, plus a live feed and message sending) and how
+much of it exists today.
 
 ## Stack
 

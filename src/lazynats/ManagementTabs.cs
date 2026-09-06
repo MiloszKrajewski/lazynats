@@ -44,13 +44,30 @@ internal sealed class ManagementTabs: Tabs
         // previously focused within the content) is internal, not accessible from this assembly;
         // SetFocus() - the same public method the base Value setter itself uses - is the
         // sanctioned substitute, at the cost of always landing on the content's default focus
-        // target rather than wherever focus was before the header was entered.
+        // target rather than wherever focus was before the header was entered. That "default
+        // target" can resolve to Value itself when Value is CanFocus while also hosting its own
+        // focusable descendants (every tab's content today) - an invisible, non-interactive focus
+        // target indistinguishable from focus having gone nowhere. Finding and focusing the first
+        // focusable descendant explicitly removes that ambiguity.
         if (Value?.Border.View is { HasFocus: true } headerView) {
             headerView.HasFocus = false;
-            Value?.SetFocus();
+            var target = Value is { } content ? FindFirstFocusableDescendant(content) ?? content : null;
+            target?.SetFocus();
         }
 
         return true;
+    }
+
+    private static View? FindFirstFocusableDescendant(View view)
+    {
+        foreach (var sub in view.SubViews) {
+            if (!sub.Visible || !sub.Enabled) continue;
+            var deeper = FindFirstFocusableDescendant(sub);
+            if (deeper is not null) return deeper;
+            if (sub.CanFocus) return sub;
+        }
+
+        return null;
     }
 
     private bool? SwitchTab(int direction)
