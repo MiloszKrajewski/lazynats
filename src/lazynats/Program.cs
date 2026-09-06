@@ -35,7 +35,7 @@ services.AddSingleton(jetStream);
 services.AddSingleton<IObserver<FeedEnvelope>>(feed);
 services.AddSingleton<IObservable<FeedEnvelope>>(feed);
 services.AddSingleton(new MessageDeduplicator(TimeSpan.FromMilliseconds(50)));
-services.AddSingleton<IApplication>(app);
+services.AddSingleton(app);
 services.AddSingleton(new ShortcutTracker(app));
 Services.Configure(services);
 

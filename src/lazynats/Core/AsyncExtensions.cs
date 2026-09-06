@@ -22,7 +22,7 @@ internal static class AsyncExtensions
     // (value, error, completion) through it before it reaches downstream subscribers.
     public static IObservable<T> ObserveOnApp<T>(this IObservable<T> source, IApplication app) =>
         Observable.Create<T>(observer => source.Subscribe(
-            value => app.Invoke(() => observer.OnNext(value)),
-            ex => app.Invoke(() => observer.OnError(ex)),
-            () => app.Invoke(() => observer.OnCompleted())));
+            ov => app.Invoke(ov, observer.OnNext),
+            ex => app.Invoke(ex, observer.OnError),
+            () => app.Invoke(observer.OnCompleted)));
 }

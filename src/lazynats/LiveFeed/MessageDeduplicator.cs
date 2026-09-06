@@ -9,7 +9,9 @@ namespace lazynats.LiveFeed;
 // wrapped subject - notifications are serialized, so no locking is needed here.
 internal sealed class MessageDeduplicator(TimeSpan window)
 {
-    private readonly Dictionary<ulong, (DateTimeOffset Timestamp, Guid SubscriptionId)> _lastSeen = new();
+    private record struct MessageTrace(DateTimeOffset Timestamp, Guid SubscriptionId);
+
+    private readonly Dictionary<ulong, MessageTrace> _lastSeen = new();
 
     // A message is a duplicate only if the *same* key was already seen, within the window, from
     // a *different* subscription - see dedup-subscription-freeze/design.md. The stored canonical
@@ -20,12 +22,13 @@ internal sealed class MessageDeduplicator(TimeSpan window)
     {
         var key = ComputeKey(envelope.Message);
         var now = envelope.ReceivedAt;
-        var isDuplicate = _lastSeen.TryGetValue(key, out var canonical)
-                        && now - canonical.Timestamp <= window
-                        && envelope.SubscriptionId != canonical.SubscriptionId;
+        var isDuplicate = 
+            _lastSeen.TryGetValue(key, out var canonical) && 
+            now - canonical.Timestamp <= window && 
+            envelope.SubscriptionId != canonical.SubscriptionId;
 
         if (!isDuplicate)
-            _lastSeen[key] = (now, envelope.SubscriptionId);
+            _lastSeen[key] = new MessageTrace(now, envelope.SubscriptionId);
 
         Prune(now);
         return isDuplicate;
@@ -34,13 +37,15 @@ internal sealed class MessageDeduplicator(TimeSpan window)
     private void Prune(DateTimeOffset now)
     {
         List<ulong>? expired = null;
+        
         foreach (var (key, canonical) in _lastSeen)
             if (now - canonical.Timestamp > window)
                 (expired ??= []).Add(key);
 
         if (expired is null) return;
 
-        foreach (var key in expired) _lastSeen.Remove(key);
+        foreach (var key in expired) 
+            _lastSeen.Remove(key);
     }
 
     // Subject + headers + payload only. ReceivedAt is excluded - it never matches core NATS's
