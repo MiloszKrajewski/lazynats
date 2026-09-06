@@ -67,10 +67,12 @@ internal abstract class DrillableListView<T>: View, IShortcutSource
 
     // Re-fetched contents from a Ctrl+R (or the initial load) replace _items wholesale; the
     // previously-highlighted item stays highlighted if it's still present (by GetIdentity),
-    // otherwise the first item is selected - per "Identity-Preserving Replace".
-    public void ReplaceItems(IReadOnlyList<T> items)
+    // otherwise the first item is selected - per "Identity-Preserving Replace". `selectIdentity`
+    // overrides that fallback (e.g. after a create, to highlight the newly added item instead of
+    // whatever was selected before it existed).
+    public void ReplaceItems(IReadOnlyList<T> items, string? selectIdentity = null)
     {
-        var currentIdentity = SelectedItem is { } current ? GetIdentity(current) : null;
+        var currentIdentity = selectIdentity ?? (SelectedItem is { } current ? GetIdentity(current) : null);
 
         _items.Clear();
         foreach (var item in items) _items.Add(item);

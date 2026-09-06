@@ -52,6 +52,7 @@ internal sealed class StreamsTab: View
         _listView.RefreshRequested += () => _ = RefreshListAsync();
         _listView.HighlightChanged += OnStreamHighlightChanged;
         _listView.DescendRequested += Descend;
+        _listView.CreateRequested += () => OpenCreateStreamDialog(null);
 
         _consumerListView = new ConsumerListView(_consumerItems) { Background = Theme.EditableBackground };
         _consumerListFrame = new EditFrame(_consumerListView) {
@@ -150,12 +151,42 @@ internal sealed class StreamsTab: View
         _listView.SetFocus();
     }
 
-    private async Task RefreshListAsync()
+    // Always runs on the UI thread - either directly from the Ctrl+N key command (already on the
+    // UI thread) or via the App.Invoke below, reached from TryCreateStreamAsync's continuation
+    // after an await. Terminal.Gui has no SynchronizationContext (see AsyncExtensions.cs), so that
+    // continuation resumes on an arbitrary thread pool thread; App!.Run(dialog) is a blocking
+    // modal pump that has to run on the UI thread, same as every other Ctrl+N/E/D dialog in the
+    // app already does from inside a main-loop-driven callback - nesting it inside an App.Invoke
+    // callback is no different.
+    private void OpenCreateStreamDialog(NewStreamOptions? seed)
+    {
+        var dialog = new CreateStreamDialog(seed);
+        App!.Run(dialog);
+        if (dialog.Result is { } options) _ = TryCreateStreamAsync(options);
+    }
+
+    private async Task TryCreateStreamAsync(NewStreamOptions options)
+    {
+        try {
+            await _jetStream.CreateStreamAsync(options.ToStreamConfig());
+            _ = RefreshListAsync(options.Name);
+        } catch (Exception ex) {
+            App?.Invoke(() => {
+                MessageBox.ErrorQuery(App!, "Create Stream Failed", ex.Message, "_Ok");
+                OpenCreateStreamDialog(options);
+            });
+        }
+    }
+
+    // `selectName` highlights a specific stream after the refresh (used right after a create, so
+    // the new stream is selected instead of ReplaceItems' default "keep whatever was highlighted
+    // before" fallback) - null for a plain Ctrl+R/initial-load refresh.
+    private async Task RefreshListAsync(string? selectName = null)
     {
         try {
             var streams = new List<StreamInfo>();
             await foreach (var stream in _jetStream.ListStreamsAsync()) streams.Add(stream.Info);
-            App?.Invoke(() => _listView.ReplaceItems(streams));
+            App?.Invoke(() => _listView.ReplaceItems(streams, selectName));
         } catch (Exception ex) {
             // Keep whatever the list previously showed rather than clearing it on a transient
             // error - per the "poll or refresh error" decision in design.md.
