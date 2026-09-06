@@ -1,4 +1,3 @@
-using System.Threading.Channels;
 using lazynats.LiveFeed;
 using NATS.Client.Core;
 
@@ -11,15 +10,15 @@ internal sealed record SubscriptionInfo(Guid Id, string Pattern);
 internal sealed class SubscriptionRegistry
 {
     private readonly NatsConnection _connection;
-    private readonly ChannelWriter<FeedEnvelope> _writer;
+    private readonly IObserver<FeedEnvelope> _sink;
     private readonly Dictionary<Guid, (string Pattern, CancellationTokenSource Cts)> _subscriptions = new();
 
     public event Action? Changed;
 
-    public SubscriptionRegistry(NatsConnection connection, ChannelWriter<FeedEnvelope> writer)
+    public SubscriptionRegistry(NatsConnection connection, IObserver<FeedEnvelope> sink)
     {
         _connection = connection;
-        _writer = writer;
+        _sink = sink;
     }
 
     public IReadOnlyList<SubscriptionInfo> Active =>
@@ -52,7 +51,7 @@ internal sealed class SubscriptionRegistry
             await foreach (var message in subscription)
             {
                 var envelope = new FeedEnvelope(DateTimeOffset.UtcNow, id, message);
-                await _writer.WriteAsync(envelope, cancellationToken);
+                _sink.OnNext(envelope);
             }
         }
         catch (OperationCanceledException)

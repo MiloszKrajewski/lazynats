@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+﻿using System.Reactive.Subjects;
 using lazynats;
 using lazynats.LiveFeed;
 using lazynats.Subscriptions;
@@ -13,8 +13,12 @@ using Attribute = Terminal.Gui.Drawing.Attribute;
 var connection = new NatsConnection(new NatsOpts { Url = "nats://localhost:4222" });
 await connection.ConnectAsync();
 
-var channel = Channel.CreateUnbounded<FeedEnvelope>();
-var registry = new SubscriptionRegistry(connection, channel.Writer);
+// Synchronize() is load-bearing: SubscriptionRegistry runs one task per active subscription, all
+// calling OnNext concurrently, and a raw Subject<T> isn't safe under concurrent OnNext. Only ever
+// register this synchronized instance below (never the raw Subject type) so producers/consumers
+// can't accidentally bypass the serialization.
+var feed = Subject.Synchronize(new Subject<FeedEnvelope>());
+var registry = new SubscriptionRegistry(connection, feed);
 var jetStream = connection.CreateJetStreamContext();
 
 // Application.Create() must run before Services.Configure() - ShortcutTracker needs a live
@@ -28,7 +32,8 @@ var services = new ServiceCollection();
 services.AddSingleton(connection);
 services.AddSingleton(registry);
 services.AddSingleton(jetStream);
-services.AddSingleton(channel.Reader);
+services.AddSingleton<IObserver<FeedEnvelope>>(feed);
+services.AddSingleton<IObservable<FeedEnvelope>>(feed);
 services.AddSingleton(new MessageDeduplicator(TimeSpan.FromMilliseconds(50)));
 services.AddSingleton<IApplication>(app);
 services.AddSingleton(new ShortcutTracker(app));

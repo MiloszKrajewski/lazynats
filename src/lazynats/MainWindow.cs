@@ -1,5 +1,4 @@
-﻿using System.Threading.Channels;
-using lazynats.LiveFeed;
+﻿using lazynats.LiveFeed;
 using lazynats.Streams;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +23,7 @@ internal sealed class MainWindow: Runnable
         var registry = Services.Root.GetRequiredService<SubscriptionRegistry>();
         var connection = Services.Root.GetRequiredService<NatsConnection>();
         var jetStream = Services.Root.GetRequiredService<INatsJSContext>();
-        var feedReader = Services.Root.GetRequiredService<ChannelReader<FeedEnvelope>>();
+        var feed = Services.Root.GetRequiredService<IObservable<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
         _shortcutTracker = Services.Root.GetRequiredService<ShortcutTracker>();
 
@@ -35,7 +34,7 @@ internal sealed class MainWindow: Runnable
         tabs.Add(subscribeTab, publishTab, streamsTab);
         tabs.Value = subscribeTab;
 
-        var liveUpdates = new LiveUpdatesView(feedReader, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
+        var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         liveUpdates.ItemSelected += envelope => MessageBox.Query(App!, "Selected", envelope.Message.Subject, "_Ok");
 
         // Dim.Fill(1) leaves the bottom row free for the StatusBar, which sits outside this frame.

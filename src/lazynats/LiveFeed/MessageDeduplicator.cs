@@ -4,8 +4,9 @@ using NATS.Client.Core;
 
 namespace lazynats.LiveFeed;
 
-// Window size is a starting guess pending real traffic (see design.md). Only ever
-// called from the single FeedReaderLoop that owns it, so no locking is needed.
+// Window size is a starting guess pending real traffic (see design.md). Only ever called from
+// the Where() predicate of the live feed's Rx chain, which runs against a Subject.Synchronize()-
+// wrapped subject - notifications are serialized, so no locking is needed here.
 internal sealed class MessageDeduplicator(TimeSpan window)
 {
     private readonly Dictionary<ulong, DateTimeOffset> _lastSeen = new();

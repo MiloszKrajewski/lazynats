@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
-using System.Threading.Channels;
+using System.Reactive.Linq;
+using lazynats.Core;
 using lazynats.LiveFeed;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -9,14 +10,19 @@ namespace lazynats;
 
 internal sealed class LiveUpdatesView: View
 {
+    private static readonly TimeSpan BufferWindow = TimeSpan.FromMilliseconds(25);
+
     private readonly ObservableCollection<FeedEnvelope> _events = [];
     private readonly LiveLogDataSource _dataSource;
     private readonly ListView _listView;
-    private readonly CancellationTokenSource _cts = new();
+    private IDisposable? _subscription;
 
     public event Action<FeedEnvelope>? ItemSelected;
 
-    public LiveUpdatesView(ChannelReader<FeedEnvelope> feed, MessageDeduplicator dedup)
+    // App resolves via the SuperView chain, so it's unavailable during the constructor (this
+    // view has no SuperView yet - it's added to feedFrame/MainWindow afterward). Wiring the Rx
+    // chain here instead, once Initialized fires, guarantees App is live.
+    public LiveUpdatesView(IObservable<FeedEnvelope> feed, MessageDeduplicator dedup)
     {
         CanFocus = true;
 
@@ -31,16 +37,19 @@ internal sealed class LiveUpdatesView: View
         AddCommand(Command.DeleteAll, () => { Clear(); return true; });
         KeyBindings.Add(Key.C, Command.DeleteAll);
 
-        var loop = new FeedReaderLoop(feed, dedup, OnBatch);
-        _ = loop.RunAsync(_cts.Token);
+        Initialized += (_, _) => {
+            _subscription = feed
+                .Where(envelope => !dedup.IsDuplicate(envelope))
+                .Buffer(BufferWindow)
+                .Where(batch => batch.Count > 0)
+                .ObserveOnApp(App!)
+                .Subscribe(batch => {
+                    foreach (var envelope in batch) OnEvent(envelope);
+                });
+        };
     }
 
     public void Clear() => _events.Clear();
-
-    private void OnBatch(IReadOnlyList<FeedEnvelope> batch) =>
-        App?.Invoke(() => {
-            foreach (var envelope in batch) OnEvent(envelope);
-        });
 
     private void OnEvent(FeedEnvelope envelope)
     {
@@ -61,8 +70,7 @@ internal sealed class LiveUpdatesView: View
     protected override void Dispose(bool disposing)
     {
         if (disposing) {
-            _cts.Cancel();
-            _cts.Dispose();
+            _subscription?.Dispose();
             _dataSource.Dispose();
         }
         base.Dispose(disposing);
