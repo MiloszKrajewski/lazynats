@@ -66,9 +66,10 @@ selected pair from the list below it. No mouse-only affordances (no decorative o
 buttons) for this.
 
 The Send button is disabled whenever the current entry is invalid (e.g. empty subject), with
-invalid fields flagged visually (e.g. red text/icon) rather than via a popup. Sending reports
-success/failure inline in the dialog and keeps the form filled in without closing the dialog, so
-the same message can be tweaked and resent. Cancel (or Esc) closes the dialog without sending.
+invalid fields flagged visually (e.g. red text/icon) rather than via a popup. A successful send
+closes the dialog. A failed send reports the error inline and keeps the form filled in without
+closing the dialog, so the message can be fixed and resent. Cancel (or Esc) closes the dialog
+without sending.
 
 Initially payload as text only (enables JSON and UTF8), but loading a binary file might be
 considered later.

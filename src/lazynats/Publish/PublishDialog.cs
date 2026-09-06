@@ -12,9 +12,10 @@ namespace lazynats.Publish;
 // Modal counterpart to the old PublishTab (see openspec/changes/publish-dialog/design.md):
 // composing/sending one message is a one-off action, not a standing view, so it now lives behind
 // Alt+P instead of its own permanent tab. Unlike every Dialog<T> elsewhere in this codebase, this
-// is a plain Dialog - Send is meant to be pressed repeatedly without closing (so the same message
-// can be tweaked and resent), and nothing outside the dialog needs the composed message as a
-// value; the dialog publishes it directly via its injected NatsConnection, same as PublishTab did.
+// is a plain Dialog - nothing outside the dialog needs the composed message as a value; the
+// dialog publishes it directly via its injected NatsConnection, same as PublishTab did. A
+// successful Send closes the dialog (RequestStop in PublishAsync's success branch); a failed one
+// leaves it open with the error in the status label so the message can be fixed and resent.
 internal sealed class PublishDialog: Dialog
 {
     private static readonly Attribute InvalidSubject = new(ColorName16.Red, Theme.EditableBackground);
@@ -130,7 +131,7 @@ internal sealed class PublishDialog: Dialog
     {
         try {
             await _connection.PublishAsync(subject, payload, headers: headers);
-            App?.Invoke(() => _statusLabel.Text = $"Published to {subject}");
+            App?.Invoke(RequestStop);
         } catch (Exception ex) {
             App?.Invoke(() => _statusLabel.Text = $"Publish failed: {ex.Message}");
         }

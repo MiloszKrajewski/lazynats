@@ -149,20 +149,19 @@ connection.
 - **THEN** a NATS message is published on subject `orders.created` carrying the `tenant: acme-co`
   header and the UTF-8 encoded payload `{"id":42}`
 
-### Requirement: Send Feedback and Form Retention
-The system SHALL report the outcome of a Send (success or failure) via a status message inline in
-the Publish dialog, and SHALL NOT clear the Subject, Headers, or Payload fields after a Send, so
-the same message can be edited and resent without closing the dialog.
+### Requirement: Send Feedback and Close-on-Success
+The system SHALL close the Publish dialog automatically when a Send succeeds. When a Send fails,
+the system SHALL report the failure via a status message inline in the Publish dialog and SHALL
+NOT clear or close the dialog, so the message can be corrected and resent.
 
-#### Scenario: Successful send reports status and keeps the form filled
+#### Scenario: Successful send closes the dialog
 - **WHEN** a message is sent successfully
-- **THEN** the Publish dialog shows an inline message reporting the successful publish, and the
-  Subject, Headers, and Payload fields remain populated with the values that were just sent
+- **THEN** the Publish dialog closes, the same as activating Cancel
 
 #### Scenario: Failed send reports status and keeps the form filled
 - **WHEN** a send attempt fails (e.g. connection error)
-- **THEN** the Publish dialog shows an inline message reporting the failure, and the Subject,
-  Headers, and Payload fields remain populated as entered, so the user can retry
+- **THEN** the Publish dialog remains open, shows an inline message reporting the failure, and the
+  Subject, Headers, and Payload fields remain populated as entered, so the user can retry
 
 ### Requirement: Framed Field Presentation
 The Publish dialog's Subject field, Payload field, and header editor SHALL each be presented
