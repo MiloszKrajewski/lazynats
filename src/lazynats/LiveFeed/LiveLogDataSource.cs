@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using Terminal.Gui.Views;
+using Attribute = Terminal.Gui.Drawing.Attribute;
 
 namespace lazynats.LiveFeed;
 
@@ -39,11 +40,33 @@ internal sealed class LiveLogDataSource: IListDataSource
 
     public void Render(ListView listView, bool selected, int item, int col, int row, int width, int viewportX)
     {
-        var text = FeedRowFormatter.Format(_items[item]);
+        var (text, subjectStart, subjectLength) = FeedRowFormatter.Format(_items[item]);
         var visible = viewportX < text.Length ? text[viewportX..] : string.Empty;
         if (visible.Length > width) visible = visible[..width];
+
         listView.Move(col, row);
-        listView.AddStr(visible.PadRight(width));
+
+        // Intersect the subject's text-space range with the visible window (already sliced
+        // above) to split `visible` into up to three segments - only the middle one, if
+        // non-empty, gets the subject color. Coordinates below are relative to `visible`.
+        var subjectVisibleStart = Math.Max(subjectStart, viewportX) - viewportX;
+        var subjectVisibleEnd = Math.Min(subjectStart + subjectLength, viewportX + visible.Length) - viewportX;
+
+        if (subjectVisibleStart < subjectVisibleEnd) {
+            listView.AddStr(visible[..subjectVisibleStart]);
+
+            // Live feed's "Row Subject Text Is Colored" requirement: color only the subject
+            // segment, composed with whatever attribute (normal or selected) ListView already
+            // set for this row, so the highlight survives selection instead of assuming Normal.
+            var prior = listView.GetCurrentAttribute();
+            listView.SetAttribute(new Attribute(Theme.SubjectColor, prior.Background));
+            listView.AddStr(visible[subjectVisibleStart..subjectVisibleEnd]);
+            listView.SetAttribute(prior);
+
+            listView.AddStr(visible[subjectVisibleEnd..].PadRight(width - subjectVisibleEnd));
+        } else {
+            listView.AddStr(visible.PadRight(width));
+        }
     }
 
     public void Dispose() => _items.CollectionChanged -= OnCollectionChanged;

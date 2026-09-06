@@ -2,19 +2,27 @@ using lazynats.Payloads;
 
 namespace lazynats.LiveFeed;
 
+// SubjectStart/SubjectLength locate the subject segment within Text, so a renderer can
+// highlight it without re-parsing the row - see live-feed's "Row Subject Text Is Colored"
+// requirement.
+internal readonly record struct FeedRow(string Text, int SubjectStart, int SubjectLength);
+
 internal static class FeedRowFormatter
 {
     private const int MaxPayloadBodyLength = 1024;
 
-    public static string Format(FeedEnvelope envelope)
+    public static FeedRow Format(FeedEnvelope envelope)
     {
         var message = envelope.Message;
+        var timestampText = $"{envelope.ReceivedAt:HH:mm:ss.fff}";
         var headerText = message.Headers is { Count: > 0 } headers
             ? string.Join(' ', headers.Select(kv => $"{kv.Key}={kv.Value}"))
             : string.Empty;
         var payloadText = RenderPayload(envelope);
 
-        return $"{envelope.ReceivedAt:HH:mm:ss.fff}  {message.Subject}  {headerText}  {payloadText}";
+        var subjectStart = timestampText.Length + 2;
+        var text = $"{timestampText}  {message.Subject}  {headerText}  {payloadText}";
+        return new FeedRow(text, subjectStart, message.Subject.Length);
     }
 
     // Classification and rendering are cached on the envelope, computed at most once - and only on

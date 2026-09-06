@@ -22,6 +22,11 @@ internal static class Theme
     public static readonly Color LiveFeedFollowingColor = new(ColorName16.BrightGreen);
     public static readonly Color LiveFeedStickyColor = new(ColorName16.BrightYellow);
 
+    // Shared with MessageDetailDialog's read-only Subject field and the live feed row's subject
+    // segment - a message's subject identifies it and reads first, so it's picked out from
+    // surrounding text with this color everywhere it's shown.
+    public static readonly Color SubjectColor = new(ColorName16.Cyan);
+
     private static readonly Attribute EditableAttribute = new(ColorName16.White, EditableBackground);
 
     // Dimmed foreground, same EditableBackground - explicit rather than left to derive from

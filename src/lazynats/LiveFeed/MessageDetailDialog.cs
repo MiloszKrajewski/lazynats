@@ -112,7 +112,7 @@ internal sealed class MessageDetailDialog: Dialog, IShortcutSource
         var subjectFrame = WrapText(message.Subject, subjectY, subjectFrameHeight, out var subjectView);
         // Subject reads first and identifies the message - cyan foreground picks it out from the
         // plain white Headers/Payload text below, both still on the same editable-grey background.
-        subjectView.SetScheme(new Scheme(new Attribute(ColorName16.Cyan, Theme.EditableBackground)));
+        subjectView.SetScheme(new Scheme(new Attribute(Theme.SubjectColor, Theme.EditableBackground)));
 
         var headersLabel = new Label { Text = "Headers", X = 0, Y = headersLabelY };
         var headerFrame = WrapText(headersText, headerFrameY, headerFrameHeight, out _);
