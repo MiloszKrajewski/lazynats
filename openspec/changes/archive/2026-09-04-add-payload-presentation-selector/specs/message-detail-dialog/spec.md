@@ -1,33 +1,4 @@
-# message-detail-dialog Specification
-
-## Purpose
-
-Provide a read-only dialog that presents a single message's full subject, headers, and payload,
-so a user can inspect a message's complete content rather than only the truncated text visible in
-a Live Feed row. The payload's classification from the `payload-content-probe` capability picks a
-default presentation value, and a presentation selector (per the `payload-presentation`
-capability) lets the user switch among the presentation values valid for that payload
-(`Json`/`Text`/`Hex`/`Base64`) without leaving the dialog.
-
-## Requirements
-
-### Requirement: Message Detail Dialog Shows Subject, Headers, and Payload
-The system SHALL provide a read-only dialog that displays a message's subject, its headers, and
-its payload, so a user can inspect a full message rather than only the truncated text visible in
-a feed row.
-
-#### Scenario: Dialog shows the message subject
-- **WHEN** the Message Detail dialog is opened for a message
-- **THEN** the dialog displays that message's subject
-
-#### Scenario: Dialog shows each header
-- **WHEN** the Message Detail dialog is opened for a message that has one or more headers
-- **THEN** the dialog displays each header's key and value
-
-#### Scenario: Dialog shows an explicit empty state when there are no headers
-- **WHEN** the Message Detail dialog is opened for a message with no headers
-- **THEN** the dialog displays an explicit indication that the message has no headers, rather
-  than an empty or missing headers section
+## MODIFIED Requirements
 
 ### Requirement: Payload Rendered According to a Selectable Presentation Value
 The system SHALL classify the message's payload using the payload-content-probe capability to
@@ -65,6 +36,8 @@ presentation value is currently selected.
 - **WHEN** the user selects a presentation value whose rendering exceeds the payload section's
   visible height, whether or not the previously selected value also exceeded it
 - **THEN** the user can scroll to reach the remaining content
+
+## ADDED Requirements
 
 ### Requirement: Payload Presentation Is Selectable, Limited to Valid Values
 The system SHALL provide a control in the Message Detail dialog's payload section that lets the
@@ -132,20 +105,3 @@ SHALL NOT modify the underlying message, its subject, its headers, or its raw pa
 #### Scenario: Changing presentation does not alter the message
 - **WHEN** the user changes the presentation selector's value
 - **THEN** the message's subject, headers, and underlying payload bytes are unchanged
-
-### Requirement: Dialog Is Read-Only
-The system SHALL NOT allow editing, copying-out, or re-sending the message from within the
-Message Detail dialog; it exists solely to display the message's content.
-
-#### Scenario: Dialog content cannot be edited
-- **WHEN** the Message Detail dialog is open and focused
-- **THEN** no action within the dialog modifies the underlying message content, and no send/edit
-  affordance is offered
-
-### Requirement: Escape Closes the Dialog
-The system SHALL close the Message Detail dialog when the user presses `Esc`, with no confirmation
-step, consistent with other read-only/cancel-only dialogs in the application.
-
-#### Scenario: Esc closes the dialog
-- **WHEN** the Message Detail dialog is open and the user presses `Esc`
-- **THEN** the dialog closes immediately
