@@ -40,33 +40,49 @@ internal sealed class LiveLogDataSource: IListDataSource
 
     public void Render(ListView listView, bool selected, int item, int col, int row, int width, int viewportX)
     {
-        var (text, subjectStart, subjectLength) = FeedRowFormatter.Format(_items[item]);
-        var visible = viewportX < text.Length ? text[viewportX..] : string.Empty;
-        if (visible.Length > width) visible = visible[..width];
+        var segments = FeedRowFormatter.Format(_items[item]).Segments;
+        var viewportEnd = viewportX + width;
 
         listView.Move(col, row);
 
-        // Intersect the subject's text-space range with the visible window (already sliced
-        // above) to split `visible` into up to three segments - only the middle one, if
-        // non-empty, gets the subject color. Coordinates below are relative to `visible`.
-        var subjectVisibleStart = Math.Max(subjectStart, viewportX) - viewportX;
-        var subjectVisibleEnd = Math.Min(subjectStart + subjectLength, viewportX + visible.Length) - viewportX;
+        // Walk segments in order, tracking a running cursor (position in the row's full,
+        // unclipped text) - each segment picks up exactly where the previous left off, so
+        // [cursor, cursor + segment.Text.Length) is its text-space range. Intersect that with
+        // the visible window and slice/draw only the intersected portion, under the segment's
+        // own color (capture-and-restore, doc/multi-color-rendering.md idiom 2) when set, or the
+        // attribute ListView already put in place for this row (normal or selected) when null -
+        // see live-feed's "Row Subject/Header Text Is Colored" and "Row Payload Type Prefix Is
+        // Colored" requirements.
+        var cursor = 0;
+        var written = 0;
+        foreach (var segment in segments)
+        {
+            var segmentStart = cursor;
+            var segmentEnd = cursor + segment.Text.Length;
+            cursor = segmentEnd;
 
-        if (subjectVisibleStart < subjectVisibleEnd) {
-            listView.AddStr(visible[..subjectVisibleStart]);
+            var visibleStart = Math.Max(segmentStart, viewportX);
+            var visibleEnd = Math.Min(segmentEnd, viewportEnd);
+            if (visibleStart >= visibleEnd) continue;
 
-            // Live feed's "Row Subject Text Is Colored" requirement: color only the subject
-            // segment, composed with whatever attribute (normal or selected) ListView already
-            // set for this row, so the highlight survives selection instead of assuming Normal.
-            var prior = listView.GetCurrentAttribute();
-            listView.SetAttribute(new Attribute(Theme.SubjectColor, prior.Background));
-            listView.AddStr(visible[subjectVisibleStart..subjectVisibleEnd]);
-            listView.SetAttribute(prior);
+            var slice = segment.Text.Substring(visibleStart - segmentStart, visibleEnd - visibleStart);
 
-            listView.AddStr(visible[subjectVisibleEnd..].PadRight(width - subjectVisibleEnd));
-        } else {
-            listView.AddStr(visible.PadRight(width));
+            if (segment.Color is { } color)
+            {
+                var prior = listView.GetCurrentAttribute();
+                listView.SetAttribute(new Attribute(color, prior.Background));
+                listView.AddStr(slice);
+                listView.SetAttribute(prior);
+            }
+            else
+            {
+                listView.AddStr(slice);
+            }
+
+            written += slice.Length;
         }
+
+        if (written < width) listView.AddStr(new string(' ', width - written));
     }
 
     public void Dispose() => _items.CollectionChanged -= OnCollectionChanged;

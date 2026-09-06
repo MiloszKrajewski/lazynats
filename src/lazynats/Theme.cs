@@ -27,6 +27,14 @@ internal static class Theme
     // surrounding text with this color everywhere it's shown.
     public static readonly Color SubjectColor = new(ColorName16.Cyan);
 
+    // Live feed row's header segment (openspec/changes/live-feed-multicolor-rendering) - CSS
+    // LimeGreen, distinct from SubjectColor so headers are scannable alongside the subject.
+    public static readonly Color HeaderColor = new(50, 205, 50);
+
+    // Live feed row's payload-type prefix ("(json) "/"(text) "/"(blob) "/"(empty)") - distinct
+    // from both SubjectColor and HeaderColor so the type indicator is scannable while skimming.
+    public static readonly Color PayloadTypeColor = new(ColorName16.White);
+
     private static readonly Attribute EditableAttribute = new(ColorName16.White, EditableBackground);
 
     // Dimmed foreground, same EditableBackground - explicit rather than left to derive from

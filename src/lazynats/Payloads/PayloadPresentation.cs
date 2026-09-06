@@ -38,12 +38,29 @@ internal static class PayloadPresentation
     // horizontal space and no line wrapping (a feed row), not the dialog's width-wrapped output.
     // `kind` is the payload's own PayloadContentProbe.Classify result (unlike Render/AllowedTypes,
     // there's no user-selectable type here - the row always renders under its classified kind).
-    // `maxLength` caps the body (post-prefix) only; the prefix is always shown in full.
-    public static string RenderSingleLine(byte[] data, PayloadContentKind kind, int maxLength) => kind switch
+    // `maxLength` caps the body only; the prefix (from SingleLinePrefix) is separate and always
+    // shown in full.
+    //
+    // Split from the prefix (SingleLinePrefix below) so callers can color/cache each piece
+    // independently: the body is the expensive part (JSON parse/minify, whitespace collapse,
+    // hex encoding) and is what gets cached per envelope; the prefix is a cheap literal lookup
+    // recomputed on every render - see live-feed-multicolor-rendering design.md.
+    public static string RenderSingleLineBody(byte[] data, PayloadContentKind kind, int maxLength) => kind switch
     {
-        PayloadContentKind.Json => "(json) " + Cap(RenderMinifiedJson(data), maxLength),
-        PayloadContentKind.Utf8Text => "(text) " + Cap(CollapseWhitespace(Encoding.UTF8.GetString(data)), maxLength),
-        PayloadContentKind.Binary => "(blob) " + RenderHexBudgeted(data, maxLength),
+        PayloadContentKind.Json => Cap(RenderMinifiedJson(data), maxLength),
+        PayloadContentKind.Utf8Text => Cap(CollapseWhitespace(Encoding.UTF8.GetString(data)), maxLength),
+        PayloadContentKind.Binary => RenderHexBudgeted(data, maxLength),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+    };
+
+    // The single-line mode's type-prefix literal, given the already-classified kind and whether
+    // the rendered body (from RenderSingleLineBody) came out empty. An empty Utf8Text body
+    // renders as the standalone "(empty)" indicator rather than "(text) " followed by nothing.
+    public static string SingleLinePrefix(PayloadContentKind kind, bool bodyEmpty) => kind switch
+    {
+        PayloadContentKind.Json => "(json) ",
+        PayloadContentKind.Utf8Text => bodyEmpty ? "(empty)" : "(text) ",
+        PayloadContentKind.Binary => "(blob) ",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 

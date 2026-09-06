@@ -13,5 +13,5 @@ internal sealed record FeedEnvelope(
     // classification/rendering cost scoped to what's actually scrolled into view rather than total
     // feed throughput. UI-thread-only, same as the rest of the render path - see FeedRowFormatter.
     public PayloadContentKind? CachedContentKind { get; set; }
-    public string? CachedRowText { get; set; }
+    public string? CachedPayloadBody { get; set; }
 }
