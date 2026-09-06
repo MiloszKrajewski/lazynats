@@ -53,16 +53,30 @@ exists today.
   and renders rows via `FeedRowFormatter`. `LiveLogDataSource` intentionally reports
   `MaxItemLength = 0` to avoid an O(n²) rescan on append — see the comment in that file before
   "fixing" it.
-- `MainWindow` hosts `ManagementTabs` (currently `SubscribeTab`/`PublishTab`, per `doc/UI.md`'s
-  full tab list) over the live feed, plus a `StatusBar`. Each tab's content is a
-  self-contained component that owns its own internal layout (labels, `EditFrame` wrapping,
-  sub-bands); `MainWindow` only resolves dependencies, constructs the tab, and registers it with
-  `ManagementTabs` — see `openspec/specs/tab-content-structure/spec.md`.
-- Two reusable pieces in `Components/` back that per-tab UI: `EditFrame` (a thin padded frame
-  around a single edit-capable child — see `doc/glyphs.md` for its border glyph/position naming)
-  and `ListEditorView<T>` (a presenter-formatted list with New/Edit/Delete, generalizing the
-  shape shared by `SubscriptionsView` and `PublishTab`'s header editor; row creation/edit is
-  delegated to abstract callbacks, row formatting to an injected `IValuePresenter<T>`).
+- `MainWindow` hosts `ManagementTabs` (`SubscribeTab`, `PublishTab`, `StreamsTab`, `KvTab`,
+  `ObjTab` — the full list in `doc/UI.md`) over the live feed, plus a `StatusBar`. Each tab's
+  content is a self-contained component (one per top-level folder: `Subscriptions/`, `Publish/`,
+  `Streams/`, `KVStore/`, `ObjStore/`) that owns its own internal layout (labels, `EditFrame`
+  wrapping, sub-bands); `MainWindow` only resolves dependencies, constructs the tab, and
+  registers it with `ManagementTabs` — see `openspec/specs/tab-content-structure/spec.md`.
+- `StreamsTab`/`KvTab`/`ObjTab` share the same LHS-list/RHS-details, drill-down shape (e.g.
+  stream → its consumers, KV bucket → its keys), built on two more `Components/` base classes:
+  `DrillableListView<T>` (list wiring, empty-hint, identity-preserving `ReplaceItems`, Ctrl+R
+  refresh — level-specific navigation like Enter-to-descend/Esc-to-ascend is left to each
+  subclass) and `PollingDetailsView<TTarget, TInfo>` (the RHS pane's active-gated poll-on-timer +
+  debounced fetch-on-target-change pipeline, built on Rx). A tab keeps both levels' views alive
+  simultaneously and toggles them via `Visible` rather than tearing down/rebuilding on
+  descend/ascend. See `openspec/specs/drillable-list/spec.md` and
+  `openspec/specs/polling-details/spec.md`; `nats-streams`/`nats-kv`/`nats-obj` specs cover each
+  tab's own behavior. Production KV buckets can be large, so detail-panel polling is scoped to
+  the single selected item, not the whole bucket — keep any new poll path O(1) in bucket size and
+  gate genuinely O(n) operations (e.g. listing all keys) behind an explicit user action instead.
+- Two more reusable pieces in `Components/` back the flatter, non-drilling per-tab UI:
+  `EditFrame` (a thin padded frame around a single edit-capable child — see `doc/glyphs.md` for
+  its border glyph/position naming) and `ListEditorView<T>` (a presenter-formatted list with
+  New/Edit/Delete, generalizing the shape shared by `SubscriptionsView` and `PublishTab`'s header
+  editor; row creation/edit is delegated to abstract callbacks, row formatting to an injected
+  `IValuePresenter<T>`).
 - Status-bar shortcuts are discovered, not hardcoded: a view opts in via `IShortcutSource`,
   `ShortcutAggregator` walks the focused-view ancestor chain collecting hints, and
   `ShortcutTracker` (`ShortcutAggregator.cs`) recomputes them on every focus change (or on
