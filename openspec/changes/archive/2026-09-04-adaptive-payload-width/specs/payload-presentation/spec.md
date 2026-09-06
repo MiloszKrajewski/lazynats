@@ -1,64 +1,4 @@
-# payload-presentation Specification
-
-## Purpose
-
-Define, in terms of the existing `PayloadType` enum (`Json`, `Text`, `Base64`, `Hex`, already
-defined by `payload-types` for the outbound compose/validate/encode path), which presentation
-values are valid for rendering a received payload given its probed `PayloadContentKind`
-classification (from `payload-content-probe`), which value is the default, and how to render
-payload bytes as display text under a selected value. This is the display-side counterpart to
-`payload-types`' compose/validate/encode: it reuses the same enum rather than duplicating it, and
-is consumed by `message-detail-dialog`'s presentation selector.
-
-## Requirements
-
-### Requirement: Presentation Reuses the Existing Payload Type Set
-The system SHALL express a payload's display presentation using the same four-value `PayloadType`
-set already defined by `payload-types` (`Json`, `Text`, `Base64`, `Hex`), rather than defining a
-second, separate set of presentation values — this capability is the display-side counterpart to
-`payload-types`' compose/validate/encode, reusing its type rather than duplicating it.
-
-#### Scenario: Presentation values are the existing PayloadType values
-- **WHEN** a payload's available or selected presentation is referred to
-- **THEN** it is one of the same four `PayloadType` values used for composing an outbound payload
-  — `Json`, `Text`, `Base64`, or `Hex` — not a distinct type
-
-### Requirement: Presentation Availability Is Derived From Content Classification
-The system SHALL determine which `PayloadType` values are valid for rendering a given payload from
-its `PayloadContentKind` classification (as produced by `payload-content-probe`): a payload
-classified `Json` SHALL allow `Json`, `Text`, `Hex`, and `Base64`; a payload classified `Utf8Text`
-SHALL allow `Text`, `Hex`, and `Base64` but not `Json`; a payload classified `Binary` SHALL allow
-only `Hex` and `Base64`.
-
-#### Scenario: Json-classified payload allows all four values
-- **WHEN** a payload's content classification is `Json`
-- **THEN** its valid presentation values are `Json`, `Text`, `Hex`, and `Base64`
-
-#### Scenario: Utf8Text-classified payload excludes Json
-- **WHEN** a payload's content classification is `Utf8Text`
-- **THEN** its valid presentation values are `Text`, `Hex`, and `Base64`, and `Json` is not among
-  them
-
-#### Scenario: Binary-classified payload allows only Hex and Base64
-- **WHEN** a payload's content classification is `Binary`
-- **THEN** its valid presentation values are exactly `Hex` and `Base64`
-
-### Requirement: Default Presentation Matches Content Classification
-The system SHALL select a default presentation value from a payload's content classification:
-`Json` classification defaults to `Json`, `Utf8Text` classification defaults to `Text`, `Binary`
-classification defaults to `Hex`.
-
-#### Scenario: Json payload defaults to Json presentation
-- **WHEN** a payload's content classification is `Json`
-- **THEN** its default presentation value is `Json`
-
-#### Scenario: Utf8Text payload defaults to Text presentation
-- **WHEN** a payload's content classification is `Utf8Text`
-- **THEN** its default presentation value is `Text`
-
-#### Scenario: Binary payload defaults to Hex presentation
-- **WHEN** a payload's content classification is `Binary`
-- **THEN** its default presentation value is `Hex`
+## MODIFIED Requirements
 
 ### Requirement: Payload Bytes Render According to a Selected Presentation Value
 The system SHALL render payload bytes as display text according to a selected `PayloadType`
@@ -97,6 +37,8 @@ render already-received bytes for display).
   interpretation of them, wrapped into lines sized to fit that width per the Base64 Line Width
   requirement
 
+## ADDED Requirements
+
 ### Requirement: Hex Row Width Adapts To The Available Width
 The system SHALL compute the number of bytes shown per `Hex` row from the available width,
 selecting the largest candidate from the fixed set `8, 16, 24, 32, 48, 64` bytes whose formatted
@@ -131,14 +73,3 @@ of 144 characters per line.
 - **WHEN** the available width is narrower than 24 characters
 - **THEN** the `Base64` presentation still wraps lines at 24 characters, the minimum, rather than a
   narrower value
-
-### Requirement: Rendering Under an Invalid Value Is Not a Supported Operation
-The system SHALL NOT be required to produce a meaningful rendering when asked to render payload
-bytes under a presentation value not in that payload's valid set (e.g. rendering non-JSON bytes
-under the `Json` value) — callers are responsible for only offering and requesting values from the
-payload's valid set, per the availability requirement above.
-
-#### Scenario: Callers only request valid values
-- **WHEN** a caller renders payload bytes for display
-- **THEN** it selects the presentation value from that payload's valid set (as derived from its
-  content classification), never a value outside that set

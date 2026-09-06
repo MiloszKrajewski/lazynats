@@ -41,6 +41,18 @@ internal sealed class MessageDetailDialog: Dialog, IShortcutSource
     // Wide enough for "Base64" (the longest option) plus the dropdown's own button glyph.
     private const int PresentationDropDownWidth = 10;
 
+    // Reserved unconditionally from the payload label's measured width (see the
+    // _payloadLabelWidth comment below) - whether the vertical scrollbar actually ends up shown
+    // depends on the rendered line count, which itself depends on this same width, so there's no
+    // non-circular way to reserve it only when needed. Wasting columns when no scrollbar appears
+    // is preferable to overflowing under one when it does.
+    private const int ScrollbarWidth = 1;
+
+    // A blank column between the rendered content and the (reserved-for) scrollbar - without it,
+    // content runs right up to the scrollbar's own column with no breathing room, which reads as
+    // crowded even though nothing is actually clipped or overlapping.
+    private const int ScrollbarGap = 1;
+
     private readonly byte[] _payloadData;
     private readonly PayloadType[] _allowedPresentationTypes;
     private readonly Label _payloadView;
@@ -55,6 +67,12 @@ internal sealed class MessageDetailDialog: Dialog, IShortcutSource
     // Fixed at construction from the default type's line count (design.md Decision 4) - switching
     // presentation never resizes the frame, only what fits inside it before scrolling kicks in.
     private readonly int _payloadVisibleLines;
+
+    // The payload Label's resolved available width, computed once from its own EditFrame after the
+    // dialog's initial layout and reused for every Hex/Base64 render for the dialog's lifetime -
+    // never recomputed on a later terminal resize. See
+    // openspec/changes/adaptive-payload-width/design.md Decision 2.
+    private readonly int _payloadLabelWidth;
 
     public MessageDetailDialog(FeedEnvelope envelope)
     {
@@ -80,11 +98,6 @@ internal sealed class MessageDetailDialog: Dialog, IShortcutSource
         _allowedPresentationTypes = hasPayload ? PayloadPresentation.AllowedTypes(contentKind) : [];
         var defaultType = hasPayload ? PayloadPresentation.DefaultType(contentKind) : default;
 
-        var payloadText = hasPayload ? PayloadPresentation.Render(_payloadData, defaultType) : "(empty payload)";
-        var payloadLineCount = CountLines(payloadText);
-        _payloadVisibleLines = Math.Min(payloadLineCount, MaxPayloadVisibleLines);
-        var payloadFrameHeight = _payloadVisibleLines + 2;
-
         const int subjectY = 1;
         const int subjectFrameHeight = 3;
         var headersLabelY = subjectY + subjectFrameHeight;
@@ -101,10 +114,35 @@ internal sealed class MessageDetailDialog: Dialog, IShortcutSource
         var headersLabel = new Label { Text = "Headers", X = 0, Y = headersLabelY };
         var headerFrame = WrapText(headersText, headerFrameY, headerFrameHeight, out _);
 
+        // Placeholder content/height - the payload EditFrame's actual text and height depend on
+        // its own resolved width (Hex/Base64 sizing), which isn't known until this dialog's
+        // subtree has gone through an initial layout pass, just below.
         var payloadLabel = new Label { Text = "Payload", X = 0, Y = payloadLabelY };
-        var payloadFrame = WrapText(payloadText, payloadFrameY, payloadFrameHeight, out _payloadView);
+        var payloadFrame = WrapText(string.Empty, payloadFrameY, MaxPayloadVisibleLines + 2, out _payloadView);
 
         Add(subjectLabel, subjectFrame, headersLabel, headerFrame, payloadLabel, payloadFrame);
+
+        // Forces an immediate layout pass so the payload Label's Viewport - and therefore its
+        // resolved available width - is known synchronously, without waiting for this dialog's
+        // eventual app.Run to render it. Safe to call before app.Run: the Dialog's own Width is a
+        // self-contained Dim.Func over app.Screen.Width, with no SuperView dependency.
+        Layout();
+        // Measured before RefreshPayloadScrollState (below) ever turns the vertical scrollbar on,
+        // so the raw Viewport.Width here doesn't yet reflect the column that scrollbar will claim
+        // once the payload turns out taller than MaxPayloadVisibleLines - hence the unconditional
+        // ScrollbarWidth reservation, not just an artifact of measurement order. ScrollbarGap is
+        // reserved on top of that so content doesn't sit flush against the scrollbar column.
+        _payloadLabelWidth = _payloadView.Viewport.Width - ScrollbarWidth - ScrollbarGap;
+
+        var payloadText = hasPayload
+            ? PayloadPresentation.Render(_payloadData, defaultType, _payloadLabelWidth)
+            : "(empty payload)";
+        var payloadLineCount = CountLines(payloadText);
+        _payloadVisibleLines = Math.Min(payloadLineCount, MaxPayloadVisibleLines);
+        var payloadFrameHeight = _payloadVisibleLines + 2;
+
+        _payloadView.Text = payloadText;
+        payloadFrame.Height = payloadFrameHeight;
 
         // Bound once, unconditionally - KeyBindings.Add throws if the same key/command pair is
         // added twice, so this can't be re-run from RefreshPayloadScrollState on every
@@ -238,7 +276,7 @@ internal sealed class MessageDetailDialog: Dialog, IShortcutSource
     {
         if (newValue is null) return;
         var type = Enum.Parse<PayloadType>(newValue);
-        var text = PayloadPresentation.Render(_payloadData, type);
+        var text = PayloadPresentation.Render(_payloadData, type, _payloadLabelWidth);
         _payloadView.Text = text;
         RefreshPayloadScrollState(CountLines(text));
 
