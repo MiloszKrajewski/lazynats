@@ -25,13 +25,10 @@ internal sealed class ObjectListView: DrillableListView<string>
         EnableCreate();
         EnableDelete();
 
+        // Command.Save is unused elsewhere on this view - repurposed here for Ctrl+S download,
+        // which stays list-bound (out of scope for tab-scoped-list-shortcuts, unlike Ctrl+F below).
         AddCommand(Command.Save, () => { DownloadRequested?.Invoke(); return true; });
         KeyBindings.Add(Key.S.WithCtrl, Command.Save);
-
-        // Command.Open is unused elsewhere on this view - repurposed here the same way
-        // Command.Save is repurposed above for Ctrl+S download.
-        AddCommand(Command.Open, () => { FilterRequested?.Invoke(); return true; });
-        KeyBindings.Add(Key.F.WithCtrl, Command.Open);
     }
 
     protected override IValuePresenter<string> Presenter => PresenterInstance;
@@ -41,7 +38,8 @@ internal sealed class ObjectListView: DrillableListView<string>
     public string? SelectedObject => SelectedItem;
 
     public override IEnumerable<ShortcutHint> Shortcuts =>
-        base.Shortcuts
-            .Append(new ShortcutHint(Key.S.WithCtrl, "Download", () => DownloadRequested?.Invoke()))
-            .Append(new ShortcutHint(Key.F.WithCtrl, "Filter", () => FilterRequested?.Invoke()));
+        base.Shortcuts.Append(new ShortcutHint(Key.S.WithCtrl, "Download", () => DownloadRequested?.Invoke()));
+
+    public override IEnumerable<ShortcutHint> TabOperations =>
+        base.TabOperations.Append(new ShortcutHint(Key.F.WithCtrl, "Filter", () => FilterRequested?.Invoke()));
 }

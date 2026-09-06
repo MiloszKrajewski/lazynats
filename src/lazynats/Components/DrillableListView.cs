@@ -21,7 +21,7 @@ namespace lazynats.Components;
 // render: identical to `_items` when no FilterBox is attached or its field is empty, otherwise the
 // subset matching the search query - see openspec/changes/add-drillable-list-search/design.md
 // Decision 2.
-internal abstract class DrillableListView<T>: View, IShortcutSource, IFilterable
+internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperationsSource, IFilterable
 {
     private readonly ObservableCollection<T> _items;
     private readonly ObservableCollection<T> _filtered;
@@ -71,7 +71,6 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, IFilterable
         UpdateEmptyHintScheme();
 
         AddCommand(Command.Refresh, () => { RefreshRequested?.Invoke(); return true; });
-        KeyBindings.Add(Key.R.WithCtrl, Command.Refresh);
 
         Add(_listView, _emptyHintLabel);
         _items.CollectionChanged += (_, _) => UpdateEmptyHintVisibility();
@@ -122,7 +121,6 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, IFilterable
         _listView.KeyBindings.Remove(Key.N.WithCtrl);
 
         AddCommand(Command.New, () => { CreateRequested?.Invoke(); return true; });
-        KeyBindings.Add(Key.N.WithCtrl, Command.New);
     }
 
     // Ctrl+D -> DeleteRequested, plus a "Delete" Shortcuts hint. Independent of EnableCreate.
@@ -131,7 +129,6 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, IFilterable
         _deleteEnabled = true;
 
         AddCommand(Command.DeleteAll, () => { DeleteRequested?.Invoke(); return true; });
-        KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
     }
 
     // Ctrl+E -> EditRequested, plus an "Edit" Shortcuts hint. Independent of EnableCreate/EnableDelete.
@@ -140,7 +137,6 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, IFilterable
         _editEnabled = true;
 
         AddCommand(Command.Edit, () => { EditRequested?.Invoke(); return true; });
-        KeyBindings.Add(Key.E.WithCtrl, Command.Edit);
     }
 
     // Links an externally-created, externally-positioned FilterBox to this list, so "/" focuses it
@@ -330,20 +326,34 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, IFilterable
         UpdateEmptyHintScheme();
     }
 
-    // Ctrl+R plus whatever hints the enabled shared shapes (EnableAscend/EnableCreate/
-    // EnableDelete/EnableEdit/AttachFilterBox) imply - a subclass with its own navigation commands
-    // beyond those shapes still appends to this via `base.Shortcuts.Append(...)` rather than
-    // replacing it.
+    // Back/Search - the two operations that stay genuinely list-owned once tab-scoped-list-shortcuts
+    // moves Refresh/New/Delete/Edit up to the owning tab (see TabOperations below). A subclass with
+    // its own list-local navigation commands beyond these still appends to this via
+    // `base.Shortcuts.Append(...)` rather than replacing it.
     public virtual IEnumerable<ShortcutHint> Shortcuts
     {
         get
         {
-            IEnumerable<ShortcutHint> hints = [new(Key.R.WithCtrl, "Refresh", () => RefreshRequested?.Invoke())];
+            IEnumerable<ShortcutHint> hints = [];
             if (_ascendEnabled) hints = hints.Append(new ShortcutHint(Key.Esc, "Back", () => AscendRequested?.Invoke()));
+            if (_filterBox is { } box) hints = hints.Append(new ShortcutHint(new Key('/'), "Search", box.Focus));
+            return hints;
+        }
+    }
+
+    // Refresh/New/Delete/Edit - whatever the enabled shared shapes (EnableCreate/EnableDelete/
+    // EnableEdit) imply, for the owning tab to bind Ctrl+R/N/D/E to and dispatch through (see
+    // openspec/specs/tab-scoped-list-shortcuts/spec.md). A subclass with its own tab-dispatched
+    // operation beyond these shapes (e.g. KeyListView/ObjectListView's Ctrl+F) still appends to
+    // this via `base.TabOperations.Append(...)` rather than replacing it.
+    public virtual IEnumerable<ShortcutHint> TabOperations
+    {
+        get
+        {
+            IEnumerable<ShortcutHint> hints = [new(Key.R.WithCtrl, "Refresh", () => RefreshRequested?.Invoke())];
             if (_createEnabled) hints = hints.Append(new ShortcutHint(Key.N.WithCtrl, "New", () => CreateRequested?.Invoke()));
             if (_deleteEnabled) hints = hints.Append(new ShortcutHint(Key.D.WithCtrl, "Delete", () => DeleteRequested?.Invoke()));
             if (_editEnabled) hints = hints.Append(new ShortcutHint(Key.E.WithCtrl, "Edit", () => EditRequested?.Invoke()));
-            if (_filterBox is { } box) hints = hints.Append(new ShortcutHint(new Key('/'), "Search", box.Focus));
             return hints;
         }
     }

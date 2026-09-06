@@ -6,6 +6,7 @@ using lazynats.Core;
 using lazynats.Subscriptions;
 using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -17,7 +18,7 @@ namespace lazynats.Values;
 // between BucketListView/KeyListView - see StreamsTab, which this deliberately mirrors).
 // _currentBucket is null at the bucket level, and holds the drilled-into bucket's name at the key
 // level.
-internal sealed class ValuesTab: View
+internal sealed class ValuesTab: View, IShortcutSource
 {
     // A filtered fetch stops once this many matches are collected, regardless of how many more an
     // over-approximated native filter (e.g. one collapsing to `>`) could still return from a huge
@@ -112,7 +113,36 @@ internal sealed class ValuesTab: View
         // separately skips FilterBox for the tab's *default* focus target, so entering/returning
         // to this tab still lands on the list, not the search field, despite that order.
         Add(_listLabel, _bucketFilterBox, _bucketListFrame, _keyFilterBox, _keyListFrame, _detailsLabel, _details, _keyDetails);
+
+        SetShortcutSource(_listView);
     }
+
+    // Whichever list is currently the visible/active one - the bucket list at the top level, the
+    // key list once drilled in. Updated alongside every other piece of level-toggling state in
+    // Descend/Ascend, not computed from _currentBucket - see openspec/specs/tab-scoped-list-shortcuts/
+    // spec.md. Backs both OnKeyDownNotHandled and Shortcuts below, so dispatch and advertisement read
+    // the same list and can't drift apart.
+    private ITabOperationsSource _shortcutSource = null!;
+
+    private void SetShortcutSource(ITabOperationsSource source) => _shortcutSource = source;
+
+    // No KeyBindings/AddCommand for Ctrl+R/N/D/E/F here - that would hardcode which keys this tab
+    // forwards. Instead this fires once Terminal.Gui has already tried the focused view (and its own
+    // ancestors, including whichever list is focused) and found no handler, at which point it's
+    // this tab's turn; whatever key the currently active list's own TabOperations happens to expose
+    // is what gets dispatched, so a list is free to add a new operation without this tab needing to
+    // know about it in advance.
+    protected override bool OnKeyDownNotHandled(Key key)
+    {
+        if (_shortcutSource.TabOperations.FirstOrDefault(h => h.Key == key) is { Action: { } action }) {
+            action();
+            return true;
+        }
+
+        return base.OnKeyDownNotHandled(key);
+    }
+
+    public IEnumerable<ShortcutHint> Shortcuts => _shortcutSource.TabOperations;
 
     // "Selected tab" in this app is focus-driven (doc/terminal-gui-howto.md: "The focused SubView
     // is the selected (front-most) tab") - so this fires exactly on tab entry/exit, which is what
@@ -177,6 +207,7 @@ internal sealed class ValuesTab: View
 
         _details.SetActive(false);
         _keyDetails.SetActive(HasFocus);
+        SetShortcutSource(_keyListView);
 
         _keyListView.SetFocus();
         _ = RefreshKeyListAsync();
@@ -201,6 +232,7 @@ internal sealed class ValuesTab: View
 
         _keyDetails.SetActive(false);
         _details.SetActive(HasFocus);
+        SetShortcutSource(_listView);
 
         _listView.SetFocus();
     }

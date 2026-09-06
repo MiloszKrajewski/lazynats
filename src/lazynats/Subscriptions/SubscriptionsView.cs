@@ -16,7 +16,7 @@ internal sealed class SubscriptionsView: ListEditorView<SubscriptionInfo>
     private SubscriptionsView(
         SubscriptionRegistry registry,
         ObservableCollection<SubscriptionInfo> items):
-        base(items, Presenter)
+        base(items, Presenter, bindSharedKeys: false)
     {
         _registry = registry;
         _items = items;

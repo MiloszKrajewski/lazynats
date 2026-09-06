@@ -5,6 +5,7 @@ using lazynats.Subscriptions;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Client.ObjectStore;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -16,7 +17,7 @@ namespace lazynats.Objects;
 // between BucketListView/ObjectListView - see ValuesTab, which this deliberately mirrors).
 // _currentBucket is null at the bucket level, and holds the drilled-into bucket's name at the
 // object level.
-internal sealed class ObjectsTab: View
+internal sealed class ObjectsTab: View, IShortcutSource
 {
     private readonly INatsJSContext _jetStream;
     private readonly INatsObjContext _obj;
@@ -103,7 +104,38 @@ internal sealed class ObjectsTab: View
         // separately skips FilterBox for the tab's *default* focus target, so entering/returning
         // to this tab still lands on the list, not the search field, despite that order.
         Add(_listLabel, _bucketFilterBox, _bucketListFrame, _objectFilterBox, _objectListFrame, _detailsLabel, _details, _objectDetails);
+
+        SetShortcutSource(_listView);
     }
+
+    // Whichever list is currently the visible/active one - the bucket list at the top level, the
+    // object list once drilled in. Updated alongside every other piece of level-toggling state in
+    // Descend/Ascend, not computed from _currentBucket - see openspec/specs/tab-scoped-list-shortcuts/
+    // spec.md. Backs both OnKeyDownNotHandled and Shortcuts below, so dispatch and advertisement read
+    // the same list and can't drift apart.
+    private ITabOperationsSource _shortcutSource = null!;
+
+    private void SetShortcutSource(ITabOperationsSource source) => _shortcutSource = source;
+
+    // No KeyBindings/AddCommand for Ctrl+R/N/D/E/F here - that would hardcode which keys this tab
+    // forwards. Instead this fires once Terminal.Gui has already tried the focused view (and its own
+    // ancestors, including whichever list is focused) and found no handler, at which point it's
+    // this tab's turn; whatever key the currently active list's own TabOperations happens to expose
+    // is what gets dispatched, so a list is free to add a new operation without this tab needing to
+    // know about it in advance. E.g. at the object level, ObjectListView's TabOperations has no
+    // Ctrl+E entry (no Edit wiring), so Ctrl+E there simply falls through unhandled, even though the
+    // bucket level's TabOperations does include one.
+    protected override bool OnKeyDownNotHandled(Key key)
+    {
+        if (_shortcutSource.TabOperations.FirstOrDefault(h => h.Key == key) is { Action: { } action }) {
+            action();
+            return true;
+        }
+
+        return base.OnKeyDownNotHandled(key);
+    }
+
+    public IEnumerable<ShortcutHint> Shortcuts => _shortcutSource.TabOperations;
 
     // "Selected tab" in this app is focus-driven (doc/terminal-gui-howto.md: "The focused SubView
     // is the selected (front-most) tab") - so this fires exactly on tab entry/exit, which is what
@@ -171,6 +203,7 @@ internal sealed class ObjectsTab: View
 
         _details.SetActive(false);
         _objectDetails.SetActive(HasFocus);
+        SetShortcutSource(_objectListView);
 
         _objectListView.SetFocus();
         _ = RefreshObjectListAsync();
@@ -194,6 +227,7 @@ internal sealed class ObjectsTab: View
 
         _objectDetails.SetActive(false);
         _details.SetActive(HasFocus);
+        SetShortcutSource(_listView);
 
         _listView.SetFocus();
     }

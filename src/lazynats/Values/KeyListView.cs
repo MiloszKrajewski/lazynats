@@ -21,11 +21,6 @@ internal sealed class KeyListView: DrillableListView<string>
         EnableCreate();
         EnableDelete();
         EnableEdit();
-
-        // Command.Open is unused elsewhere on this view - repurposed here the same way
-        // ObjectListView repurposes Command.Save for its own Ctrl+S download binding.
-        AddCommand(Command.Open, () => { FilterRequested?.Invoke(); return true; });
-        KeyBindings.Add(Key.F.WithCtrl, Command.Open);
     }
 
     protected override IValuePresenter<string> Presenter => PresenterInstance;
@@ -34,6 +29,6 @@ internal sealed class KeyListView: DrillableListView<string>
 
     public string? SelectedKey => SelectedItem;
 
-    public override IEnumerable<ShortcutHint> Shortcuts =>
-        base.Shortcuts.Append(new ShortcutHint(Key.F.WithCtrl, "Filter", () => FilterRequested?.Invoke()));
+    public override IEnumerable<ShortcutHint> TabOperations =>
+        base.TabOperations.Append(new ShortcutHint(Key.F.WithCtrl, "Filter", () => FilterRequested?.Invoke()));
 }

@@ -17,17 +17,23 @@ namespace lazynats.Components;
 // mutates the item collection directly) so a subclass whose true source of truth lives elsewhere
 // (e.g. SubscriptionsView redirecting into a NATS subscription registry) can commit there instead,
 // without the base class also mutating the item collection on its behalf.
-internal abstract class ListEditorView<T>: View, IShortcutSource
+internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperationsSource
 {
     private readonly ObservableCollection<T> _items;
     private readonly PresenterListDataSource<T> _dataSource;
     private readonly ListView _listView;
     private readonly Label _emptyHintLabel;
+    private readonly bool _bindSharedKeys;
 
-    public ListEditorView(ObservableCollection<T> items, IValuePresenter<T> presenter)
+    // `bindSharedKeys` defaults true for standalone/modal usage (e.g. HeaderEditorView inside
+    // PublishDialog), where there is no owning tab to hoist Ctrl+N/E/D up to. A tab-hosted instance
+    // (e.g. SubscriptionsView inside SubscribeTab) passes false and exposes TabOperations instead -
+    // see openspec/specs/tab-scoped-list-shortcuts/spec.md.
+    public ListEditorView(ObservableCollection<T> items, IValuePresenter<T> presenter, bool bindSharedKeys = true)
     {
         CanFocus = true;
         _items = items;
+        _bindSharedKeys = bindSharedKeys;
 
         _dataSource = new PresenterListDataSource<T>(_items, presenter);
         _listView = new ListView { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
@@ -47,13 +53,17 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         UpdateEmptyHintScheme();
 
         // Bound here (on the whole component), not on the list, so Ctrl+N/E/D work no matter
-        // which child currently has focus - same rationale as PublishDialog's header editor.
+        // which child currently has focus - same rationale as PublishDialog's header editor. Only
+        // when bindSharedKeys is true (standalone/modal usage); a tab-hosted instance leaves these
+        // unbound and exposes TabOperations instead for its owning tab to bind/dispatch.
         AddCommand(Command.New, TryCreateItem);
         AddCommand(Command.Edit, TryEditItem);
         AddCommand(Command.DeleteAll, TryDeleteItem);
-        KeyBindings.Add(Key.N.WithCtrl, Command.New);
-        KeyBindings.Add(Key.E.WithCtrl, Command.Edit);
-        KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
+        if (_bindSharedKeys) {
+            KeyBindings.Add(Key.N.WithCtrl, Command.New);
+            KeyBindings.Add(Key.E.WithCtrl, Command.Edit);
+            KeyBindings.Add(Key.D.WithCtrl, Command.DeleteAll);
+        }
 
         Add(_listView, _emptyHintLabel);
         _items.CollectionChanged += OnItemsChanged;
@@ -185,7 +195,19 @@ internal abstract class ListEditorView<T>: View, IShortcutSource
         Delete(index);
     }
 
-    public virtual IEnumerable<ShortcutHint> Shortcuts => [
+    // Only meaningful when bindSharedKeys is true - a tab-hosted instance's New/Edit/Delete hints
+    // move to TabOperations below, for the owning tab to advertise instead (otherwise the same
+    // three hints would be collected twice - once here, once from the tab).
+    public virtual IEnumerable<ShortcutHint> Shortcuts =>
+        _bindSharedKeys
+            ? [
+                new(Key.N.WithCtrl, "New", TryCreateItem),
+                new(Key.E.WithCtrl, "Edit", TryEditItem),
+                new(Key.D.WithCtrl, "Delete", TryDeleteItem),
+            ]
+            : [];
+
+    public virtual IEnumerable<ShortcutHint> TabOperations => [
         new(Key.N.WithCtrl, "New", TryCreateItem),
         new(Key.E.WithCtrl, "Edit", TryEditItem),
         new(Key.D.WithCtrl, "Delete", TryDeleteItem),
