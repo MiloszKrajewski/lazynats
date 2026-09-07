@@ -32,7 +32,7 @@ internal sealed class ObjectListView: DrillableListView<string>
     }
 
     protected override IValuePresenter<string> Presenter => PresenterInstance;
-    protected override string EmptyHintText => "No objects — R to refresh";
+    protected override string EmptyHintText => "No objects - N to add one, R to refresh";
     protected override string GetIdentity(string item) => item;
     protected override string FilterDialogTitle => "Filter Objects";
 

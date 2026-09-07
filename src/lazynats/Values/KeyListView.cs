@@ -21,7 +21,7 @@ internal sealed class KeyListView: DrillableListView<string>
     }
 
     protected override IValuePresenter<string> Presenter => PresenterInstance;
-    protected override string EmptyHintText => "No keys — R to refresh";
+    protected override string EmptyHintText => "No keys - N to add one, R to refresh";
     protected override string GetIdentity(string item) => item;
     protected override string FilterDialogTitle => "Filter Keys";
 
