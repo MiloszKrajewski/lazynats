@@ -201,7 +201,60 @@ class Program: NukeBuild
 			}
 		});
 
+	void PublishLinuxViaDocker(
+		Project project, AbsolutePath publishDirectory, string rid, string platform, string archSuffix)
+	{
+		var builderImage = $"lazynats-release-linux-{archSuffix}-builder";
+		publishDirectory.CreateOrCleanDirectory();
+
+		try
+		{
+			DockerBuild(s => s
+				.SetProcessWorkingDirectory(RootDirectory)
+				.SetPath(RootDirectory)
+				.SetFile(DockerDirectory / "release-linux-x64.dockerfile")
+				.SetPlatform(platform)
+				.AddTag(builderImage)
+				.EnableQuiet());
+
+			var projectPath = RootDirectory.GetUnixRelativePathTo(project.Path);
+			DockerRun(s => s
+				.SetProcessWorkingDirectory(RootDirectory)
+				.SetImage(builderImage)
+				.SetPlatform(platform)
+				.EnableRm()
+				.SetVolume($"{RootDirectory}:/repo", $"{publishDirectory}:/out")
+				.SetWorkdir("/repo")
+				.SetCommand("dotnet")
+				.SetArgs(
+					"publish", $"/repo/{projectPath}",
+					"--configuration", Configuration.Release,
+					"--runtime", rid,
+					"--self-contained",
+					"-p:PublishAot=true",
+					"--output", "/out"));
+		}
+		catch (Exception ex) when (
+			ex.Message.Contains("exec format error", StringComparison.OrdinalIgnoreCase) ||
+			ex.Message.Contains("no match for platform", StringComparison.OrdinalIgnoreCase) ||
+			ex.Message.Contains("no matching manifest", StringComparison.OrdinalIgnoreCase))
+		{
+			throw new NotSupportedException(
+				$"Docker cannot run '{platform}' containers on this host: emulation is not " +
+				"registered. Install/enable QEMU user-mode emulation for Docker, e.g. " +
+				"`docker run --privileged --rm tonistiigi/binfmt --install arm64`, or use Docker " +
+				"Desktop, which registers it automatically.", ex);
+		}
+
+		RemoveDebugSymbols(publishDirectory);
+
+		var zipName = $"{project.Name}-{PackageVersion}-linux-{archSuffix}.zip";
+		Log.Information("Compressing {ZipName}...", zipName);
+		CompressToFresh(publishDirectory, OutputDirectory / zipName);
+	}
+
 	Target ReleaseWindowsX64 => _ => _
+		.After(Release)
 		.DependsOn(Restore)
 		.Executes(() =>
 		{
@@ -228,57 +281,29 @@ class Program: NukeBuild
 		});
 
 	Target ReleaseLinuxX64 => _ => _
+		.After(Release)
 		.DependsOn(Restore)
 		.Executes(() =>
 		{
 			var project = Projects(IsApplication).Single();
-			var builderImage = "lazynats-release-linux-x64-builder";
-			var publishDirectory = OutputDirectory / $"{project.Name}-linux-x64";
-			publishDirectory.CreateOrCleanDirectory();
-
-			DockerBuild(s => s
-				.SetProcessWorkingDirectory(RootDirectory)
-				.SetPath(RootDirectory)
-				.SetFile(DockerDirectory / "release-linux-x64.dockerfile")
-				.AddTag(builderImage)
-				.EnableQuiet());
-
-			var projectPath = RootDirectory.GetUnixRelativePathTo(project.Path);
-			DockerRun(s => s
-				.SetProcessWorkingDirectory(RootDirectory)
-				.SetImage(builderImage)
-				.EnableRm()
-				.SetVolume($"{RootDirectory}:/repo", $"{publishDirectory}:/out")
-				.SetWorkdir("/repo")
-				.SetCommand("dotnet")
-				.SetArgs(
-					"publish", $"/repo/{projectPath}",
-					"--configuration", Configuration.Release,
-					"--runtime", "linux-x64",
-					"--self-contained",
-					"-p:PublishAot=true",
-					"--output", "/out"));
-			RemoveDebugSymbols(publishDirectory);
-
-			var zipName = $"{project.Name}-{PackageVersion}-linux-x64.zip";
-			Log.Information("Compressing {ZipName}...", zipName);
-			CompressToFresh(publishDirectory, OutputDirectory / zipName);
+			PublishLinuxViaDocker(
+				project, OutputDirectory / $"{project.Name}-linux-x64",
+				rid: "linux-x64", platform: "linux/amd64", archSuffix: "x64");
 		});
 
 	Target ReleaseLinuxArm64 => _ => _
+		.After(Release)
+		.DependsOn(Restore)
 		.Executes(() =>
 		{
-			// Two possible future implementations, neither wired up yet:
-			// (1) a QEMU-emulated `docker run --platform linux/arm64` container, mirroring
-			//     release-linux-x64 but under emulation; or
-			// (2) a portable clang/binutils-aarch64/sysroot cross-toolchain run natively.
-			throw new NotSupportedException(
-				"release-linux-arm64 is not implemented yet: it needs either a QEMU-emulated " +
-				"linux/arm64 build container or a clang/binutils-aarch64/sysroot cross-toolchain, " +
-				"neither of which exists in this pipeline yet.");
+			var project = Projects(IsApplication).Single();
+			PublishLinuxViaDocker(
+				project, OutputDirectory / $"{project.Name}-linux-arm64",
+				rid: "linux-arm64", platform: "linux/arm64", archSuffix: "arm64");
 		});
 
 	Target ReleaseMacosArm64 => _ => _
+		.After(Release)
 		.Executes(() =>
 		{
 			// Native AOT for macOS can only be produced on macOS hardware - there is no

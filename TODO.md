@@ -2,5 +2,8 @@
 
 - `v` for value stores
 - wrap to value stores quick peek (live feed more then `v`)
-- text for stores says `r` for refresh which is too limited, maybe just `?`
-- cross complation for linux-arm64
+- green headers in message view
+- `0` for live feed
+- wrap "failed to connect" (no nats, bad auth, etc) into user facing message (no stack trace)
+- ? shows shortcuts as well (with ---)
+- relax subscription filters (he*lo>ld)

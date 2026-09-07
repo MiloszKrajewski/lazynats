@@ -1,55 +1,4 @@
-# platform-release-builds Specification
-
-## Purpose
-Defines the Nuke build targets that produce release artifacts for `lazynats`: the
-framework-dependent default `Release` build, plus OS/arch-specific native-AOT release archives
-(Windows x64, Linux x64 via Docker, Linux arm64 via emulated Docker) and an explicit placeholder
-target for the combination not yet supported (macOS arm64), each following the
-`lazynats-<version>-<system>-<arch>.zip` naming convention in `.output/`.
-
-## Requirements
-
-### Requirement: Framework-dependent Release build
-The `Release` target SHALL publish `lazynats` as a framework-dependent, non-self-contained build
-(no forced Native AOT), producing `lazynats-<version>.zip` in `.output/`.
-
-#### Scenario: Release runs without a RID or AOT
-- **WHEN** the `Release` target is executed
-- **THEN** the published output is framework-dependent (requires a matching .NET runtime to run,
-  is not self-contained, and is not a Native AOT binary)
-- **AND** the zip artifact is named `lazynats-<version>.zip`
-
-### Requirement: Windows x64 native release archive
-A `release-windows-x64` target SHALL produce a self-contained, Native AOT `win-x64` build of
-`lazynats`, zipped as `lazynats-<version>-windows-x64.zip` in `.output/`, and SHALL only run on a
-Windows host.
-
-#### Scenario: Building on Windows
-- **WHEN** `release-windows-x64` is executed on a Windows host
-- **THEN** `lazynats` is published self-contained for `win-x64` with Native AOT enabled
-- **AND** the result is zipped to `.output/lazynats-<version>-windows-x64.zip`
-
-#### Scenario: Attempted on a non-Windows host
-- **WHEN** `release-windows-x64` is executed on a non-Windows host
-- **THEN** the target fails immediately with a message explaining that Windows AOT builds require
-  a Windows host
-- **AND** no partial or incorrect artifact is produced
-
-### Requirement: Linux x64 native release archive via Docker
-A `release-linux-x64` target SHALL produce a self-contained, Native AOT `linux-x64` build of
-`lazynats` by running the publish inside a Docker container (so it does not require a Linux
-host), zipped as `lazynats-<version>-linux-x64.zip` in `.output/`.
-
-#### Scenario: Building from any host with Docker available
-- **WHEN** `release-linux-x64` is executed on a host with Docker running
-- **THEN** a Linux build container (.NET SDK plus the Native AOT Linux prerequisites) publishes
-  `lazynats` self-contained for `linux-x64` with Native AOT enabled
-- **AND** the result is zipped to `.output/lazynats-<version>-linux-x64.zip` on the host
-
-#### Scenario: Docker unavailable
-- **WHEN** `release-linux-x64` is executed and Docker is not running or not installed
-- **THEN** the target fails outright with Docker's own error surfaced, rather than silently
-  skipping or producing a partial artifact
+## ADDED Requirements
 
 ### Requirement: Linux arm64 native release archive via emulated Docker
 A `release-linux-arm64` target SHALL produce a self-contained, Native AOT `linux-arm64` build of
@@ -73,6 +22,8 @@ does not require an arm64 host), zipped as `lazynats-<version>-linux-arm64.zip` 
   `linux/arm64` emulation registered (no QEMU/binfmt support for arm64)
 - **THEN** the target fails with a message explaining that `linux/arm64` emulation is required
   and how to register it, rather than surfacing Docker's raw exec-format error
+
+## MODIFIED Requirements
 
 ### Requirement: Explicit placeholders for unsupported platforms
 `release-macos-arm64` SHALL exist and be discoverable as a build target, and SHALL fail
