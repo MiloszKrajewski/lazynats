@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using NuGet.Versioning;
 using Nuke.Common;
 using Nuke.Common.ChangeLog;
@@ -53,6 +54,7 @@ class Program: NukeBuild
 	static readonly AbsolutePath DockerDirectory = RootDirectory / "docker";
 
 	AbsolutePath PackageArtifactsPattern => OutputDirectory / $"*.{PackageVersion}.nupkg";
+	AbsolutePath PlatformArtifactsPattern => OutputDirectory / $"*-{PackageVersion}-*.zip";
 
 	readonly ReleaseNotes[] ReleaseNotes = ChangelogTasks
 		.ReadReleaseNotes(RootDirectory / "CHANGES.md")
@@ -78,6 +80,15 @@ class Program: NukeBuild
 		where !NukeDirectory.Contains(p)
 		where predicate is null || predicate(p)
 		select p;
+
+	static bool HostMatchesRid(string rid) => rid switch
+	{
+		"win-x64" => OperatingSystem.IsWindows() && RuntimeInformation.OSArchitecture == Architecture.X64,
+		"linux-x64" => OperatingSystem.IsLinux() && RuntimeInformation.OSArchitecture == Architecture.X64,
+		"linux-arm64" => OperatingSystem.IsLinux() && RuntimeInformation.OSArchitecture == Architecture.Arm64,
+		"osx-arm64" => OperatingSystem.IsMacOS() && RuntimeInformation.OSArchitecture == Architecture.Arm64,
+		_ => throw new ArgumentOutOfRangeException(nameof(rid), rid, "Unknown RID"),
+	};
 
 	static void RemoveDebugSymbols(AbsolutePath publishDirectory) =>
 		publishDirectory.GlobFiles("*.pdb", "*.dbg").ForEach(f => File.Delete(f));
@@ -254,6 +265,24 @@ class Program: NukeBuild
 		CompressToFresh(publishDirectory, OutputDirectory / zipName);
 	}
 
+	void PublishNative(Project project, string rid, string archSuffix)
+	{
+		var publishDirectory = OutputDirectory / $"{project.Name}-{archSuffix}";
+
+		DotNetPublish(s => s
+			.SetProject(project.Path)
+			.SetConfiguration(Configuration.Release)
+			.SetRuntime(rid)
+			.EnableSelfContained()
+			.SetProperty("PublishAot", true)
+			.SetOutput(publishDirectory));
+		RemoveDebugSymbols(publishDirectory);
+
+		var zipName = $"{project.Name}-{PackageVersion}-{archSuffix}.zip";
+		Log.Information("Compressing {ZipName}...", zipName);
+		CompressToFresh(publishDirectory, OutputDirectory / zipName);
+	}
+
 	Target ReleaseWindowsX64 => _ => _
 		.After(Release)
 		.DependsOn(Restore)
@@ -265,20 +294,7 @@ class Program: NukeBuild
 					"cross-compilation story from Linux or macOS.");
 
 			var project = Projects(IsApplication).Single();
-			var publishDirectory = OutputDirectory / $"{project.Name}-win-x64";
-
-			DotNetPublish(s => s
-				.SetProject(project.Path)
-				.SetConfiguration(Configuration.Release)
-				.SetRuntime("win-x64")
-				.EnableSelfContained()
-				.SetProperty("PublishAot", true)
-				.SetOutput(publishDirectory));
-			RemoveDebugSymbols(publishDirectory);
-
-			var zipName = $"{project.Name}-{PackageVersion}-windows-x64.zip";
-			Log.Information("Compressing {ZipName}...", zipName);
-			CompressToFresh(publishDirectory, OutputDirectory / zipName);
+			PublishNative(project, rid: "win-x64", archSuffix: "windows-x64");
 		});
 
 	Target ReleaseLinuxX64 => _ => _
@@ -287,9 +303,12 @@ class Program: NukeBuild
 		.Executes(() =>
 		{
 			var project = Projects(IsApplication).Single();
-			PublishLinuxViaDocker(
-				project, OutputDirectory / $"{project.Name}-linux-x64",
-				rid: "linux-x64", platform: "linux/amd64", archSuffix: "x64");
+			if (HostMatchesRid("linux-x64"))
+				PublishNative(project, rid: "linux-x64", archSuffix: "linux-x64");
+			else
+				PublishLinuxViaDocker(
+					project, OutputDirectory / $"{project.Name}-linux-x64",
+					rid: "linux-x64", platform: "linux/amd64", archSuffix: "x64");
 		});
 
 	Target ReleaseLinuxArm64 => _ => _
@@ -298,20 +317,28 @@ class Program: NukeBuild
 		.Executes(() =>
 		{
 			var project = Projects(IsApplication).Single();
-			PublishLinuxViaDocker(
-				project, OutputDirectory / $"{project.Name}-linux-arm64",
-				rid: "linux-arm64", platform: "linux/arm64", archSuffix: "arm64");
+			if (HostMatchesRid("linux-arm64"))
+				PublishNative(project, rid: "linux-arm64", archSuffix: "linux-arm64");
+			else
+				PublishLinuxViaDocker(
+					project, OutputDirectory / $"{project.Name}-linux-arm64",
+					rid: "linux-arm64", platform: "linux/arm64", archSuffix: "arm64");
 		});
 
 	Target ReleaseMacosArm64 => _ => _
 		.After(Release)
+		.DependsOn(Restore)
 		.Executes(() =>
 		{
 			// Native AOT for macOS can only be produced on macOS hardware - there is no
 			// cross-compile or container-based path from Windows/Linux.
-			throw new NotSupportedException(
-				"release-macos-arm64 is not implemented: a macOS Native AOT build requires an " +
-				"actual macOS build host, which is not available to this pipeline.");
+			if (!HostMatchesRid("osx-arm64"))
+				throw new NotSupportedException(
+					"release-macos-arm64 is not implemented: a macOS Native AOT build requires an " +
+					"actual macOS build host, which is not available to this pipeline.");
+
+			var project = Projects(IsApplication).Single();
+			PublishNative(project, rid: "osx-arm64", archSuffix: "macos-arm64");
 		});
 
 	Target VerifyArtifacts => _ => _
@@ -320,6 +347,14 @@ class Program: NukeBuild
 		{
 			if (!PackageArtifactsPattern.GlobFiles().Any())
 				throw new FileNotFoundException($"No artifacts found for {PackageArtifactsPattern}");
+		});
+
+	Target VerifyPlatformArtifacts => _ => _
+		.After(ReleaseWindowsX64).After(ReleaseLinuxX64).After(ReleaseLinuxArm64).After(ReleaseMacosArm64)
+		.Executes(() =>
+		{
+			if (!PlatformArtifactsPattern.GlobFiles().Any())
+				throw new FileNotFoundException($"No artifacts found for {PlatformArtifactsPattern}");
 		});
 
 	Target PublishToNuget => _ => _
@@ -342,11 +377,11 @@ class Program: NukeBuild
 		.After(ReleaseLinuxX64)
 		.After(ReleaseLinuxArm64)
 		.After(ReleaseMacosArm64)
-		.DependsOn(VerifyArtifacts)
+		.DependsOn(VerifyPlatformArtifacts)
 		.Executes(async () =>
 		{
 			var token = GetGitHubApiKey();
-			var artifacts = PackageArtifactsPattern.GlobFiles().ToArray();
+			var artifacts = PlatformArtifactsPattern.GlobFiles().ToArray();
 			var api = new GitHubApi(token);
 			await api.Release(
 				PackageVersion,

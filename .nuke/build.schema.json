@@ -37,7 +37,8 @@
         "ReleaseWindowsX64",
         "Restore",
         "Test",
-        "VerifyArtifacts"
+        "VerifyArtifacts",
+        "VerifyPlatformArtifacts"
       ]
     },
     "Verbosity": {
