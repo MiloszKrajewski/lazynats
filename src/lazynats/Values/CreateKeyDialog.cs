@@ -1,4 +1,6 @@
 using lazynats.Components;
+using Microsoft.Extensions.DependencyInjection;
+using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -16,6 +18,20 @@ namespace lazynats.Values;
 // PutAsync (see ValuesTab).
 internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
 {
+    // Same reasoning/values as ValueDetailDialog's own consts - see that class's comment.
+    private const int PreferredDialogWidth = 132;
+    private const int TerminalWidthMargin = 4;
+
+    // MinValueHeight is today's previous fixed height (the floor a small terminal still gets);
+    // MaxValueHeight caps how large the Value field grows on a tall terminal - see design.md's
+    // "Value field height" decision for why 30 and not unbounded. ReservedChromeRows covers
+    // everything else the dialog draws around the Value field (top padding, Name label + frame,
+    // Value label, button row + its own blank separator row, dialog border/title, and a few rows
+    // of margin) - kept next to the Y offsets below so a future layout change stays visible to it.
+    private const int MinValueHeight = 10;
+    private const int MaxValueHeight = 30;
+    private const int ReservedChromeRows = 14;
+
     private static readonly Attribute InvalidAttribute = new(ColorName16.Red, Theme.EditableBackground);
 
     private readonly TextField _nameField;
@@ -26,8 +42,15 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
 
     public CreateKeyDialog(NewKeyOptions? initial = null, bool isEdit = false)
     {
+        // IApplication.Screen, not the obsolete static Application.Screen - see CLAUDE.md's DI
+        // convention (Services.Root.GetRequiredService<T>(), not a static/ambient accessor).
+        var app = Services.Root.GetRequiredService<IApplication>();
+
         Title = isEdit ? " Edit Key " : " New Key ";
+        Width = Dim.Func(_ => Math.Min(PreferredDialogWidth, app.Screen.Width - TerminalWidthMargin));
         Padding.Thickness = new Thickness(1, 1, 1, 0);
+
+        var valueHeight = Math.Clamp(app.Screen.Height - ReservedChromeRows, MinValueHeight, MaxValueHeight);
 
         var nameLabel = new Label { Text = "Name", X = 0, Y = 0 };
         _nameField = new TextField {
@@ -43,7 +66,7 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
         _valueView = new TextView { Text = initial?.Value ?? string.Empty, TabKeyAddsTab = false };
 #pragma warning restore CS0618
         _valueView.FixPasteRedraw();
-        var valueFrame = WrapField(_valueView, 5, 10);
+        var valueFrame = WrapField(_valueView, 5, valueHeight);
 
         Add(nameLabel, nameFrame, valueLabel, valueFrame);
 
@@ -82,7 +105,7 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
         // regardless of content.
         var background = field.GetAttributeForRole(VisualRole.Editable).Background;
         return new EditFrame(field) {
-            X = 0, Y = y, Width = 43, Height = height,
+            X = 0, Y = y, Width = Dim.Fill(), Height = height,
             InnerBackgroundNormal = background, InnerBackgroundFocused = background,
             // See CreateBucketDialog's identical WrapField for why: EditFrame's own CanFocus is
             // hardcoded true unconditionally, so without this a locked field's frame becomes a
