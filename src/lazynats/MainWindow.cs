@@ -52,7 +52,7 @@ internal sealed class MainWindow: Runnable
 
         // Dim.Fill(1) leaves the bottom row free for the StatusBar, which sits outside this frame.
         var feedFrame = new FrameView
-            { Title = " Live Feed ", X = 0, Y = Pos.Bottom(tabs), Width = Dim.Fill(), Height = Dim.Fill(1) };
+            { Title = " 0:Live Feed ", X = 0, Y = Pos.Bottom(tabs), Width = Dim.Fill(), Height = Dim.Fill(1) };
         feedFrame.Add(liveUpdates);
 
         // Sibling of feedFrame (not a child of its Border, not inside LiveUpdatesView itself, per
@@ -110,7 +110,7 @@ internal sealed class MainWindow: Runnable
             new(Key.D3.WithAlt, "Values", () => tabs.SelectTab(valuesTab)),
             new(Key.D4.WithAlt, "Objects", () => tabs.SelectTab(objectsTab)),
             new(Key.D5.WithAlt, "Templates", () => tabs.SelectTab(templatesTab)),
-            new(Key.M.WithAlt, "Live Feed", () => liveUpdates.SetFocus()),
+            new(Key.D0.WithAlt, "Live Feed", () => liveUpdates.SetFocus()),
         };
         // Deferred via AddTimeout(Zero, ...) rather than calling App!.Run directly: this Action
         // runs from inside the very same Alt+P key dispatch that's still unwinding, and Run()

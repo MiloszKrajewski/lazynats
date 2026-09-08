@@ -68,7 +68,10 @@ internal sealed class MessageDetailDialog: Dialog
         subjectView.SetScheme(new Scheme(new Attribute(Theme.SubjectColor, Theme.EditableBackground)));
 
         var headersLabel = new Label { Text = "Headers", X = 0, Y = headersLabelY };
-        var headerFrame = EditFrame.CreateReadOnly(headersText, headerFrameY, headerFrameHeight, out _);
+        var headerFrame = EditFrame.CreateReadOnly(headersText, headerFrameY, headerFrameHeight, out var headerView);
+        // Headers get the same green used everywhere else a message's headers are shown (the live
+        // feed row and ValueDetailDialog's metadata section) - see design.md Decision.
+        headerView.SetScheme(new Scheme(new Attribute(Theme.HeaderColor, Theme.EditableBackground)));
 
         // Reuses envelope.CachedContentKind (populated by FeedRowFormatter once the row is
         // rendered, which it always has been by the time this dialog can be opened from it)

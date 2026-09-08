@@ -96,7 +96,7 @@ view scrolled to the newest row as long as the user hadn't scrolled away from th
   subject. A real detail view (full headers, full payload, JSON-formatted where applicable) is
   still to design.
 - **In-view header suppression** is already correct: `LiveUpdatesView` renders no heading of its
-  own, relying on the hosting `FrameView`'s `" Live Feed "` title/border.
+  own, relying on the hosting `FrameView`'s `" 0:Live Feed "` title/border.
 
 Press **C** (only while the feed has focus) to clear it.
 
