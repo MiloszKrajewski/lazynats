@@ -23,6 +23,7 @@ using static Nuke.Common.Tools.Docker.DockerTasks;
 [GitHubActions(
 	"continuous",
 	GitHubActionsImage.WindowsLatest,
+	AutoGenerate = false,
 	On = [GitHubActionsTrigger.Push],
 	InvokedTargets = [nameof(Release)],
 	CacheKeyFiles = ["Directory.Packages.props", "**/*.csproj"])]
