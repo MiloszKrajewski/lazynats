@@ -38,6 +38,37 @@ internal sealed class EditFrame: View
     private Color? _edgeAccent;
     private Color? _edgeAccentFocused;
 
+    // Builds a read-only, non-focusable frame wrapping a plain multi-line Label - the shape shared
+    // by every read-only text section in this codebase (MessageDetailDialog's Subject/Headers,
+    // PayloadDetailSection's own label, the KV Value Detail dialog's Details frame). See
+    // openspec/changes/kv-value-peek-and-view/design.md Decision 3.
+    public static EditFrame CreateReadOnly(string text, int y, int height, out Label view)
+    {
+        // HotKeySpecifier must be disabled before Text is assigned - Label parses '_' out of Text
+        // at assignment time using whatever HotKeySpecifier is current, and Label defaults it to
+        // '_' (unlike the plain View base, which defaults to disabled). Displayed content is
+        // arbitrary (NATS subjects/JSON/headers/KV values routinely contain '_'), so leaving the
+        // default on would silently eat underscores and underline the following character instead
+        // of rendering the text verbatim.
+        var label = new Label { HotKeySpecifier = (Rune)0xffff, Text = text };
+        label.TextFormatter.MultiLine = true;
+        label.TextFormatter.WordWrap = false;
+        Theme.ApplyEditableScheme(label);
+
+        var frame = new EditFrame(label) {
+            X = 0, Y = y, Width = Dim.Fill(), Height = height,
+            InnerBackgroundNormal = Theme.EditableBackground, InnerBackgroundFocused = Theme.EditableBackground,
+        };
+        // Unlike every other EditFrame in this codebase (which wraps a focusable TextField/
+        // TextView), this one wraps a plain non-focusable Label - leaving the frame focusable
+        // would pull Tab focus (and the owning dialog's own scroll key bindings) onto an empty
+        // frame instead of staying on the dialog itself.
+        frame.CanFocus = false;
+
+        view = label;
+        return frame;
+    }
+
     public EditFrame(View child)
     {
         // Terminal.Gui requires CanFocus=true on every ancestor for a descendant to be focusable

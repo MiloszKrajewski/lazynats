@@ -88,6 +88,7 @@ internal sealed class ValuesTab: View, IShortcutSource
         _keyListView.CreateRequested += () => OpenCreateKeyDialog(null);
         _keyListView.DeleteRequested += () => _ = TryDeleteKeyAsync();
         _keyListView.EditRequested += OpenEditKeyDialog;
+        _keyListView.ViewValueRequested += OpenValueDetailDialog;
         // KeyListView (via the shared DrillableListView<T> Filter wiring) owns the Ctrl+F
         // dialog/compile/in-memory-narrow mechanics itself; this tab only needs to additionally
         // scope its server-side fetch and reflect the active pattern in the list's title - the one
@@ -465,6 +466,18 @@ internal sealed class ValuesTab: View, IShortcutSource
                 OpenCreateKeyDialog(options);
             });
         }
+    }
+
+    // V at the key level. Reuses KeyDetails' already-fetched entry rather than issuing a fresh
+    // fetch of its own - see design.md Decision 5. No-op if the detail panel's fetch for the
+    // highlighted key hasn't landed yet (CurrentEntry still null), per nats-kv's "Open KV Value
+    // Detail Dialog" requirement's "before the initial fetch completes" scenario.
+    private void OpenValueDetailDialog()
+    {
+        if (_currentBucket is not { } bucket) return;
+        if (_keyDetails.CurrentEntry is not { } entry) return;
+
+        App!.Run(new ValueDetailDialog(bucket, entry));
     }
 
     // Ctrl+E at the key level. Per design.md's "Printable-text guard" decision, this always

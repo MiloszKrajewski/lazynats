@@ -7,3 +7,4 @@
 - wrap "failed to connect" (no nats, bad auth, etc) into user facing message (no stack trace)
 - ? shows shortcuts as well (with ---)
 - relax subscription filters (he*lo>ld)
+- key/stream/consumer updates through big pipe

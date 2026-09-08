@@ -1,4 +1,3 @@
-using System.Text;
 using lazynats.Components;
 using NATS.Client.KeyValueStore;
 
@@ -25,6 +24,17 @@ internal sealed class KeyDetails: PollingDetailsView<(string Bucket, string Key)
 
     public KeyDetails(INatsKVContext kv) => _kv = kv;
 
+    // The last `Entry` passed to Show, or null once cleared - lets the KV Value Detail dialog
+    // (opened via `V`) reuse this pane's already-fetched entry instead of issuing a fresh fetch of
+    // its own. See openspec/changes/kv-value-peek-and-view/design.md Decision 5.
+    public Entry? CurrentEntry { get; private set; }
+
+    public override void Show(Entry? info)
+    {
+        CurrentEntry = info;
+        base.Show(info);
+    }
+
     public void SetTarget(string? bucket, string? key)
     {
         if (bucket is not null && key is not null) SetPollTarget((bucket, key)); else ClearPollTarget();
@@ -48,5 +58,5 @@ internal sealed class KeyDetails: PollingDetailsView<(string Bucket, string Key)
         ("Size", $"{entry.Value.Length} bytes"),
     ];
 
-    protected override string? BuildBody(Entry entry) => Encoding.UTF8.GetString(entry.Value);
+    protected override string? BuildBody(Entry entry) => ValuePeek.Render(entry.Value);
 }

@@ -57,8 +57,11 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
     protected virtual string? BuildBody(TInfo info) => null;
 
     // Null (nothing highlighted, e.g. an empty list) clears the panel rather than leaving stale
-    // content - per "Show and Clear".
-    public void Show(TInfo? info)
+    // content - per "Show and Clear". Virtual so a subclass (KeyDetails) can track the
+    // last-shown info itself (e.g. for a "peek deeper" dialog to reuse without a fresh fetch - see
+    // openspec/changes/kv-value-peek-and-view/design.md Decision 5) without this base class
+    // needing to know that concept exists.
+    public virtual void Show(TInfo? info)
     {
         _rows = info is null ? [] : BuildRows(info);
         _body = info is null ? null : BuildBody(info);
@@ -157,16 +160,27 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
         }
 
         // Body starts one row below the header rows (blank separator), or at row 0 if there are
-        // no header rows at all - clipped to whatever height remains, never scrolled.
+        // no header rows at all - clipped to whatever height remains, never scrolled. Each source
+        // line is character-wrapped (not word-wrapped) to the viewport's width first, so a long
+        // line spills onto the following visual row(s) instead of being clipped mid-line - see
+        // openspec/changes/kv-value-peek-and-view/design.md Decision 1's peek-wrap addendum. Still
+        // no scrolling: once wrapped rows exhaust the remaining height, the rest is simply not drawn.
         if (_body is not null) {
             var bodyStartRow = _rows.Length == 0 ? 0 : _rows.Length + 1;
             SetAttribute(valueAttribute);
-            var lines = _body.Split('\n');
-            for (var i = 0; i < lines.Length; i++) {
-                var row = bodyStartRow + i;
-                if (row >= Viewport.Height) break;
-                Move(0, row);
-                AddStr(lines[i].TrimEnd('\r'));
+            var width = Math.Max(1, Viewport.Width);
+            var row = bodyStartRow;
+            foreach (var rawLine in _body.Split('\n')) {
+                var line = rawLine.TrimEnd('\r');
+                var offset = 0;
+                do {
+                    if (row >= Viewport.Height) return true;
+                    var chunkLength = Math.Min(width, line.Length - offset);
+                    Move(0, row);
+                    AddStr(line.Substring(offset, chunkLength));
+                    row++;
+                    offset += chunkLength;
+                } while (offset < line.Length);
             }
         }
 

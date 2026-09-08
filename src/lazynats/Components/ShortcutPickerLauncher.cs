@@ -75,15 +75,21 @@ internal static class ShortcutPickerLauncher
     // its way up - true for ordinary content (confirmed via tmux for PublishDialog, both with its
     // Subject field and its header list focused: TextField/ListView -> ... -> PublishDialog).
     // It's false when focus has fallen back onto Terminal.Gui's internal, non-content scaffolding
-    // for a dialog with nothing genuinely focusable in it (confirmed via tmux for
-    // MessageDetailDialog, whose Labels are all CanFocus=false and whose presentation dropdown
-    // starts CanFocus=false too: MostFocused resolves to a bare View living inside the dialog's own
+    // for a dialog with nothing genuinely focusable in it at all (every descendant, transitively,
+    // CanFocus=false): MostFocused then resolves to a bare View living inside the dialog's own
     // Padding adornment, and Adornments (Margin/Border/Padding) aren't linked into the ordinary
     // parent-child SuperView chain the way real content views are - that walk dead-ends at null
-    // after 2 hops, never reaching the dialog, even though the dialog itself is a perfectly good
-    // IShortcutSource). Falling back to owner itself in that case is always safe: when owner isn't
-    // an IShortcutSource, Collect(owner) just finds nothing, same as if the picker had genuinely
-    // had nothing to show; when it is (MessageDetailDialog), this is exactly the right answer.
+    // without ever reaching the dialog. Falling back to owner itself in that case is always safe:
+    // when owner isn't an IShortcutSource, Collect(owner) just finds nothing, same as if the
+    // picker had genuinely had nothing to show; when it is, this is exactly the right answer.
+    // MessageDetailDialog/the KV Value Detail dialog are examples of the *other* branch instead -
+    // each has exactly one CanFocus=true descendant (PayloadDetailSection, deliberately so it
+    // becomes the dialog's own MostFocused fallback target - see that class's own CanFocus
+    // comment), which the walk below does find on its way up to owner, so ResolveStartView
+    // returns that section rather than owner - and per PayloadDetailSection's own IShortcutSource
+    // implementation, that's also why those dialogs must NOT themselves also implement
+    // IShortcutSource and re-forward to the section's Shortcuts: Collect would then find the
+    // section directly (as returned here) and again via owner, double-listing the same hint.
     private static View? ResolveStartView(View owner)
     {
         for (var view = owner.MostFocused; view is not null; view = view.SuperView)
