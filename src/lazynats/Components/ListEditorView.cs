@@ -46,8 +46,12 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
     // `bindSharedKeys` defaults true for standalone/modal usage (e.g. HeaderEditorView inside
     // PublishDialog), where there is no owning tab to hoist N/E/D up to. A tab-hosted instance
     // (e.g. SubscriptionsView inside SubscribeTab) passes false and exposes TabOperations instead -
-    // see openspec/specs/tab-scoped-list-shortcuts/spec.md.
-    public ListEditorView(ObservableCollection<T> items, IValuePresenter<T> presenter, bool bindSharedKeys = true)
+    // see openspec/specs/tab-scoped-list-shortcuts/spec.md. `textColor` is per-subclass opt-in
+    // (null default keeps today's plain-text rows) - SubscriptionsView passes Theme.SubjectColor,
+    // HeaderEditorView leaves it unset since a header row is a key/value pair, not a single
+    // identifier - see openspec/specs/list-editor/spec.md's "Per-Subclass Row Text Color".
+    public ListEditorView(
+        ObservableCollection<T> items, IValuePresenter<T> presenter, bool bindSharedKeys = true, Color? textColor = null)
     {
         CanFocus = true;
         _items = items;
@@ -55,7 +59,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         _presenter = presenter;
         _bindSharedKeys = bindSharedKeys;
 
-        _dataSource = new PresenterListDataSource<T>(_filtered, presenter);
+        _dataSource = new PresenterListDataSource<T>(_filtered, presenter, textColor);
         _listView = new ListView { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         _listView.KeystrokeNavigator = null;
         _listView.Source = _dataSource;

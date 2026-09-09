@@ -70,7 +70,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         _items = items;
         _filtered = [];
 
-        _dataSource = new PresenterListDataSource<T>(_filtered, Presenter);
+        _dataSource = new PresenterListDataSource<T>(_filtered, Presenter, Theme.SubjectColor);
         _listView = new ListView { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         // Disables ListView's own built-in type-to-jump navigation - AttachFilterBox's field is
         // this class's own answer to "find an item by typing", so the two must not compete for
