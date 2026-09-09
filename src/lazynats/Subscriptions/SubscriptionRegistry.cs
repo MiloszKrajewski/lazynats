@@ -1,5 +1,9 @@
+using lazynats.Core;
 using lazynats.LiveFeed;
+using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
+using Terminal.Gui.App;
+using Terminal.Gui.Views;
 
 namespace lazynats.Subscriptions;
 
@@ -11,7 +15,7 @@ internal sealed class SubscriptionRegistry
 {
     private readonly NatsConnection _connection;
     private readonly IObserver<FeedEnvelope> _sink;
-    private readonly Dictionary<Guid, (string Pattern, CancellationTokenSource Cts)> _subscriptions = new();
+    private readonly Dictionary<Guid, (string Pattern, NatsFilter Filter, CancellationTokenSource Cts)> _subscriptions = new();
 
     public event Action? Changed;
 
@@ -27,9 +31,11 @@ internal sealed class SubscriptionRegistry
     public Guid Add(string pattern)
     {
         var id = Guid.NewGuid();
+        var filter = FilterExpression.TryCompile(pattern)
+            ?? throw new ArgumentException($"Pattern '{pattern}' does not compile.", nameof(pattern));
         var cts = new CancellationTokenSource();
-        _subscriptions[id] = (pattern, cts);
-        _ = RunAsync(id, pattern, cts.Token);
+        _subscriptions[id] = (pattern, filter, cts);
+        _ = RunAsync(id, filter, cts.Token);
         Changed?.Invoke();
         return id;
     }
@@ -43,13 +49,19 @@ internal sealed class SubscriptionRegistry
         Changed?.Invoke();
     }
 
-    private async Task RunAsync(Guid id, string pattern, CancellationToken cancellationToken)
+    private async Task RunAsync(Guid id, NatsFilter filter, CancellationToken cancellationToken)
     {
+        var nativeFilter = filter.Native;
+        var clientFilter = !filter.NativeFilterIsExact ? filter.Client : null;
+
         try
         {
-            var subscription = _connection.SubscribeAsync<byte[]>(pattern, cancellationToken: cancellationToken);
+            var subscription = _connection.SubscribeAsync<byte[]>(nativeFilter, cancellationToken: cancellationToken);
             await foreach (var message in subscription)
             {
+                var isMatch = clientFilter is null || clientFilter.IsMatch(message.Subject);
+                if (!isMatch) continue;
+
                 var envelope = new FeedEnvelope(DateTimeOffset.UtcNow, id, message);
                 _sink.OnNext(envelope);
             }
@@ -57,6 +69,17 @@ internal sealed class SubscriptionRegistry
         catch (OperationCanceledException)
         {
             // Expected when Remove() cancels this subscription's token.
+        }
+        catch (Exception ex)
+        {
+            if (_subscriptions.Remove(id, out var entry)) 
+                entry.Cts.Dispose();
+            Changed?.Invoke();
+
+            // Non-View, non-DI-constructed class reaching UI services - see CLAUDE.md's DI
+            // convention (Services.Root.GetRequiredService<T>(), not a static/ambient accessor).
+            var app = Services.Root.GetRequiredService<IApplication>();
+            app.Invoke(() => MessageBox.ErrorQuery(app, " Subscription Failed ", ex.Message.Pad(), "_Ok"));
         }
     }
 }

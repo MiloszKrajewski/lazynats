@@ -1,14 +1,4 @@
-# nats-subscriptions Specification
-
-## Purpose
-Manage the set of active NATS subject-pattern subscriptions that feed the live message feed: listing what's currently active, adding new subject-pattern subscriptions, and deleting them.
-## Requirements
-### Requirement: Subscription List Management
-The system SHALL provide a Subscriptions screen listing the currently active subject-pattern subscriptions (e.g. `invoices.>`), so the user can see at a glance which patterns are currently being monitored.
-
-#### Scenario: Active subscriptions are listed
-- **WHEN** one or more subject-pattern subscriptions are active
-- **THEN** the Subscriptions screen lists each active pattern
+## MODIFIED Requirements
 
 ### Requirement: Add Subscription
 The system SHALL allow the user to add a new subscription pattern, which SHALL be compiled via the
@@ -40,13 +30,6 @@ first — into the shared feed pipeline.
   pattern `invoices.>` is added again
 - **THEN** the newly added subscription is assigned a different subscription identity than the one
   that was deleted
-
-### Requirement: Delete Subscription
-The system SHALL allow the user to delete an active subscription, which SHALL stop its underlying NATS subscription so no further messages for that pattern are received.
-
-#### Scenario: Deleting a pattern stops receiving its messages
-- **WHEN** the user deletes an active subscription for pattern `invoices.>`
-- **THEN** its background reader task and NATS subscription are cancelled/disposed, and messages published afterward on subjects matching `invoices.>` (and not matched by any other still-active pattern) no longer appear in the feed
 
 ### Requirement: Modifying a Subscription Pattern
 The system SHALL provide an E convenience for changing an active subscription's pattern: it SHALL
@@ -91,6 +74,8 @@ subscription unchanged.
 - **THEN** the modal closes, the original subscription is left unchanged, and no new subscription is
   added
 
+## ADDED Requirements
+
 ### Requirement: Subscription Failure Reporting
 The system SHALL NOT allow a subscription's start-up or background-read failure to go unreported or
 crash the application. When starting a subscription's underlying NATS subscription throws, or its
@@ -113,17 +98,3 @@ dismissible error dialog.
 #### Scenario: Deleting a subscription is not reported as a failure
 - **WHEN** the user deletes an active subscription
 - **THEN** its background read loop's resulting cancellation is not reported via an error dialog
-
-### Requirement: Framed List Presentation
-The Subscribe tab's subscription list SHALL be presented with a "Subscriptions" label above a
-padded `EditFrame`, using the same shared editable-control background as the Publish tab's fields
-and header editor, giving it visual breathing room, background consistency, and field-name
-labeling matching the Publish tab's fields, without altering any of its existing add/edit/delete
-behavior.
-
-#### Scenario: Subscription list is visually framed and labeled
-- **WHEN** the Subscribe tab is displayed
-- **THEN** a "Subscriptions" label is shown above the subscription list, the list is presented
-  inside a padded frame using the shared editable background color, and its existing
-  New/Edit/Delete behavior is unchanged
-

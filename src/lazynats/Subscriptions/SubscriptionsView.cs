@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using lazynats.Components;
+using lazynats.Core;
 
 namespace lazynats.Subscriptions;
 
@@ -33,7 +34,7 @@ internal sealed class SubscriptionsView: ListEditorView<SubscriptionInfo>
 
     private bool TryEditPattern(string title, string initialPattern, out SubscriptionInfo result)
     {
-        var dialog = new PatternDialog(title, initialPattern);
+        var dialog = new PatternDialog(title, initialPattern, validator: p => FilterExpression.TryCompile(p) is not null);
         App!.Run(dialog);
 
         if (dialog.Result is { } pattern) {
