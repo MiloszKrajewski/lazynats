@@ -1,4 +1,4 @@
-name: continuous
+name: Build
 
 on: [push]
 
@@ -19,8 +19,3 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
       - name: 'Run: Release'
         run: ./build.cmd Release
-      - name: 'Publish: .output'
-        uses: actions/upload-artifact@v5
-        with:
-          name: .output
-          path: .output

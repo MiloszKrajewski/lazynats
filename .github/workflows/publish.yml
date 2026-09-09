@@ -1,9 +1,26 @@
-name: release
+name: Publish
 
 on:
   workflow_dispatch: {}
 
 jobs:
+  dotnet-noarch:
+    name: dotnet-noarch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: 'Cache: .nuke/temp, ~/.nuget/packages'
+        uses: actions/cache@v5
+        with:
+          path: |
+            .nuke/temp
+            ~/.nuget/packages
+          key: ${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+      - name: 'Run: release'
+        run: ./build.sh release
+
   windows-x64:
     name: windows-x64
     runs-on: windows-latest
