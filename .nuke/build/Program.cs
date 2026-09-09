@@ -181,7 +181,7 @@ class Program: NukeBuild
 					.SetOutput(OutputDirectory / a.Name)
 				);
 				RemoveDebugSymbols(OutputDirectory / a.Name);
-				var zipName = $"{a.Name}-{PackageVersion}.zip";
+				var zipName = $"{a.Name}-{PackageVersion}-noarch.zip";
 				Log.Information("Compressing {Application}...", zipName);
 				CompressToFresh(OutputDirectory / a.Name, OutputDirectory / zipName);
 			}
