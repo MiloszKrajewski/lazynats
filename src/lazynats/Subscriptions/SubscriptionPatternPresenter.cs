@@ -2,7 +2,7 @@ using lazynats.Components;
 
 namespace lazynats.Subscriptions;
 
-internal sealed class SubscriptionPatternPresenter: IValuePresenter<SubscriptionInfo>
+internal sealed class SubscriptionPatternPresenter: IValuePresenter<ISubscriptionInfo>
 {
-    public string Format(SubscriptionInfo value) => value.Pattern;
+    public string Format(ISubscriptionInfo value) => value.Pattern;
 }

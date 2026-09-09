@@ -1,23 +1,33 @@
+using System.Collections.Concurrent;
 using lazynats.Core;
 using lazynats.LiveFeed;
-using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
-using Terminal.Gui.App;
-using Terminal.Gui.Views;
 
 namespace lazynats.Subscriptions;
 
-internal sealed record SubscriptionInfo(Guid Id, string Pattern);
+internal sealed record SubscriptionInfo(Guid Id, string Pattern): ISubscriptionInfo;
 
-// Add/Remove are only ever called from the UI thread (button/key handlers), so the
-// dictionary needs no locking - the background RunAsync tasks never touch it.
+internal sealed class Subscription: ISubscriptionInfo
+{
+    public required Guid Id { get; init; }
+    public required string Pattern { get; init; }
+    public required NatsFilter Filter { get; init; }
+    public required CancellationTokenSource Cts { get; init; }
+}
+
+// Add/Remove (the public API) are only ever called from the UI thread; Remove is the only method
+// that mutates _subscriptions. RunAsync (background-task thread) only reads it via TryGetValue and
+// raises Failed, relying on a Failed subscriber to call Remove() - it never removes or disposes the
+// entry itself. ConcurrentDictionary remains necessary because that background-thread read still
+// races the UI-thread Add/Remove calls.
 internal sealed class SubscriptionRegistry
 {
     private readonly NatsConnection _connection;
     private readonly IObserver<FeedEnvelope> _sink;
-    private readonly Dictionary<Guid, (string Pattern, NatsFilter Filter, CancellationTokenSource Cts)> _subscriptions = new();
+    private readonly ConcurrentDictionary<Guid, Subscription> _subscriptions = new();
 
     public event Action? Changed;
+    public event Action<ISubscriptionInfo, Exception>? Failed;
 
     public SubscriptionRegistry(NatsConnection connection, IObserver<FeedEnvelope> sink)
     {
@@ -25,8 +35,7 @@ internal sealed class SubscriptionRegistry
         _sink = sink;
     }
 
-    public IReadOnlyList<SubscriptionInfo> Active =>
-        _subscriptions.Select(kv => new SubscriptionInfo(kv.Key, kv.Value.Pattern)).ToList();
+    public IReadOnlyList<ISubscriptionInfo> Active => _subscriptions.Values.ToList();
 
     public Guid Add(string pattern)
     {
@@ -34,7 +43,7 @@ internal sealed class SubscriptionRegistry
         var filter = FilterExpression.TryCompile(pattern)
             ?? throw new ArgumentException($"Pattern '{pattern}' does not compile.", nameof(pattern));
         var cts = new CancellationTokenSource();
-        _subscriptions[id] = (pattern, filter, cts);
+        _subscriptions[id] = new Subscription { Id = id, Pattern = pattern, Filter = filter, Cts = cts };
         _ = RunAsync(id, filter, cts.Token);
         Changed?.Invoke();
         return id;
@@ -42,7 +51,7 @@ internal sealed class SubscriptionRegistry
 
     public void Remove(Guid id)
     {
-        if (!_subscriptions.Remove(id, out var entry)) return;
+        if (!_subscriptions.TryRemove(id, out var entry)) return;
 
         entry.Cts.Cancel();
         entry.Cts.Dispose();
@@ -66,20 +75,15 @@ internal sealed class SubscriptionRegistry
                 _sink.OnNext(envelope);
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Expected when Remove() cancels this subscription's token.
+            // Expected when Remove() cancels this subscription's own token.
         }
         catch (Exception ex)
         {
-            if (_subscriptions.Remove(id, out var entry)) 
-                entry.Cts.Dispose();
-            Changed?.Invoke();
+            if (!_subscriptions.TryGetValue(id, out var entry)) return;
 
-            // Non-View, non-DI-constructed class reaching UI services - see CLAUDE.md's DI
-            // convention (Services.Root.GetRequiredService<T>(), not a static/ambient accessor).
-            var app = Services.Root.GetRequiredService<IApplication>();
-            app.Invoke(() => MessageBox.ErrorQuery(app, " Subscription Failed ", ex.Message.Pad(), "_Ok"));
+            Failed?.Invoke(entry, ex);
         }
     }
 }
