@@ -47,9 +47,9 @@
 
 ## 5. End-to-end verification
 
-- [ ] 5.1 Manually dispatch `release.yml` and confirm all four build jobs complete with no Docker
+- [x] 5.1 Manually dispatch `release.yml` and confirm all four build jobs complete with no Docker
   activity in their logs
-- [ ] 5.2 Confirm the `publish` job creates one GitHub Release for the current `CHANGES.md`
+- [x] 5.2 Confirm the `publish` job creates one GitHub Release for the current `CHANGES.md`
   version with all four platform zips attached as assets
-- [ ] 5.3 Re-dispatch the workflow without bumping `CHANGES.md` and confirm the `publish` job
+- [x] 5.3 Re-dispatch the workflow without bumping `CHANGES.md` and confirm the `publish` job
   completes successfully while `PublishToGitHub` skips creating a duplicate release
