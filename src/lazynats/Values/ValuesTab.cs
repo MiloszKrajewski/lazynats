@@ -106,7 +106,7 @@ internal sealed class ValuesTab: View, IShortcutSource
         _keyDetails.Error += message => StatusChanged?.Invoke($"Values: {message}");
 
         // Add()-order matches spatial top-down layout (label, then FilterBox, then its list) so
-        // Tab/Shift+Tab cycles in reading order - ManagementTabs.FindFirstFocusableDescendant
+        // Tab/Shift+Tab cycles in reading order - TabbedView's own FindFirstFocusableDescendant
         // separately skips FilterBox for the tab's *default* focus target, so entering/returning
         // to this tab still lands on the list, not the search field, despite that order.
         Add(_listLabel, _bucketFilterBox, _bucketListFrame, _keyFilterBox, _keyListFrame, _detailsLabel, _details, _keyDetails);
@@ -141,22 +141,27 @@ internal sealed class ValuesTab: View, IShortcutSource
 
     public IEnumerable<ShortcutHint> Shortcuts => _shortcutSource.TabOperations;
 
-    // "Selected tab" in this app is focus-driven (doc/terminal-gui-howto.md: "The focused SubView
-    // is the selected (front-most) tab") - so this fires exactly on tab entry/exit, which is what
-    // gates the one-time initial load and the detail poll, per the "Refresh does not run while the
-    // tab is not selected" requirement. Polling itself is owned by each *Details pane (see their
-    // own comments) - this just tells whichever level is current whether it's allowed to fire.
-    protected override void OnHasFocusChanged(bool newHasFocus, View? previousFocusedView, View? focusedView)
+    // "Selected tab" is Visible-driven, not focus-driven: TabbedView (openspec/changes/
+    // adopt-tabbed-view) lets Left/Right preview a tab - toggling Visible - while keyboard focus
+    // stays on the tab strip's header (see tab-navigation's "Tab Switching via Arrows Requires
+    // Header Focus"), so gating solely on HasFocus left a freshly-previewed tab showing stale/empty
+    // content until the user actually entered it. OnVisibleChanged fires for that preview case too
+    // (TabbedView.Select toggles Visible before it ever touches focus), so it alone is enough to
+    // gate the one-time initial load and the detail poll, per the "Refresh does not run while the
+    // tab is not selected" requirement - no OnHasFocusChanged override needed alongside it. Polling
+    // itself is owned by each *Details pane (see their own comments) - this just tells whichever
+    // level is current whether it's allowed to fire.
+    protected override void OnVisibleChanged()
     {
-        base.OnHasFocusChanged(newHasFocus, previousFocusedView, focusedView);
+        base.OnVisibleChanged();
 
-        if (newHasFocus && !_loaded) {
+        if (Visible && !_loaded) {
             _loaded = true;
             _ = RefreshListAsync();
         }
 
-        if (_currentBucket is null) _details.SetActive(newHasFocus);
-        else _keyDetails.SetActive(newHasFocus);
+        if (_currentBucket is null) _details.SetActive(Visible);
+        else _keyDetails.SetActive(Visible);
     }
 
     private void OnBucketHighlightChanged(KvBucketItem? item)

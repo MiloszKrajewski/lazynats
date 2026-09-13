@@ -97,20 +97,25 @@ internal sealed class TemplatesTab: View, IShortcutSource
 
     public IEnumerable<ShortcutHint> Shortcuts => _listView.TabOperations.Concat(_extraOperations);
 
-    // "Selected tab" in this app is focus-driven (doc/terminal-gui-howto.md) - so this fires
-    // exactly on tab entry/exit, which is what gates the one-time initial load per
-    // nats-templates' "Template List" requirement (fetched when the tab is first activated, never
-    // on a timer).
-    protected override void OnHasFocusChanged(bool newHasFocus, View? previousFocusedView, View? focusedView)
+    // "Selected tab" is Visible-driven, not focus-driven: TabbedView (openspec/changes/
+    // adopt-tabbed-view) lets Left/Right preview a tab - toggling Visible - while keyboard focus
+    // stays on the tab strip's header (see tab-navigation's "Tab Switching via Arrows Requires
+    // Header Focus"), so gating solely on HasFocus left a freshly-previewed tab showing stale
+    // content until the user actually entered it. OnVisibleChanged fires for that preview case too
+    // (TabbedView.Select toggles Visible before it ever touches focus), so it alone is enough to
+    // gate the one-time initial load per nats-templates' "Template List" requirement (fetched when
+    // the tab is first activated, never on a timer) - no OnHasFocusChanged override needed
+    // alongside it.
+    protected override void OnVisibleChanged()
     {
-        base.OnHasFocusChanged(newHasFocus, previousFocusedView, focusedView);
+        base.OnVisibleChanged();
 
-        if (newHasFocus && !_loaded) {
+        if (Visible && !_loaded) {
             _loaded = true;
             _ = RefreshListAsync();
         }
 
-        _details.SetActive(newHasFocus);
+        _details.SetActive(Visible);
     }
 
     private void OnHighlightChanged(Template? template)

@@ -7,7 +7,7 @@ using Terminal.Gui.Views;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 using Color = Terminal.Gui.Drawing.Color;
 
-namespace lazynats.Spike.Tabs;
+namespace lazynats.Components;
 
 /// <summary>
 /// A from-scratch tabbed container: a full bordered box whose top border line carries every tab's
@@ -120,7 +120,7 @@ internal class TabbedView : View
         // default/theme, rather than pinning its own separate value that could silently drift from
         // theirs.
         BorderStyle = FrameView.DefaultBorderStyle;
-        _borderView = Border!.GetOrCreateView();
+        _borderView = Border.GetOrCreateView();
         _borderView.CanFocus = true; // required for _headerProxy (its SubView) to be focusable at all - same rule as above
 
         // X = 1, never 0: confirmed live that a SubView occupying the literal corner cell (0,0)
@@ -150,7 +150,37 @@ internal class TabbedView : View
         KeyBindings.Add(Key.CursorLeft, Command.Left);
         KeyBindings.Add(Key.CursorRight, Command.Right);
 
+        // Tabs sets this on itself for the same reason - without it, Tab/Shift+Tab resolve against
+        // whatever's the nearest enclosing TabGroup, which in the real app (unlike this spike-turned-
+        // control's own single-child Toplevel) is a MainWindow with sibling TabStop content of its
+        // own (the Live Feed, the status bar's shortcut widgets) - confirmed live via tmux: without
+        // this, Tab from a tab's content escapes clean past this control's own header/content
+        // boundary into those unrelated siblings, and a subsequent Alt+N global shortcut silently
+        // stops firing once focus is resting there. Setting TabGroup routes Tab/Shift+Tab here
+        // instead, to be handled by AdvanceWithinContent below - the same containment the removed
+        // Tabs-based ManagementTabs' own workaround existed for, just relocated.
+        TabStop = TabBehavior.TabGroup;
+        // Bound to Command.Accept, not Command.NextTabStop/PreviousTabStop - routing *through*
+        // NextTabStop/PreviousTabStop specifically left Terminal.Gui's own internal Tab-navigation
+        // bookkeeping in a state where, once PreviousTabStop (Shift+Tab) had fired once in a
+        // session, NextTabStop (Tab) silently stopped reaching this view's KeyBindings at all for
+        // the rest of the session (the same Terminal.Gui quirk the removed ManagementTabs.cs
+        // documented at length). Using an unrelated Command sidesteps it entirely.
+        KeyBindings.Add(Key.Tab, Command.Accept);
+        KeyBindings.Add(Key.Tab.WithShift, Command.Accept);
+        AddCommand(Command.Accept, AdvanceWithinContent);
+
         _borderView.MouseEvent += OnBorderMouseEvent;
+    }
+
+    // Advances focus within the selected tab's own content, direction-agnostically (mirrors the
+    // removed ManagementTabs.AdvanceWithinPage) - generic fallback for a TabbedView with no
+    // lazynats-specific content awareness. A subclass (ManagementTabs) overrides this to special-
+    // case exiting a FilterBox first, falling back to this base behavior otherwise.
+    protected virtual bool? AdvanceWithinContent()
+    {
+        App?.Navigation?.AdvanceFocus(NavigationDirection.Forward, TabBehavior.TabStop);
+        return true;
     }
 
     /// <summary>Number of tabs currently added.</summary>
@@ -281,11 +311,20 @@ internal class TabbedView : View
         }
     }
 
-    protected static View? FindFirstFocusableDescendant(View view)
+    // CanFocus, not just Visible/Enabled, gates recursion: Terminal.Gui requires every ancestor up
+    // to a descendant to itself be CanFocus for that descendant to actually receive focus (see the
+    // constructor's _borderView.CanFocus comment) - a sub with CanFocus false (e.g. an inactive
+    // FilterBox, which deliberately sits out of the tab order until "/" activates it - see
+    // FilterBox.cs) can never actually deliver focus to whatever's inside it, so descending into it
+    // anyway returns an unreachable target and SetFocus on it silently fails. Confirmed live: a
+    // Streams/Values/Objects tab's FilterBox precedes its list in SubViews order, so this returned
+    // the FilterBox's own inner TextField and every subsequent SetFocus() call - direct, blurred,
+    // even deferred to the next main-loop iteration - kept failing.
+    private static View? FindFirstFocusableDescendant(View view)
     {
         foreach (var sub in view.SubViews)
         {
-            if (!sub.Visible || !sub.Enabled)
+            if (!sub.Visible || !sub.Enabled || !sub.CanFocus)
             {
                 continue;
             }
@@ -296,10 +335,7 @@ internal class TabbedView : View
                 return deeper;
             }
 
-            if (sub.CanFocus)
-            {
-                return sub;
-            }
+            return sub;
         }
 
         return null;
@@ -562,20 +598,34 @@ internal class TabbedView : View
             _subscribedApp.Navigation!.FocusedChanged += OnAppFocusedChanged;
             _subscribedFocusedChanged = true;
 
-            // Terminal.Gui's default startup focus assignment lands on TabbedView itself (the first
-            // CanFocus view it finds, depth-first) rather than descending into a tab's content -
-            // confirmed live. Redirect that to the initially-selected tab's content, matching
-            // ManagementTabs' own startup behavior. Deferred via AddTimeout(Zero, ...) rather than
-            // called inline here: SetFocus() called synchronously from inside this very first draw
-            // pass silently returned false - confirmed live - so it's pushed to the next main-loop
-            // iteration instead, after this draw (and Terminal.Gui's own startup focus pass)
-            // completes.
+            // Terminal.Gui's default startup focus assignment picks the first CanFocus view it
+            // finds, depth-first - confirmed live this can land on TabbedView itself when it's the
+            // Toplevel's only focusable child (the spike's own setup), but in a real app with
+            // sibling containers (e.g. lazynats' MainWindow, which has its own CanFocus Toplevel
+            // alongside the Live Feed frame and status bar) it can just as easily land one level up,
+            // on an ancestor never checked here before. Redirect whenever focus isn't already
+            // somewhere inside this strip at all (StripHasFocus, not a narrower "is it exactly
+            // TabbedView" check), to the initially-selected tab's content. Deferred via
+            // AddTimeout(Zero, ...) rather than called inline here: SetFocus() called synchronously
+            // from inside this very first draw pass silently returned false - confirmed live - so
+            // it's pushed to the next main-loop iteration instead, after this draw (and Terminal.
+            // Gui's own startup focus pass) completes.
             var app = App;
             app.AddTimeout(TimeSpan.Zero, () => {
-                if (app.Navigation?.GetFocused() is (null or TabbedView) && _selectedIndex >= 0)
+                if (!StripHasFocus && _selectedIndex >= 0)
                 {
                     SelectAndFocusContent(_selectedIndex);
                 }
+
+                // Whether or not a redirect happened above, this is the first point after
+                // subscribing to FocusedChanged where the caption/frame colors get recomputed - if
+                // Terminal.Gui's own default startup focus assignment already landed correctly
+                // inside this strip (e.g. straight onto a tab's content) before this subscription
+                // was live to observe that transition, the strip would otherwise keep rendering the
+                // stale colors computed back when App was still null (i.e. permanently unfocused-
+                // looking) despite genuinely holding focus - confirmed live.
+                UpdateCaptionAttributes();
+                SetNeedsDraw();
 
                 return false;
             });

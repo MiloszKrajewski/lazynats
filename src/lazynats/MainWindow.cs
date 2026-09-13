@@ -38,21 +38,29 @@ internal sealed class MainWindow: Runnable
         var feed = Services.Root.GetRequiredService<IObservable<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
 
-        var subscribeTab = new SubscribeTab(registry) { Title = " 1:Subscribe ", Padding = { Thickness = new Thickness(1) } };
-        var streamsTab = new StreamsTab(jetStream) { Title = " 2:Streams ", Padding = { Thickness = new Thickness(1) } };
-        var valuesTab = new ValuesTab(kvContext) { Title = " 3:Values ", Padding = { Thickness = new Thickness(1) } };
-        var objectsTab = new ObjectsTab(jetStream, objContext) { Title = " 4:Objects ", Padding = { Thickness = new Thickness(1) } };
-        var templatesTab = new TemplatesTab(kvContext) { Title = " 5:Templates ", Padding = { Thickness = new Thickness(1) } };
+        var subscribeTab = new SubscribeTab(registry) { Padding = { Thickness = new Thickness(1) } };
+        var streamsTab = new StreamsTab(jetStream) { Padding = { Thickness = new Thickness(1) } };
+        var valuesTab = new ValuesTab(kvContext) { Padding = { Thickness = new Thickness(1) } };
+        var objectsTab = new ObjectsTab(jetStream, objContext) { Padding = { Thickness = new Thickness(1) } };
+        var templatesTab = new TemplatesTab(kvContext) { Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
-        tabs.Add(subscribeTab, streamsTab, valuesTab, objectsTab, templatesTab);
+        tabs.Add(" 1:Subscribe ", subscribeTab);
+        tabs.Add(" 2:Streams ", streamsTab);
+        tabs.Add(" 3:Values ", valuesTab);
+        tabs.Add(" 4:Objects ", objectsTab);
+        tabs.Add(" 5:Templates ", templatesTab);
         tabs.SelectTab(subscribeTab);
 
         var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         liveUpdates.ItemSelected += envelope => App!.Run(new MessageDetailDialog(envelope));
 
         // Dim.Fill(1) leaves the bottom row free for the StatusBar, which sits outside this frame.
-        var feedFrame = new FrameView
-            { Title = " 0:Live Feed ", X = 0, Y = Pos.Bottom(tabs), Width = Dim.Fill(), Height = Dim.Fill(1) };
+        // FocusView (not a plain FrameView) turns the border bright yellow while focus
+        // is anywhere inside it, matching ManagementTabs' TabbedView frame.
+        var feedFrame = new FocusView {
+            AccentColor = Theme.LiveFeedFocusAccentColor,
+            Title = " 0:Live Feed ", X = 0, Y = Pos.Bottom(tabs), Width = Dim.Fill(), Height = Dim.Fill(1),
+        };
         feedFrame.Add(liveUpdates);
 
         // Sibling of feedFrame (not a child of its Border, not inside LiveUpdatesView itself, per

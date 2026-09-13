@@ -1,8 +1,10 @@
 # TODO
 
+- templates have no age and not marker ttl (leak!)
+- be better explaining why you cannot edit binary key (or allow editing)
+- background is black-black (not transparent black)
 - explicit `$` subscriptions
 - NatsFilter: isExact == regex is null
-- different frame color for active window
 - wrap "failed to connect" (no nats, bad auth, etc) into user facing message (no stack trace)
 - `?` shows "big" shortcuts as well (with ---)
 - key/stream/consumer updates through big pipe

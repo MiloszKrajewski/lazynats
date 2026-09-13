@@ -45,6 +45,21 @@ internal static class Theme
     // - distinct from SubjectColor (Cyan) so the two never read as the same accent.
     public static readonly Color EditFrameEdgeAccentFocused = new(ColorName16.BrightBlue);
 
+    // ManagementTabs' TabbedView accent/dim/selected colors (openspec/changes/adopt-tabbed-view) -
+    // assigned onto TabbedView's own generic properties by ManagementTabs, not read by TabbedView
+    // itself, matching this file's "centralize tunable colors" convention.
+    public static readonly Color TabAccentColor = new(ColorName16.BrightYellow);
+    public static readonly Color TabDimColor = new(ColorName16.Gray);
+    public static readonly Color TabSelectedForegroundColor = new(ColorName16.Black);
+
+    // Live Feed frame's focus-accent color (openspec/changes/adopt-tabbed-view) - a plain frame
+    // accent color. Theme.cs has no notion of FocusView/TabbedView (the controls that happen to
+    // apply it, both via a settable AccentColor property) - that wiring is done at the composition
+    // root (MainWindow), as high up as possible, not here and not in View itself. Same value as
+    // TabAccentColor, kept as its own named constant per this file's one-constant-per-usage-site
+    // convention (see EditFrameEdgeAccentFocused vs. SubjectColor).
+    public static readonly Color LiveFeedFocusAccentColor = new(ColorName16.BrightYellow);
+
     private static readonly Attribute EditableAttribute = new(ColorName16.White, EditableBackground);
 
     // Dimmed foreground, same EditableBackground - explicit rather than left to derive from

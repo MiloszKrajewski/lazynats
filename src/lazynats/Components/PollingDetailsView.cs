@@ -82,13 +82,21 @@ internal abstract class PollingDetailsView<TTarget, TInfo>: View
     // Gates the pipeline's poll-tick branch - false means every tick is a genuine no-op (no fetch
     // issued at all), not just a discarded result. Target-change fetches are NOT gated by this,
     // matching the old RefreshNow's "independent of the active-gate" contract. The underlying
-    // subscription is created once, lazily, the first time this is called with true (by which
-    // point App is guaranteed to be available) and is never recreated - only Dispose() tears it
-    // down.
+    // subscription is created once, lazily, the first time this is called with App available, and
+    // is never recreated - only Dispose() tears it down. Gated on App itself, not on `active`:
+    // since the TabbedView migration, a tab's content gets its initial SetActive(false) from
+    // AddTab's `content.Visible = false` *before* that content is even added as a SubView (let
+    // alone attached to a running Application) - see TabbedView.AddTab. Starting the pipeline
+    // there would capture a null App in StartPolling's ObserveOnApp closure forever (the
+    // subscription is memoized and never recreated), which then throws the first time a fetch
+    // result actually reaches ObserveOnApp - silently killing the Interval timer for good, since
+    // that's downstream of Switch (see FetchInternalAsync's comment on why an OnError there is
+    // fatal to the whole pipeline). Waiting for a real App defers StartPolling to whenever this is
+    // next called after attachment (e.g. the tab's first genuine Visible/HasFocus transition).
     public void SetActive(bool active)
     {
         _active = active;
-        _subscription ??= StartPolling();
+        if (_subscription is null && App is not null) _subscription = StartPolling();
     }
 
     private IDisposable StartPolling()
