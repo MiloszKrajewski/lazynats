@@ -1,6 +1,5 @@
 # TODO
 
-- templates have no age and not marker ttl (leak!)
 - editing sdingle entry triggers full refresh of the list? (it does in templates)
 - be better explaining why you cannot edit binary key (or allow editing)
 - background is black-black (not transparent black)
