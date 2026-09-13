@@ -44,7 +44,7 @@ internal sealed class SubscriptionRegistry
             ?? throw new ArgumentException($"Pattern '{pattern}' does not compile.", nameof(pattern));
         var cts = new CancellationTokenSource();
         _subscriptions[id] = new Subscription { Id = id, Pattern = pattern, Filter = filter, Cts = cts };
-        _ = RunAsync(id, filter, cts.Token);
+        _ = RunAsync(id, pattern, filter, cts.Token);
         Changed?.Invoke();
         return id;
     }
@@ -58,16 +58,21 @@ internal sealed class SubscriptionRegistry
         Changed?.Invoke();
     }
 
-    private async Task RunAsync(Guid id, NatsFilter filter, CancellationToken cancellationToken)
+    private async Task RunAsync(Guid id, string pattern, NatsFilter filter, CancellationToken cancellationToken)
     {
         var nativeFilter = filter.Native;
         var clientFilter = !filter.NativeFilterIsExact ? filter.Client : null;
+        var excludeSystem = !pattern.StartsWith('$');
+        var excludeInbox = !pattern.StartsWith("_INBOX.");
 
         try
         {
             var subscription = _connection.SubscribeAsync<byte[]>(nativeFilter, cancellationToken: cancellationToken);
             await foreach (var message in subscription)
             {
+                if (excludeSystem && message.Subject.StartsWith('$')) continue;
+                if (excludeInbox && message.Subject.StartsWith("_INBOX.")) continue;
+
                 var isMatch = clientFilter is null || clientFilter.IsMatch(message.Subject);
                 if (!isMatch) continue;
 
