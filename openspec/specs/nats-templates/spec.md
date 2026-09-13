@@ -48,6 +48,13 @@ string, as today. Reading a document whose Payload was written as a JSON-encoded
 `Json` Payload Type (the shape used before this requirement changed) SHALL still succeed, treating
 that string as the template's payload text.
 
+The bucket SHALL be configured with a marker TTL (`LimitMarkerTTL`) of 1 minute, so that
+delete/purge markers left behind by Delete Template expire instead of being retained
+indefinitely. Any write path that ensures the bucket exists (template create, template edit,
+import) SHALL apply this configuration to the bucket, including a bucket that already exists from
+before this requirement changed, so the marker TTL takes effect regardless of whether the bucket
+was freshly created or already present.
+
 #### Scenario: A saved template is stored as a KV entry
 - **WHEN** a template named `get-invoice` with Subject `invoices.get` is created
 - **THEN** the `lazynats-templates` bucket contains an entry keyed `get-invoice` whose value is a
@@ -63,6 +70,15 @@ that string as the template's payload text.
   `payload` field is the JSON string `"{\"id\":1}"` (written before this requirement changed)
 - **THEN** the system reads that template's Payload as the text `{"id":1}`, the same as it would
   for the native-JSON-value shape
+
+#### Scenario: Creating the first template configures the bucket with a marker TTL
+- **WHEN** the `lazynats-templates` bucket does not exist and the user creates the first template
+- **THEN** the bucket is created with `LimitMarkerTTL` set to 1 minute
+
+#### Scenario: A pre-existing bucket without a marker TTL is upgraded on the next write
+- **WHEN** the `lazynats-templates` bucket already exists with `LimitMarkerTTL` unset (created
+  before this requirement changed) and the user creates, edits, or imports a template
+- **THEN** the bucket's configuration is updated to set `LimitMarkerTTL` to 1 minute
 
 ### Requirement: Template List
 The system SHALL list the names of all templates currently present in the `lazynats-templates`
@@ -235,8 +251,12 @@ Field Validation" to the fields it leaves editable. Name, being disabled, is exe
 The system SHALL allow the user to delete the highlighted template via D. Before deleting,
 the system SHALL prompt the user to confirm, naming the template to be deleted, with the
 non-destructive choice (Cancel) as the prompt's default (Enter-activated) response. On
-confirmation the system SHALL delete the entry from the `lazynats-templates` bucket and refresh
-the template list so the deleted template no longer appears.
+confirmation the system SHALL purge the entry from the `lazynats-templates` bucket — removing
+prior revisions immediately and leaving a purge marker that expires after the bucket's marker TTL,
+rather than a tombstone retained indefinitely — and refresh the template list so the deleted
+template no longer appears. If the bucket does not yet carry a marker TTL (e.g. it was created
+before this requirement changed and no write/import has upgraded it yet), the system SHALL apply
+the bucket's configured marker TTL before purging.
 
 #### Scenario: D prompts for confirmation
 - **WHEN** the user presses D while the Templates list holds focus and a template is
@@ -245,7 +265,7 @@ the template list so the deleted template no longer appears.
 
 #### Scenario: Confirming deletes the template
 - **WHEN** the user confirms the deletion prompt (Delete)
-- **THEN** the system deletes the entry from the `lazynats-templates` bucket, and the template
+- **THEN** the system purges the entry from the `lazynats-templates` bucket, and the template
   list is refreshed so the deleted template no longer appears
 
 #### Scenario: Highlight moves to a neighboring template after delete

@@ -45,6 +45,16 @@ exists today.
   Single-field, button-less dialogs that commit on Enter (`PatternDialog`, `HeaderDialog`) are
   exempt — they have no bottom blank row to balance against, so they stay compact.
 
+## Code conventions
+
+- Domain-named wrappers: when a call expresses a technical mechanism rather than the intent
+  behind it (e.g. `_kv.CreateOrUpdateStoreAsync(BucketConfig)` to mean "the bucket is there"),
+  and that call appears more than once, wrap it in a small private method named for what it's
+  *for* (e.g. `EnsureBucketExistsAsync()`), not how it works. This applies even within a single
+  class — the goal is call sites that read as domain logic, with the technical detail (API
+  choice, config, options) pushed into one named place. A one-line wrapper is enough; don't
+  generalize it into something reusable across classes unless a second class actually needs it.
+
 ## Architecture
 
 - `Program.cs` wires everything up: opens the `NatsConnection`, creates an unbounded

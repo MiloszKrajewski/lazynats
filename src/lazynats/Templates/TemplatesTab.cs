@@ -20,7 +20,8 @@ namespace lazynats.Templates;
 internal sealed class TemplatesTab: View, IShortcutSource
 {
     private const string BucketName = "lazynats-templates";
-    private static readonly NatsKVConfig BucketConfig = new(BucketName) { Storage = NatsKVStorageType.File };
+    private static readonly TimeSpan MarkerTtl = TimeSpan.FromMinutes(1);
+    private static readonly NatsKVConfig BucketConfig = new(BucketName) { Storage = NatsKVStorageType.File, LimitMarkerTTL = MarkerTtl };
 
     private readonly INatsKVContext _kv;
 
@@ -118,6 +119,11 @@ internal sealed class TemplatesTab: View, IShortcutSource
         _details.SetActive(Visible);
     }
 
+    // Domain-named wrapper around the KV call so call sites read as "ensure the bucket is there",
+    // not "create-or-update a store with this config" - see CLAUDE.md's "Domain-named wrappers"
+    // convention.
+    private ValueTask<INatsKVStore> EnsureBucketExistsAsync() => _kv.CreateOrUpdateStoreAsync(BucketConfig);
+
     private void OnHighlightChanged(Template? template)
     {
         _details.SetTarget(template);
@@ -148,7 +154,7 @@ internal sealed class TemplatesTab: View, IShortcutSource
     private async Task WriteAsync(Template template, bool isEdit)
     {
         try {
-            var store = await _kv.CreateStoreAsync(BucketConfig);
+            var store = await EnsureBucketExistsAsync();
             var document = new TemplateDocument(
                 template.Subject, new Dictionary<string, string>(template.Headers), template.PayloadType,
                 TemplatePayloadCodec.ToNode(template.PayloadType, template.Payload));
@@ -179,8 +185,8 @@ internal sealed class TemplatesTab: View, IShortcutSource
         var neighborName = _listView.NeighborIdentity(name);
 
         try {
-            var store = await _kv.GetStoreAsync(BucketName);
-            await store.DeleteAsync(name);
+            var store = await EnsureBucketExistsAsync();
+            await store.PurgeAsync(name, MarkerTtl);
             _ = RefreshListAsync(neighborName);
         } catch (Exception ex) {
             App?.Invoke(() => MessageBox.ErrorQuery(App!, " Delete Template Failed ", ex.Message.Pad(), "_Ok"));
@@ -251,7 +257,7 @@ internal sealed class TemplatesTab: View, IShortcutSource
         }
 
         try {
-            var store = await _kv.CreateStoreAsync(BucketConfig);
+            var store = await EnsureBucketExistsAsync();
             foreach (var (name, document) in documents) {
                 var bytes = JsonSerializer.SerializeToUtf8Bytes(document, TemplateJsonContext.Default.TemplateDocument);
                 await store.PutAsync(name, bytes);
