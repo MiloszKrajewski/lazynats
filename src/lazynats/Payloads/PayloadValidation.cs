@@ -29,21 +29,9 @@ internal static class PayloadValidation
         }
     }
 
-    // Buffer sized to payload.Length is always large enough - base64 decoding never produces more
-    // bytes than the encoded text's own length.
-    private static bool IsValidBase64(string payload) =>
-        Convert.TryFromBase64String(payload, new byte[payload.Length], out _);
+    // Whitespace-tolerant: see PayloadBinaryText for the boundary-checked scan/decode this shares
+    // with PayloadEncoding.ToBytes.
+    private static bool IsValidBase64(string payload) => PayloadBinaryText.TryDecodeBase64(payload, out _);
 
-    private static bool IsValidHex(string payload)
-    {
-        try
-        {
-            Convert.FromHexString(payload);
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
+    private static bool IsValidHex(string payload) => PayloadBinaryText.TryDecodeHex(payload, out _);
 }

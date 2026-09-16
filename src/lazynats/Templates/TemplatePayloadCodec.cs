@@ -10,10 +10,19 @@ namespace lazynats.Templates;
 internal static class TemplatePayloadCodec
 {
     // For Json, the payload text is already validated JSON at this point, so it parses cleanly
-    // into a native JsonNode; for Text/Base64/Hex, the node is just a plain JSON string wrapping
-    // the text unchanged - the same shape these three types have always used.
-    public static JsonNode ToNode(PayloadType type, string payload) =>
-        type == PayloadType.Json ? JsonNode.Parse(payload)! : JsonValue.Create(payload);
+    // into a native JsonNode; for Text, the node is just a plain JSON string wrapping the text
+    // unchanged. For Hex/Base64, the caller's payload text may carry whitespace formatting (per
+    // payload-types' whitespace-tolerant validation) - round-trip it through PayloadEncoding.ToBytes
+    // and back to a canonical, whitespace-free encoded string, so the stored form is normalized
+    // rather than whatever whitespace the user typed or pasted (see design.md's "Templates store
+    // the normalized form" decision).
+    public static JsonNode ToNode(PayloadType type, string payload) => type switch
+    {
+        PayloadType.Json => JsonNode.Parse(payload)!,
+        PayloadType.Hex => JsonValue.Create(Convert.ToHexString(PayloadEncoding.ToBytes(type, payload))),
+        PayloadType.Base64 => JsonValue.Create(Convert.ToBase64String(PayloadEncoding.ToBytes(type, payload))),
+        _ => JsonValue.Create(payload),
+    };
 
     // For Text/Base64/Hex, the node is always a plain JSON string - unwrap it directly. For Json,
     // a JsonValue wrapping a string means the *old* string-encoded storage shape (or a

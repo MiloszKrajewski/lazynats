@@ -71,7 +71,7 @@ internal sealed class TemplateDialog: Dialog<Template>
 
         var payloadLabel = new Label { Text = "Payload", X = 0, Y = 21 };
 #pragma warning disable CS0618
-        _payloadView = new TextView { Text = initial?.Payload ?? string.Empty, TabKeyAddsTab = false };
+        _payloadView = new TextView { Text = SeedPayloadText(initial), TabKeyAddsTab = false };
 #pragma warning restore CS0618
         _payloadView.ContentsChanged += (_, _) => UpdateValidity();
         _payloadView.FixPasteRedraw();
@@ -108,6 +108,20 @@ internal sealed class TemplateDialog: Dialog<Template>
     // CreateKeyDialog/PublishDialog's identical override for the full rationale. Enter inside
     // Payload is consumed by TextView itself (inserts a newline) and never reaches here.
     protected override bool OnAccepting(CommandEventArgs args) => true;
+
+    // Hex/Base64 render through PayloadPresentation.Render (the same rendering the read-only
+    // Message Detail view uses) rather than the stored text verbatim, so the field opens
+    // wrapped/grouped for readability instead of as one unbroken string - see design.md's
+    // "Templates store the normalized form; editing re-renders from bytes" decision. Json/Text are
+    // seeded unchanged.
+    private static string SeedPayloadText(Template? initial)
+    {
+        if (initial is null) return string.Empty;
+        if (initial.PayloadType is not (PayloadType.Hex or PayloadType.Base64)) return initial.Payload;
+
+        var bytes = PayloadEncoding.ToBytes(initial.PayloadType, initial.Payload);
+        return PayloadPresentation.Render(bytes, initial.PayloadType, FieldWidth);
+    }
 
     private static EditFrame WrapField(View field, int y, int height)
     {
@@ -146,7 +160,12 @@ internal sealed class TemplateDialog: Dialog<Template>
     {
         var nameValid = _nameField.Text.Trim().Length > 0;
         var subjectValid = _subjectField.Text.Trim().Length > 0;
-        var payloadValid = PayloadValidation.IsValid(_payloadTypeDropDown.Value ?? PayloadType.Text, _payloadView.Text);
+        var payloadType = _payloadTypeDropDown.Value ?? PayloadType.Text;
+        var payloadValid = PayloadValidation.IsValid(payloadType, _payloadView.Text);
+
+        // See PublishDialog.UpdateValidity's identical line - same "wrap off only for Json" rule,
+        // folded into the handler both the constructor and the dropdown's ValueChanged already call.
+        _payloadView.WordWrap = payloadType != PayloadType.Json;
 
         SetFieldValidity(_nameField, nameValid);
         SetFieldValidity(_subjectField, subjectValid);

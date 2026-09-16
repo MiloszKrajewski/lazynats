@@ -1,22 +1,4 @@
-# payload-types
-
-## Purpose
-
-Define a shared payload-type concept — the set of payload types, how a payload's text is
-validated against a selected type, and how validated text is encoded to raw bytes — reused by
-every feature that composes or stores a message payload (Publish, Templates), rather than each
-feature defining its own set independently.
-
-## Requirements
-
-### Requirement: Payload Type Set
-The system SHALL define a shared set of four payload types — `Json`, `Text`, `Base64`, and `Hex`
-— usable anywhere a message payload is composed or stored, rather than each feature defining its
-own set.
-
-#### Scenario: Four payload types are available
-- **WHEN** a payload type is selected from a Payload Type field
-- **THEN** the available choices are exactly `Json`, `Text`, `Base64`, and `Hex`
+## MODIFIED Requirements
 
 ### Requirement: Payload Validation
 The system SHALL validate a payload's text against its selected Payload Type: `Json` text SHALL

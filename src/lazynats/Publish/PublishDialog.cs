@@ -132,6 +132,12 @@ internal sealed class PublishDialog: Dialog
         var payloadType = _payloadTypeDropDown.Value ?? PayloadType.Text;
         var payloadValid = PayloadValidation.IsValid(payloadType, _payloadView.Text);
 
+        // Json's own pretty-printed indentation has deliberate line structure that an added
+        // soft-wrap would visually clash with - see design.md's "Wrap is on for Hex/Base64/Text,
+        // off for Json" decision. Folded into UpdateValidity (rather than a separate handler) since
+        // that's what both the constructor and the dropdown's ValueChanged already call.
+        _payloadView.WordWrap = payloadType != PayloadType.Json;
+
         _sendButton.Enabled = subjectValid && payloadValid;
         // new Scheme(Attribute)'s single-value constructor derives Editable independently and
         // silently drops our background (defaults it to Black) - re-set Editable explicitly so
