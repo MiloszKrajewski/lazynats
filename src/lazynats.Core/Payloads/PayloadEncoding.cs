@@ -1,13 +1,12 @@
 using System.Text;
 
-namespace lazynats.Payloads;
+namespace lazynats.Core.Payloads;
 
 // Converts an already-validated payload's text to the raw bytes it is sent/stored as - see
 // design.md's "Shared payload-types capability" decision.
 internal static class PayloadEncoding
 {
-    public static byte[] ToBytes(PayloadType type, string payload) => type switch
-    {
+    public static byte[] ToBytes(PayloadType type, string payload) => type switch {
         PayloadType.Base64 => Decode(payload, PayloadBinaryText.TryDecodeBase64),
         PayloadType.Hex => Decode(payload, PayloadBinaryText.TryDecodeHex),
         _ => Encoding.UTF8.GetBytes(payload), // Json, Text: sent as their own UTF-8 text

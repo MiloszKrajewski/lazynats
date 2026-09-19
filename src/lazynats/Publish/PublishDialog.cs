@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 using lazynats.Components;
-using lazynats.Payloads;
+using lazynats.Core.Payloads;
 using NATS.Client.Core;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;

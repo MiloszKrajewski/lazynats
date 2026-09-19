@@ -1,4 +1,4 @@
-using lazynats.Payloads;
+using lazynats.Core.Payloads;
 using NATS.Client.Core;
 
 namespace lazynats.LiveFeed;

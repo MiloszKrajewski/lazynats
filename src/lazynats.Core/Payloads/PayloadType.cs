@@ -1,4 +1,4 @@
-namespace lazynats.Payloads;
+namespace lazynats.Core.Payloads;
 
 internal enum PayloadType
 {

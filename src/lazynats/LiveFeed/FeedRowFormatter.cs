@@ -1,5 +1,5 @@
 using lazynats.Components;
-using lazynats.Payloads;
+using lazynats.Core.Payloads;
 
 namespace lazynats.LiveFeed;
 

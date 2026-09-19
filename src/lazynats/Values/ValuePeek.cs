@@ -1,5 +1,5 @@
 using System.Text;
-using lazynats.Payloads;
+using lazynats.Core.Payloads;
 
 namespace lazynats.Values;
 

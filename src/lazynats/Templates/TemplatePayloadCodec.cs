@@ -1,5 +1,5 @@
 using System.Text.Json.Nodes;
-using lazynats.Payloads;
+using lazynats.Core.Payloads;
 
 namespace lazynats.Templates;
 

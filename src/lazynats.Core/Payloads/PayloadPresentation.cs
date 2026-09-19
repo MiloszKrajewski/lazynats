@@ -1,8 +1,7 @@
 using System.Text;
 using System.Text.Json;
-using lazynats.Core;
 
-namespace lazynats.Payloads;
+namespace lazynats.Core.Payloads;
 
 // Display-side counterpart to PayloadValidation/PayloadEncoding: those validate/encode
 // user-typed text for sending, this renders already-received bytes for display. Reuses the

@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.Text.Json;
 using lazynats.Components;
 using lazynats.Core;
-using lazynats.Payloads;
+using lazynats.Core.Payloads;
 using NATS.Client.KeyValueStore;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;

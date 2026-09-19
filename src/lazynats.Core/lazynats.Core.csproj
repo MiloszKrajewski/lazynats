@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <!--
+  No Terminal.Gui / NATS.Client package references here by design - this assembly holds the
+  framework-independent, unit-testable core (currently: Payloads/) shared across UI tabs, so it
+  can be exercised by lazynats.Core.Tests without constructing UI or network state.
+  -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="lazynats" />
+    <InternalsVisibleTo Include="lazynats.Core.Tests" />
+  </ItemGroup>
+
+</Project>

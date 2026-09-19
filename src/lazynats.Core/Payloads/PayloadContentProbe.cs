@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.Json;
 
-namespace lazynats.Payloads;
+namespace lazynats.Core.Payloads;
+
+// TODO: this code needs some performance tuning as it will be executed on every keystroke / message received
 
 // Classifies raw payload bytes for display purposes - the inverse of the PayloadType/
 // PayloadValidation/PayloadEncoding trio (which validate/encode already-chosen-type text for
@@ -16,23 +18,25 @@ internal static class PayloadContentProbe
     // does), which is what makes the first check below a strict well-formedness check rather than
     // a lossy guess.
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
-
+    
     public static PayloadContentKind Classify(byte[] payload)
     {
         string text;
         try
         {
+            // TODO: use stackalloc/Span for small payloads, pool byte buffer otherwise
             text = StrictUtf8.GetString(payload);
         }
         catch (DecoderFallbackException)
         {
             return PayloadContentKind.Binary;
         }
-
+        
         // Binary data can, by chance, still be well-formed UTF-8 - reject it here if the decoded
         // text carries control characters a genuine text/JSON payload wouldn't, rather than
         // rendering it as "text" full of control-character noise. Tab/newline/carriage-return are
         // the only control characters a legitimate text payload uses, so those alone are exempt.
+        // TODO: use SearchValues, build SearchValues once at static constructor
         foreach (var c in text)
         {
             if (char.IsControl(c) && c is not ('\t' or '\n' or '\r'))
@@ -46,6 +50,7 @@ internal static class PayloadContentProbe
     {
         try
         {
+            // TODO: TryParseValue might save us from exception handling
             using var _ = JsonDocument.Parse(text);
             return true;
         }

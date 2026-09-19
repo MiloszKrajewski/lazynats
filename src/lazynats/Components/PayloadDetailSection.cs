@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using lazynats.Payloads;
+using lazynats.Core.Payloads;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;

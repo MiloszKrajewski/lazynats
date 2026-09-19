@@ -1,5 +1,5 @@
 using lazynats.Components;
-using lazynats.Payloads;
+using lazynats.Core.Payloads;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.Core;
 using Terminal.Gui.App;
