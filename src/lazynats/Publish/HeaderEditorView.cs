@@ -17,7 +17,8 @@ internal sealed class HeaderEditorView: ListEditorView<HeaderPair>
 {
     private static readonly HeaderColonPresenter Presenter = new();
 
-    public HeaderEditorView(ObservableCollection<HeaderPair> items): base(items, Presenter) { }
+    public HeaderEditorView(ObservableCollection<HeaderPair> items):
+        base(items, Presenter, "Add new Header", "Edit Header", "Delete Header") { }
 
     protected override string EmptyHint => "No headers — N to add one";
 

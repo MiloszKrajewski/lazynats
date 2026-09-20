@@ -36,9 +36,12 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
     private readonly ListView _listView;
     private readonly Label _emptyHintLabel;
     private readonly bool _bindSharedKeys;
+    private readonly string _createLabel;
+    private readonly string _editLabel;
+    private readonly string _deleteLabel;
 
     private FilterBox? _filterBox;
-    private bool _filterEnabled;
+    private string? _filterLabel;
     private string? _activeFilterPattern;
     private Regex? _activeFilterRegex;
     private string _quickSearchQuery = string.Empty;
@@ -51,12 +54,16 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
     // HeaderEditorView leaves it unset since a header row is a key/value pair, not a single
     // identifier - see openspec/specs/list-editor/spec.md's "Per-Subclass Row Text Color".
     public ListEditorView(
-        ObservableCollection<T> items, IValuePresenter<T> presenter, bool bindSharedKeys = true, Color? textColor = null)
+        ObservableCollection<T> items, IValuePresenter<T> presenter, string createLabel, string editLabel,
+        string deleteLabel, bool bindSharedKeys = true, Color? textColor = null)
     {
         CanFocus = true;
         _items = items;
         _filtered = [..items];
         _presenter = presenter;
+        _createLabel = createLabel;
+        _editLabel = editLabel;
+        _deleteLabel = deleteLabel;
         _bindSharedKeys = bindSharedKeys;
 
         _dataSource = new PresenterListDataSource<T>(_filtered, presenter, textColor);
@@ -89,7 +96,7 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
             KeyBindings.Add(Key.D, Command.DeleteAll);
         }
 
-        if (_bindSharedKeys && _filterEnabled) {
+        if (_bindSharedKeys && _filterLabel is not null) {
             // F for the shared filter wiring (see EnableFilter) - only needed in the
             // standalone/modal case, mirroring N/E/D above: a tab-hosted instance has no
             // direct key binding for Filter either (see DrillableListView<T>.EnableFilter), relying
@@ -305,17 +312,15 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
     // Opt-in shared "Filter" (Ctrl+F) shape - same sticky, `* ? >`-grammar pattern-filter
     // mechanics as DrillableListView<T>.EnableFilter, adapted to match against each item's
     // presenter-formatted text instead of an identity accessor (this base has none). Called from a
-    // subclass's own constructor, same convention as DrillableListView<T>'s Enable* shapes.
-    protected void EnableFilter() => _filterEnabled = true;
-
-    // Overridable per item type so the filter dialog's title reads naturally; defaulted rather
-    // than abstract so a forgotten override still shows something useful.
-    protected virtual string FilterDialogTitle => "Filter";
+    // subclass's own constructor, same convention as DrillableListView<T>'s Enable* shapes. `label`
+    // is used verbatim both as the advertised hint's text and as the filter dialog's own title, so
+    // the two can never disagree - see openspec/changes/descriptive-shortcut-names/design.md.
+    protected void EnableFilter(string label) => _filterLabel = label;
 
     private void OpenFilterDialog()
     {
         var dialog = new PatternDialog(
-            FilterDialogTitle, _activeFilterPattern ?? string.Empty, allowEmpty: true,
+            _filterLabel!, _activeFilterPattern ?? string.Empty, allowEmpty: true,
             validator: p => FilterExpression.TryCompile(p) is not null);
         App!.Run(dialog);
         if (dialog.Result is not { } pattern) return;
@@ -337,12 +342,12 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         {
             IEnumerable<ShortcutHint> hints = _bindSharedKeys
                 ? [
-                    new ShortcutHint(Key.N, "New", TryCreateItem),
-                    new ShortcutHint(Key.E, "Edit", TryEditItem),
-                    new ShortcutHint(Key.D, "Delete", TryDeleteItem),
+                    new ShortcutHint(Key.N, _createLabel, TryCreateItem),
+                    new ShortcutHint(Key.E, _editLabel, TryEditItem),
+                    new ShortcutHint(Key.D, _deleteLabel, TryDeleteItem),
                 ]
                 : [];
-            if (_bindSharedKeys && _filterEnabled) hints = hints.Append(new ShortcutHint(Key.F, "Filter", OpenFilterDialog));
+            if (_bindSharedKeys && _filterLabel is { } filterLabel) hints = hints.Append(new ShortcutHint(Key.F, filterLabel, OpenFilterDialog));
             if (_filterBox is { } box) hints = hints.Append(new ShortcutHint(new Key('/'), "Search", box.Activate));
             return hints;
         }
@@ -353,11 +358,11 @@ internal abstract class ListEditorView<T>: View, IShortcutSource, ITabOperations
         get
         {
             IEnumerable<ShortcutHint> hints = [
-                new(Key.N, "New", TryCreateItem),
-                new(Key.E, "Edit", TryEditItem),
-                new(Key.D, "Delete", TryDeleteItem),
+                new(Key.N, _createLabel, TryCreateItem),
+                new(Key.E, _editLabel, TryEditItem),
+                new(Key.D, _deleteLabel, TryDeleteItem),
             ];
-            if (_filterEnabled) hints = hints.Append(new ShortcutHint(Key.F, "Filter", OpenFilterDialog));
+            if (_filterLabel is { } filterLabel) hints = hints.Append(new ShortcutHint(Key.F, filterLabel, OpenFilterDialog));
             return hints;
         }
     }

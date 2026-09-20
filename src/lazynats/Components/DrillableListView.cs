@@ -49,10 +49,10 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     public event Action<string?>? FilterChanged;
 
     private bool _ascendEnabled;
-    private bool _createEnabled;
-    private bool _deleteEnabled;
-    private bool _editEnabled;
-    private bool _filterEnabled;
+    private string? _createLabel;
+    private string? _deleteLabel;
+    private string? _editLabel;
+    private string? _filterLabel;
 
     private FilterBox? _filterBox;
 
@@ -131,26 +131,29 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
         KeyBindings.Add(Key.Backspace, Command.Cancel);
     }
 
-    // N -> CreateRequested, plus a "New" Shortcuts hint. Independent of EnableDelete.
-    protected void EnableCreate()
+    // N -> CreateRequested, plus a Shortcuts hint labeled with the supplied text. Independent of
+    // EnableDelete.
+    protected void EnableCreate(string label)
     {
-        _createEnabled = true;
+        _createLabel = label;
 
         AddCommand(Command.New, () => { CreateRequested?.Invoke(); return true; });
     }
 
-    // D -> DeleteRequested, plus a "Delete" Shortcuts hint. Independent of EnableCreate.
-    protected void EnableDelete()
+    // D -> DeleteRequested, plus a Shortcuts hint labeled with the supplied text. Independent of
+    // EnableCreate.
+    protected void EnableDelete(string label)
     {
-        _deleteEnabled = true;
+        _deleteLabel = label;
 
         AddCommand(Command.DeleteAll, () => { DeleteRequested?.Invoke(); return true; });
     }
 
-    // E -> EditRequested, plus an "Edit" Shortcuts hint. Independent of EnableCreate/EnableDelete.
-    protected void EnableEdit()
+    // E -> EditRequested, plus a Shortcuts hint labeled with the supplied text. Independent of
+    // EnableCreate/EnableDelete.
+    protected void EnableEdit(string label)
     {
-        _editEnabled = true;
+        _editLabel = label;
 
         AddCommand(Command.Edit, () => { EditRequested?.Invoke(); return true; });
     }
@@ -161,12 +164,10 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     // ClearFilter). A subclass activating this needs no dialog code or event handler of its own -
     // only the one native-scoped consumer (ValuesTab, for KV keys) additionally subscribes to
     // FilterChanged to also scope its server-side fetch. See
-    // openspec/changes/unify-list-filtering/design.md Decision 2.
-    protected void EnableFilter() => _filterEnabled = true;
-
-    // Overridable per item type so the filter dialog's title reads naturally (e.g. "Filter Keys");
-    // defaulted rather than abstract so a forgotten override still shows something useful.
-    protected virtual string FilterDialogTitle => "Filter";
+    // openspec/changes/unify-list-filtering/design.md Decision 2. `label` is used verbatim both as
+    // the advertised hint's text and as the filter dialog's own title, so the two can never
+    // disagree - see openspec/changes/descriptive-shortcut-names/design.md.
+    protected void EnableFilter(string label) => _filterLabel = label;
 
     // The shared filter wiring's currently active pattern, or null if none - exposed for an owning
     // tab's title/header text (e.g. "Keys of bucket (filter: ...)").
@@ -175,7 +176,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     private void OpenFilterDialog()
     {
         var dialog = new PatternDialog(
-            FilterDialogTitle, _activeFilterPattern ?? string.Empty, allowEmpty: true,
+            _filterLabel!, _activeFilterPattern ?? string.Empty, allowEmpty: true,
             validator: p => FilterExpression.TryCompile(p) is not null);
         App!.Run(dialog);
         if (dialog.Result is not { } pattern) return;
@@ -424,10 +425,10 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     public virtual IEnumerable<ShortcutHint> TabOperations =>
         new ShortcutHint?[] {
             new ShortcutHint(Key.R, "Refresh", () => RefreshRequested?.Invoke()),
-            _createEnabled ? new ShortcutHint(Key.N, "New", () => CreateRequested?.Invoke()) : null,
-            _deleteEnabled ? new ShortcutHint(Key.D, "Delete", () => DeleteRequested?.Invoke()) : null,
-            _editEnabled ? new ShortcutHint(Key.E, "Edit", () => EditRequested?.Invoke()) : null,
-            _filterEnabled ? new ShortcutHint(Key.F, "Filter", OpenFilterDialog) : null,
+            _createLabel is { } createLabel ? new ShortcutHint(Key.N, createLabel, () => CreateRequested?.Invoke()) : null,
+            _deleteLabel is { } deleteLabel ? new ShortcutHint(Key.D, deleteLabel, () => DeleteRequested?.Invoke()) : null,
+            _editLabel is { } editLabel ? new ShortcutHint(Key.E, editLabel, () => EditRequested?.Invoke()) : null,
+            _filterLabel is { } filterLabel ? new ShortcutHint(Key.F, filterLabel, OpenFilterDialog) : null,
         }.OfType<ShortcutHint>();
 
     protected override void Dispose(bool disposing)

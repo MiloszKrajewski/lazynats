@@ -10,16 +10,15 @@ internal sealed class StreamListView: DrillableListView<StreamInfo>
 
     public StreamListView(ObservableCollection<StreamInfo> items): base(items)
     {
-        EnableCreate();
-        EnableDelete();
-        EnableEdit();
-        EnableFilter();
+        EnableCreate("Add new Stream");
+        EnableDelete("Delete Stream");
+        EnableEdit("Edit Stream");
+        EnableFilter("Filter Streams");
     }
 
     protected override IValuePresenter<StreamInfo> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No streams - N to add one, R to refresh";
     protected override string GetIdentity(StreamInfo item) => item.Config.Name!;
-    protected override string FilterDialogTitle => "Filter Streams";
 
     public StreamInfo? SelectedStream => SelectedItem;
 }

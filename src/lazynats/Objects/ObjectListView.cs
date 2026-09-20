@@ -16,14 +16,14 @@ internal sealed class ObjectListView: DrillableListView<string>
     public ObjectListView(ObservableCollection<string> items): base(items)
     {
         EnableAscend();
-        EnableCreate();
-        EnableDelete();
+        EnableCreate("Add new Object");
+        EnableDelete("Delete Object");
         // The shared Filter (Ctrl+F) wiring, using the same grammar every other list's filter
         // uses - retires this view's own WildcardToRegex-based post-fetch filter. ObjectsTab
         // subscribes to FilterChanged to re-trigger its (always-full, never server-scoped) fetch,
         // since Object Store has no server-side name-wildcard fetch API to scope in the first
         // place. See openspec/changes/unify-list-filtering/design.md Decision 3.
-        EnableFilter();
+        EnableFilter("Filter Objects");
 
         // Command.Save is unused elsewhere on this view - repurposed here for bare-S download,
         // which stays list-bound (out of scope for tab-scoped-list-shortcuts, unlike Ctrl+F/bare F).
@@ -34,7 +34,6 @@ internal sealed class ObjectListView: DrillableListView<string>
     protected override IValuePresenter<string> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No objects - N to add one, R to refresh";
     protected override string GetIdentity(string item) => item;
-    protected override string FilterDialogTitle => "Filter Objects";
 
     public string? SelectedObject => SelectedItem;
 

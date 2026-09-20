@@ -17,14 +17,14 @@ internal sealed class KeyListView: DrillableListView<string>
     public KeyListView(ObservableCollection<string> items): base(items)
     {
         EnableAscend();
-        EnableCreate();
-        EnableDelete();
-        EnableEdit();
+        EnableCreate("Add new Key");
+        EnableDelete("Delete Key");
+        EnableEdit("Edit Key");
         // The shared Filter (Ctrl+F) wiring - ValuesTab additionally subscribes to FilterChanged
         // to scope its server-side fetch (the one list in the app that can), but the base class's
         // own in-memory narrowing already fully owns the dialog/compile/apply mechanics. See
         // openspec/changes/unify-list-filtering/design.md Decision 2.
-        EnableFilter();
+        EnableFilter("Filter Keys");
 
         // V -> ViewValueRequested. Bound directly here (like EnableAscend's Esc/Backspace) rather
         // than through the shared Ctrl+R/N/D/E/F TabOperations dispatch - this is a KeyListView-
@@ -38,7 +38,6 @@ internal sealed class KeyListView: DrillableListView<string>
     protected override IValuePresenter<string> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No keys - N to add one, R to refresh";
     protected override string GetIdentity(string item) => item;
-    protected override string FilterDialogTitle => "Filter Keys";
 
     public string? SelectedKey => SelectedItem;
 

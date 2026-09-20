@@ -15,16 +15,15 @@ internal sealed class BucketListView: DrillableListView<KvBucketItem>
 
     public BucketListView(ObservableCollection<KvBucketItem> items): base(items)
     {
-        EnableCreate();
-        EnableDelete();
-        EnableEdit();
-        EnableFilter();
+        EnableCreate("Add new Bucket");
+        EnableDelete("Delete Bucket");
+        EnableEdit("Edit Bucket");
+        EnableFilter("Filter Buckets");
     }
 
     protected override IValuePresenter<KvBucketItem> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No buckets - N to add one, R to refresh";
     protected override string GetIdentity(KvBucketItem item) => item.Name;
-    protected override string FilterDialogTitle => "Filter Buckets";
 
     public KvBucketItem? SelectedBucket => SelectedItem;
 }

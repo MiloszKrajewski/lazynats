@@ -15,16 +15,15 @@ internal sealed class TemplateListView: DrillableListView<Template>
 
     public TemplateListView(ObservableCollection<Template> items): base(items)
     {
-        EnableCreate();
-        EnableDelete();
-        EnableEdit();
-        EnableFilter();
+        EnableCreate("Add new Template");
+        EnableDelete("Delete Template");
+        EnableEdit("Edit Template");
+        EnableFilter("Filter Templates");
     }
 
     protected override IValuePresenter<Template> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No templates - N to add one, R to refresh";
     protected override string GetIdentity(Template item) => item.Name;
-    protected override string FilterDialogTitle => "Filter Templates";
 
     public Template? SelectedTemplate => SelectedItem;
 }

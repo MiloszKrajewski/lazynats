@@ -11,16 +11,15 @@ internal sealed class ConsumerListView: DrillableListView<ConsumerInfo>
     public ConsumerListView(ObservableCollection<ConsumerInfo> items): base(items)
     {
         EnableAscend();
-        EnableCreate();
-        EnableDelete();
-        EnableEdit();
-        EnableFilter();
+        EnableCreate("Add new Consumer");
+        EnableDelete("Delete Consumer");
+        EnableEdit("Edit Consumer");
+        EnableFilter("Filter Consumers");
     }
 
     protected override IValuePresenter<ConsumerInfo> Presenter => PresenterInstance;
     protected override string EmptyHintText => "No consumers - N to add one, R to refresh";
     protected override string GetIdentity(ConsumerInfo item) => item.Name!;
-    protected override string FilterDialogTitle => "Filter Consumers";
 
     public ConsumerInfo? SelectedConsumer => SelectedItem;
 }
