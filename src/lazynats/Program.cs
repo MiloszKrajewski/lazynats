@@ -1,4 +1,5 @@
 ﻿using ConsoleAppFramework;
+using System.Diagnostics;
 using System.Reactive.Subjects;
 using lazynats;
 using lazynats.Core;
@@ -54,6 +55,7 @@ static async Task RunAppAsync(
     // Dev convenience only (excluded from Release/AOT builds): see live traffic immediately without
     // first driving the Subscribe tab's N shortcut by hand.
     registry.Add(">");
+    Trace.Listeners.Add(new TraceFeedListener(feed));
 #endif
 
     // DropDownList's expanded popup sizes its ContentView.Width to Dim.Auto(DimAutoStyle.Content) -

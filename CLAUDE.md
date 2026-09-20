@@ -69,6 +69,15 @@ exists today.
   and renders rows via `FeedRowFormatter`. `LiveLogDataSource` intentionally reports
   `MaxItemLength = 0` to avoid an O(n²) rescan on append — see the comment in that file before
   "fixing" it.
+- In DEBUG builds, `TraceFeedListener` (`LiveFeed/TraceFeedListener.cs`, compiled only under
+  `#if DEBUG`) forwards `System.Diagnostics.Trace.Write`/`WriteLine` calls into the same Live Feed
+  pipeline as synthetic `$TRACE`-subject `FeedEnvelope`s, bypassing `SubscriptionRegistry`
+  entirely — a debug channel for internal state (subscription lifecycle, dedup decisions, poll
+  timing) that has no DI seam to log into otherwise. See `openspec/specs/trace-listener/spec.md`.
+  `$TRACE` rows are for a human doing quick, in-app visual triage; an agent gets more value from a
+  separate process watching `System.Diagnostics.Trace` directly — don't scrape `$TRACE` rows back
+  out of the rendered Live Feed pane (e.g. via `tmux capture-pane`) when the
+  `deep-trace-diagnostics` skill's cross-process trace watcher is the more direct path.
 - `MainWindow` hosts `ManagementTabs` (`SubscribeTab`, `PublishTab`, `StreamsTab`, `ValuesTab`,
   `ObjectsTab` — the full list in `doc/UI.md`) over the live feed, plus a `StatusBar`. Each tab's
   content is a self-contained component (one per top-level folder: `Subscriptions/`, `Publish/`,
