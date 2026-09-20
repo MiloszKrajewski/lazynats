@@ -6,8 +6,9 @@ using Terminal.Gui.Views;
 namespace lazynats.Components;
 
 // Lists every shortcut the focused view (and its ancestors) currently advertises via
-// IShortcutSource, alphabetically by name - deliberately excludes MainWindow's hardcoded
-// top-level shortcuts (Alt-1..4, Alt-P, Alt-Q, this dialog's own trigger key), since those are
+// IShortcutSource, grouped and ordered per ShortcutAggregator.Collect/ShortcutHint.Group -
+// deliberately excludes MainWindow's hardcoded top-level shortcuts (Alt-1..4, Alt-P, Alt-Q, this
+// dialog's own trigger key), since those are
 // already permanently visible in the status bar and would just be redundant here; see the
 // caller in MainWindow. No buttons: Enter on the highlighted row sets Result and closes, Esc
 // cancels via Dialog<T>'s own inherited behavior (Result stays null), same compact "commits on
@@ -25,7 +26,17 @@ internal sealed class ShortcutPickerDialog: Dialog<ShortcutHint?>
         Title = " Shortcuts ";
         Padding.Thickness = new Thickness(1, 0, 1, 0);
 
-        var sorted = hints.OrderBy(hint => hint.Text, StringComparer.OrdinalIgnoreCase).ToList();
+        // GroupBy preserves first-occurrence order of both groups and of elements within a group
+        // (documented LINQ-to-Objects behavior, unlike unordered Parallel LINQ) - that alone
+        // reproduces the aggregator's focus-chain walk order across groups with no extra
+        // bookkeeping. Within each group, OrderBy's own stability keeps hints without an explicit
+        // Priority in their declared relative order while pulling a prioritized hint earlier -
+        // never into a different group's span. See openspec/changes/shortcut-picker-groups/
+        // design.md's "Ordering" decision - don't "simplify" this into a plain Distinct/Dictionary
+        // pass, which would drop the ordering guarantee.
+        var sorted = hints.GroupBy(hint => hint.Group)
+            .SelectMany(group => group.OrderBy(hint => hint.Priority ?? int.MaxValue))
+            .ToList();
 
         // Reachable now that the top-level set is excluded: a view advertising nothing of its own
         // (e.g. the live feed) would otherwise open onto a blank, content-less dialog.

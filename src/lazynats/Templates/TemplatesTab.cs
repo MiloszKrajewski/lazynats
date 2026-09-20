@@ -42,6 +42,11 @@ internal sealed class TemplatesTab: View, IShortcutSource
     // discovered and revised during that earlier implementation.
     private readonly ShortcutHint[] _extraOperations;
 
+    // Sentinel identity for _extraOperations' own group, so Export/Import stay contiguous and
+    // never interleave with _listView.TabOperations' own (default-grouped) CRUD hints in the
+    // shortcut picker - see openspec/changes/shortcut-picker-groups/design.md.
+    private static readonly object ExtraOperationsGroup = new();
+
     // Guards the one-time initial fetch - the list is otherwise load-once + Ctrl+R only, per
     // nats-templates' "Manual Template List Refresh" requirement.
     private bool _loaded;
@@ -71,8 +76,8 @@ internal sealed class TemplatesTab: View, IShortcutSource
         _details = new TemplateDetails { X = Pos.Right(_listFrame) + 1, Y = 2, Width = Dim.Fill(), Height = Dim.Fill() };
 
         _extraOperations = [
-            new ShortcutHint(Key.X, "Export", Export),
-            new ShortcutHint(Key.O, "Import", Import),
+            new ShortcutHint(Key.X, "Export", Export, Group: ExtraOperationsGroup),
+            new ShortcutHint(Key.O, "Import", Import, Group: ExtraOperationsGroup),
         ];
 
         // Add()-order matches spatial top-down layout so Tab/Shift+Tab cycles in reading order -

@@ -13,6 +13,6 @@ internal static class ShortcutAggregator
         for (var view = focused; view is not null; view = view.SuperView)
             if (view is IShortcutSource source)
                 foreach (var hint in source.Shortcuts)
-                    yield return hint;
+                    yield return hint.Group is null ? hint with { Group = source } : hint;
     }
 }
