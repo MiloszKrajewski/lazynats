@@ -3,8 +3,11 @@ using System.Reactive.Linq;
 using System.Text;
 using lazynats.Components;
 using lazynats.Core;
+using lazynats.Core.Payloads;
+using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
+using Terminal.Gui.App;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -60,7 +63,11 @@ internal sealed class ValuesTab: View, IShortcutSource
         CanFocus = true;
         _kv = kv;
 
-        _listLabel = new Label { Text = "Buckets", X = 0, Y = 0 };
+        // HotKeySpecifier disabled - its title is later set to a bucket-derived "Keys of {bucket}"
+        // (UpdateKeyListTitle), and bucket names routinely contain '_' (e.g. LAZYNATS_DEMO); Label
+        // defaults to '_' as a hotkey marker and would otherwise silently eat it. See
+        // EditFrame.CreateReadOnly's identical comment.
+        _listLabel = new Label { HotKeySpecifier = (Rune)0xffff, Text = "Buckets", X = 0, Y = 0 };
         _bucketFilterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40) };
         _listView = new BucketListView(_items) { Background = Theme.EditableBackground };
         _listView.AttachFilterBox(_bucketFilterBox);
@@ -463,7 +470,7 @@ internal sealed class ValuesTab: View, IShortcutSource
     {
         try {
             var store = await _kv.GetStoreAsync(bucket);
-            await store.PutAsync(options.Name, Encoding.UTF8.GetBytes(options.Value));
+            await store.PutAsync(options.Name, PayloadEncoding.ToBytes(options.PayloadType, options.Value));
             _ = RefreshKeyListAsync(options.Name);
         } catch (Exception ex) {
             App?.Invoke(() => {
@@ -485,9 +492,10 @@ internal sealed class ValuesTab: View, IShortcutSource
         App!.Run(new ValueDetailDialog(bucket, entry));
     }
 
-    // Ctrl+E at the key level. Per design.md's "Printable-text guard" decision, this always
-    // re-fetches the key's current entry - never reuses whatever KeyDetails last polled - and
-    // refuses to open the dialog for a missing or non-printable-text value.
+    // Ctrl+E at the key level. Per design.md's "Seeding Edit from content classification" decision,
+    // this always re-fetches the key's current entry - never reuses whatever KeyDetails last
+    // polled - and always proceeds to open the dialog, seeding Payload Type/Value from the entry's
+    // own content classification rather than refusing to open for anything but printable text.
     private void OpenEditKeyDialog()
     {
         if (_currentBucket is not { } bucket) return;
@@ -495,6 +503,23 @@ internal sealed class ValuesTab: View, IShortcutSource
 
         _ = TryOpenEditKeyDialogAsync(bucket, key);
     }
+
+    // Only Text is seeded with the plain decoded string rather than PayloadPresentation.Render:
+    // CreateKeyDialog's TextView turns WordWrap on for every type but Json (see UpdateValidity),
+    // and Render's fixed-width chop (ChunkFixedWidth) cuts mid-word wherever `width` lands, with
+    // no regard for word boundaries. Feeding that into a TextView that *does* wrap on word
+    // boundaries double-wraps it - the TextView disagrees with the chop and pushes each trailing
+    // partial word down onto its own line. Hex/Base64 don't hit this: their fixed-width rows have
+    // no partial "words" (each row is sized in this dialog CreateKeyDialog.SeedValueWidth uses,
+    // so WordWrap's own reflow is a no-op). Json is unaffected too - its WordWrap is off, so its
+    // real indentation newlines (from PayloadPresentation.Render's own re-serialization) render as
+    // typed. Saving compounds the Text case further: PayloadEncoding.ToBytes writes Text back as
+    // raw UTF-8 with no whitespace stripping (unlike Hex/Base64's whitespace-tolerant decode), so
+    // an unmodified save would have literally persisted the chop-point newlines into the value.
+    private static string SeedValueText(byte[] bytes, PayloadType type) => type switch {
+        PayloadType.Text => Encoding.UTF8.GetString(bytes),
+        _ => PayloadPresentation.Render(bytes, type, CreateKeyDialog.SeedValueWidth(Services.Root.GetRequiredService<IApplication>())),
+    };
 
     private async Task TryOpenEditKeyDialogAsync(string bucket, string key)
     {
@@ -506,12 +531,14 @@ internal sealed class ValuesTab: View, IShortcutSource
                 return;
             }
 
-            if (!ValueText.TryDecode(result.Value.Value ?? [], out var text)) {
-                App?.Invoke(() => StatusChanged?.Invoke($"Values: Cannot edit '{key}' — value is not printable text"));
-                return;
-            }
+            var bytes = result.Value.Value ?? [];
+            var kind = PayloadContentProbe.Classify(bytes);
+            var type = PayloadPresentation.DefaultType(kind);
 
-            App?.Invoke(() => OpenEditKeyDialog(bucket, key, new NewKeyOptions(key, text)));
+            App?.Invoke(() => {
+                var text = SeedValueText(bytes, type);
+                OpenEditKeyDialog(bucket, key, new NewKeyOptions(key, type, text));
+            });
         } catch (Exception ex) {
             App?.Invoke(() => StatusChanged?.Invoke($"Values: {ex.Message}"));
         }
@@ -531,7 +558,7 @@ internal sealed class ValuesTab: View, IShortcutSource
     {
         try {
             var store = await _kv.GetStoreAsync(bucket);
-            await store.PutAsync(key, Encoding.UTF8.GetBytes(edited.Value));
+            await store.PutAsync(key, PayloadEncoding.ToBytes(edited.PayloadType, edited.Value));
             _ = RefreshKeyListAsync(key);
         } catch (Exception ex) {
             App?.Invoke(() => {

@@ -1,4 +1,5 @@
 using lazynats.Components;
+using lazynats.Core.Payloads;
 using Microsoft.Extensions.DependencyInjection;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
@@ -30,11 +31,12 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
     // of margin) - kept next to the Y offsets below so a future layout change stays visible to it.
     private const int MinValueHeight = 10;
     private const int MaxValueHeight = 30;
-    private const int ReservedChromeRows = 14;
+    private const int ReservedChromeRows = 18;
 
     private static readonly Attribute InvalidAttribute = new(ColorName16.Red, Theme.EditableBackground);
 
     private readonly TextField _nameField;
+    private readonly DropDownList<PayloadType> _payloadTypeDropDown;
 #pragma warning disable CS0618 // TextView is obsolete in favor of Terminal.Gui.Editor - see PublishDialog's identical suppression.
     private readonly TextView _valueView;
 #pragma warning restore CS0618
@@ -61,14 +63,20 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
         _nameField.FixPasteRedraw();
         var nameFrame = WrapField(_nameField, 1, 3);
 
-        var valueLabel = new Label { Text = "Value", X = 0, Y = 4 };
+        var payloadTypeLabel = new Label { Text = "Payload Type", X = 0, Y = 4 };
+        _payloadTypeDropDown = new DropDownList<PayloadType> { Value = initial?.PayloadType ?? PayloadType.Text };
+        Theme.ApplyEditableScheme(_payloadTypeDropDown);
+        _payloadTypeDropDown.ValueChanged += (_, _) => UpdateValidity();
+        var payloadTypeFrame = WrapField(_payloadTypeDropDown, 5, 3);
+
+        var valueLabel = new Label { Text = "Value", X = 0, Y = 8 };
 #pragma warning disable CS0618
         _valueView = new TextView { Text = initial?.Value ?? string.Empty, TabKeyAddsTab = false };
 #pragma warning restore CS0618
         _valueView.FixPasteRedraw();
-        var valueFrame = WrapField(_valueView, 5, valueHeight);
+        var valueFrame = WrapField(_valueView, 9, valueHeight);
 
-        Add(nameLabel, nameFrame, valueLabel, valueFrame);
+        Add(nameLabel, nameFrame, payloadTypeLabel, payloadTypeFrame, valueLabel, valueFrame);
 
         // Result is left unset (null), matching Esc's own cancellation convention. Added before
         // Create so Create - not Cancel - stays the last-added, Enter-activated default button.
@@ -114,22 +122,38 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
         };
     }
 
+    // The Value field's current inner width, per design.md's "Render width for the Edit seed"
+    // decision - dialogWidth minus Padding(2) and EditFrame's own border+content-start margin(3).
+    // Called by ValuesTab before constructing the dialog, so the Edit seed's Hex/Base64 rendering
+    // groups bytes into rows sized to what the field will actually show, without ValuesTab having
+    // to duplicate this dialog's own width-clamping math.
+    public static int SeedValueWidth(IApplication app) =>
+        Math.Min(PreferredDialogWidth, app.Screen.Width - TerminalWidthMargin) - 5;
+
     private void Commit()
     {
         if (!_createButton.Enabled) return;
 
-        Result = new NewKeyOptions(_nameField.Text.Trim(), _valueView.Text);
+        Result = new NewKeyOptions(_nameField.Text.Trim(), _payloadTypeDropDown.Value ?? PayloadType.Text, _valueView.Text);
         RequestStop();
     }
 
     private void UpdateValidity()
     {
         var nameValid = _nameField.Text.Trim().Length > 0;
+        var payloadType = _payloadTypeDropDown.Value ?? PayloadType.Text;
+        var valueValid = PayloadValidation.IsValid(payloadType, _valueView.Text);
+
+        // See PublishDialog/TemplateDialog's identical line - same "wrap off only for Json" rule,
+        // folded into the handler both the constructor and the dropdown's ValueChanged already call.
+        _valueView.WordWrap = payloadType != PayloadType.Json;
+
         SetFieldValidity(_nameField, nameValid);
-        _createButton.Enabled = nameValid;
+        SetFieldValidity(_valueView, valueValid);
+        _createButton.Enabled = nameValid && valueValid;
     }
 
-    private static void SetFieldValidity(TextField field, bool valid) =>
+    private static void SetFieldValidity(View field, bool valid) =>
         // new Scheme(Attribute)'s single-value constructor derives Editable independently and
         // silently drops our background (defaults it to Black) - re-set Editable explicitly so
         // invalid state only changes the foreground, never the background (same as

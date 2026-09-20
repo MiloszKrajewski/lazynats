@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
+using System.Text;
 using lazynats.Components;
 using lazynats.Core;
 using NATS.Client.JetStream;
@@ -52,7 +53,9 @@ internal sealed class ObjectsTab: View, IShortcutSource
         _jetStream = jetStream;
         _obj = obj;
 
-        _listLabel = new Label { Text = "Buckets", X = 0, Y = 0 };
+        // HotKeySpecifier disabled - see ValuesTab's identical comment: this title is later set to
+        // a bucket-derived "Objects of {bucket}", and bucket names routinely contain '_'.
+        _listLabel = new Label { HotKeySpecifier = (Rune)0xffff, Text = "Buckets", X = 0, Y = 0 };
         _bucketFilterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40) };
         _listView = new BucketListView(_items) { Background = Theme.EditableBackground };
         _listView.AttachFilterBox(_bucketFilterBox);

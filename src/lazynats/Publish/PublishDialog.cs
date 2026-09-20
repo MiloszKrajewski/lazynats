@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text;
 using lazynats.Components;
 using lazynats.Core.Payloads;
 using NATS.Client.Core;
@@ -70,7 +71,10 @@ internal sealed class PublishDialog: Dialog
         // Height 11 -> 9 visible rows, room for a multi-line JSON/text payload.
         var payloadFrame = WrapField(_payloadView, 18, 11);
 
-        _statusLabel = new Label { Text = string.Empty, X = 0, Y = 29 };
+        // HotKeySpecifier disabled - this later shows a server error message verbatim (e.g. one
+        // referencing a subject/bucket name), which routinely contains '_'. See ValuesTab's
+        // identical comment.
+        _statusLabel = new Label { HotKeySpecifier = (Rune)0xffff, Text = string.Empty, X = 0, Y = 29 };
 
         Add(
             subjectLabel, subjectFrame, headersLabel, headerFrame, payloadTypeLabel, payloadTypeFrame,

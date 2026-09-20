@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
+using System.Text;
 using lazynats.Components;
 using lazynats.Core;
 using NATS.Client.JetStream;
@@ -48,7 +49,9 @@ internal sealed class StreamsTab: View, IShortcutSource
         CanFocus = true;
         _jetStream = jetStream;
 
-        _listLabel = new Label { Text = "Streams", X = 0, Y = 0 };
+        // HotKeySpecifier disabled - see ValuesTab's identical comment: this title is later set to
+        // a stream-derived "Consumers of {name}", and stream names routinely contain '_'.
+        _listLabel = new Label { HotKeySpecifier = (Rune)0xffff, Text = "Streams", X = 0, Y = 0 };
         _streamFilterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40) };
         _listView = new StreamListView(_items) { Background = Theme.EditableBackground };
         _listView.AttachFilterBox(_streamFilterBox);

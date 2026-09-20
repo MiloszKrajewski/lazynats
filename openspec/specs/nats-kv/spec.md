@@ -379,20 +379,30 @@ previously existed.
 
 ### Requirement: Create Key
 The system SHALL allow the user to create a new key/value entry from the key-level list via
-N, which opens a modal dialog collecting Name and Value (a multi-line text field). On
-confirmation the system SHALL write the entry to the currently drilled-into bucket on the server
-and refresh the key list so the new key is shown and highlighted.
+N, which opens a modal dialog collecting Name, Payload Type (per the payload-types capability,
+one of `Json`/`Text`/`Base64`/`Hex`, defaulted to `Text`), and Value (a multi-line text field
+interpreted according to the selected Payload Type). On confirmation the system SHALL encode
+Value to bytes according to the selected Payload Type (per the payload-types capability's Payload
+Byte Encoding), write the entry to the currently drilled-into bucket on the server, and refresh the
+key list so the new key is shown and highlighted.
 
 #### Scenario: N opens the create-key dialog
 - **WHEN** the user presses N while the key-level list holds focus
-- **THEN** a modal dialog opens with an editable Name field and a multi-line Value field, both
-  empty
+- **THEN** a modal dialog opens with an editable Name field (empty), a Payload Type selector
+  defaulted to `Text`, and a multi-line Value field (empty)
 
 #### Scenario: Confirming a valid dialog creates the key
-- **WHEN** the user fills in a non-empty Name, optionally enters a Value (including leaving it
-  empty, or entering multiple lines of text), and confirms (Create)
-- **THEN** the system writes the entry to the currently drilled-into bucket, the dialog closes,
-  and the key list is refreshed with the new key shown and highlighted
+- **WHEN** the user fills in a non-empty Name, optionally changes Payload Type, optionally enters a
+  Value valid for the selected Payload Type (including leaving it empty, or entering multiple lines
+  of text), and confirms (Create)
+- **THEN** the system encodes Value per the selected Payload Type, writes the entry to the
+  currently drilled-into bucket, the dialog closes, and the key list is refreshed with the new key
+  shown and highlighted
+
+#### Scenario: A non-Text Payload Type encodes accordingly
+- **WHEN** the user selects `Hex` or `Base64` as Payload Type and enters text that is valid for that
+  type
+- **THEN** the created entry's value is that text's decoded byte sequence, not its UTF-8 text bytes
 
 #### Scenario: Cancelling the dialog creates nothing
 - **WHEN** the user opens the create-key dialog and cancels (Esc) instead of confirming
@@ -401,8 +411,8 @@ and refresh the key list so the new key is shown and highlighted.
 #### Scenario: Server-side create failure is reported without losing entered values
 - **WHEN** the user confirms the dialog and the server rejects the write (e.g. invalid key name)
 - **THEN** the system shows a modal error dialog whose message is the failure's error text, and
-  after the user dismisses it the create-key dialog reopens with the previously entered Name and
-  Value still filled in
+  after the user dismisses it the create-key dialog reopens with the previously entered Name,
+  Payload Type, and Value still filled in
 
 #### Scenario: N has no effect at the bucket level
 - **WHEN** the user presses N while the bucket-level list holds focus
@@ -410,40 +420,75 @@ and refresh the key list so the new key is shown and highlighted.
   "Create Bucket")
 
 ### Requirement: Create Key Field Validation
-The create-key dialog SHALL validate Name before allowing confirmation, and SHALL visually flag
-an invalid Name rather than allowing a request that will fail immediately. Value has no client-
-side validation — any text, including empty text, is a valid Value.
+The create-key dialog SHALL validate Name and Value before allowing confirmation, and SHALL
+visually flag an invalid field rather than allowing a request that will fail immediately. Name is
+valid only if non-empty (after trimming); Value is valid only if it passes Payload Validation (per
+the payload-types capability) for the currently selected Payload Type - for `Text`, any value,
+including empty, is valid.
 
 #### Scenario: Empty name blocks creation
 - **WHEN** the Name field is empty or whitespace-only
 - **THEN** the Create action is unavailable and the Name field is flagged invalid
 
-#### Scenario: Empty Value is allowed
-- **WHEN** the Value field is left empty and Name is valid
+#### Scenario: Empty Value is allowed for Text
+- **WHEN** Payload Type is `Text`, the Value field is left empty, and Name is valid
 - **THEN** the Create action is available and the created key's value is an empty string
+
+#### Scenario: An invalid Value for the selected Payload Type blocks creation
+- **WHEN** Payload Type is `Json`, `Base64`, or `Hex` and the Value field's text is not valid for
+  that type (per the payload-types capability's Payload Validation)
+- **THEN** the Create action is unavailable and the Value field is flagged invalid
+
+#### Scenario: Changing Payload Type re-evaluates Value's validity
+- **WHEN** the user changes the Payload Type selector while Value already has text entered
+- **THEN** the Create action's availability and the Value field's flagged state immediately reflect
+  Value's validity under the newly selected Payload Type
 
 ### Requirement: Edit Key
 The system SHALL allow the user to edit the highlighted key's value from the key-level list via
-E, which opens the same modal dialog used for "Create Key" in edit mode: the title and
-confirm action read "Edit Key"/"Save", Name is shown but disabled (immutable once the entry
-exists), and Value is seeded with the key's current value and remains editable. On confirmation
-the system SHALL overwrite the entry on the server with the edited Value and refresh the key list
-so the updated key's detail panel reflects the new value.
+E, which opens the same modal dialog used for "Create Key" in edit mode: the title and confirm
+action read "Edit Key"/"Save", Name is shown but disabled (immutable once the entry exists), and
+Payload Type and Value are seeded from the key's current entry and remain editable. Payload Type
+SHALL be seeded from the entry's value classified via the payload-content-probe capability, using
+the payload-presentation capability's default type for that classification (`Json`→`Json`,
+`Utf8Text`→`Text`, `Binary`→`Hex`). For `Json`/`Hex`/`Base64`, Value SHALL be seeded by rendering
+the entry's raw bytes under that seeded Payload Type (per the payload-presentation capability); for
+`Text`, Value SHALL be seeded with the entry's raw bytes decoded as plain UTF-8 text, not rendered
+through the payload-presentation capability's fixed-width line wrapping (which is sized for a
+non-wrapping read-only display and would double-wrap once combined with this dialog's own
+word-wrapping Value field). On confirmation the system SHALL encode Value to bytes according to the
+selected Payload Type and overwrite the entry on the server, and refresh the key list so the
+updated key's detail panel reflects the new value.
 
 #### Scenario: E opens the edit-key dialog
-- **WHEN** the user presses E while the key-level list holds focus, a key is highlighted, and
-  that key's current value passes the printable-text guard (see "Edit Key Printable-Text Guard")
-- **THEN** a modal dialog opens, seeded with that key's Name and current Value (decoded as UTF-8
-  text), with its title and confirm button reading "Edit"/"Save"
+- **WHEN** the user presses E while the key-level list holds focus and a key is highlighted
+- **THEN** the system fetches that key's current entry and opens a modal dialog seeded with that
+  key's Name, a Payload Type derived from the entry's content classification, and Value rendered
+  under that Payload Type, with its title and confirm button reading "Edit"/"Save"
+
+#### Scenario: A JSON-classified value is seeded as Json
+- **WHEN** the user presses E on a key whose current value classifies as `Json`
+- **THEN** the edit-key dialog opens with Payload Type set to `Json` and Value showing the value
+  re-serialized with indentation
+
+#### Scenario: A plain-text-classified value is seeded as Text
+- **WHEN** the user presses E on a key whose current value classifies as `Utf8Text`
+- **THEN** the edit-key dialog opens with Payload Type set to `Text` and Value showing the decoded
+  text
+
+#### Scenario: A binary-classified value is seeded as Hex
+- **WHEN** the user presses E on a key whose current value classifies as `Binary`
+- **THEN** the edit-key dialog opens with Payload Type set to `Hex` and Value showing the value's
+  hexadecimal byte representation, rather than the dialog refusing to open
 
 #### Scenario: Name is locked
 - **WHEN** the edit-key dialog is open
 - **THEN** the Name field shows the key's current name but cannot be changed
 
 #### Scenario: Confirming updates the value
-- **WHEN** the user changes Value and confirms (Save)
-- **THEN** the system overwrites the entry's value on the server, the dialog closes, and the key
-  list is refreshed with the updated key highlighted
+- **WHEN** the user changes Payload Type and/or Value and confirms (Save)
+- **THEN** the system encodes Value per the selected Payload Type, overwrites the entry's value on
+  the server, the dialog closes, and the key list is refreshed with the updated key highlighted
 
 #### Scenario: Cancelling the dialog changes nothing
 - **WHEN** the user opens the edit-key dialog and cancels (Esc) instead of confirming
@@ -452,8 +497,8 @@ so the updated key's detail panel reflects the new value.
 #### Scenario: Server-side update failure is reported without losing entered values
 - **WHEN** the user confirms the dialog and the server rejects the update
 - **THEN** the system shows a modal error dialog whose message is the failure's error text, and
-  after the user dismisses it the edit-key dialog reopens with the previously entered Value still
-  filled in
+  after the user dismisses it the edit-key dialog reopens with the previously entered Payload Type
+  and Value still filled in
 
 #### Scenario: E has no effect at the bucket level
 - **WHEN** the user presses E while the bucket-level list holds focus
@@ -465,33 +510,13 @@ so the updated key's detail panel reflects the new value.
   key highlighted)
 - **THEN** no edit-key dialog opens
 
-### Requirement: Edit Key Printable-Text Guard
-The system SHALL refuse to open the edit-key dialog for a key whose current value, freshly
-fetched from the server, is not valid, printable UTF-8 text (invalid UTF-8, or containing a
-control character other than tab/newline/carriage-return). Instead it SHALL report the refusal as
-a status message and leave the key list and the key's value unchanged. This guard applies only to
-Edit — Create is never subject to it, since a value typed into the create-key dialog is always
-text by construction.
-
-#### Scenario: Editing a key with a binary value is refused
-- **WHEN** the user presses E on a key whose current value is not valid printable UTF-8 text
-- **THEN** the system shows a status message explaining the value can't be edited as text, and no
-  dialog opens
-
-#### Scenario: Editing a key with a printable text value proceeds normally
-- **WHEN** the user presses E on a key whose current value is valid printable UTF-8 text
-- **THEN** the edit-key dialog opens as described in "Edit Key"
-
-#### Scenario: The guard checks the value fresh, not the last polled detail-panel value
-- **WHEN** the user presses E on a highlighted key
-- **THEN** the system fetches that key's current entry from the server before deciding whether to
-  open the dialog, rather than relying on whatever the detail panel last polled
-
 ### Requirement: Create/Edit Key Dialog Sizing
 The create-key/edit-key dialog (opened via N or E per "Create Key"/"Edit Key") SHALL size
 its Name and Value fields' width, and the Value field's height, responsively to the current
 terminal size rather than using a fixed size, up to a maximum cap in each dimension. Below that
-cap the dialog SHALL still fit within the terminal.
+cap the dialog SHALL still fit within the terminal. The Payload Type selector added to this dialog
+occupies its own fixed-height row between Name and Value and does not itself resize with the
+terminal.
 
 #### Scenario: Fields widen on a large terminal
 - **WHEN** the create-key or edit-key dialog opens on a terminal wide enough to exceed the
@@ -501,7 +526,7 @@ cap the dialog SHALL still fit within the terminal.
 
 #### Scenario: Value field grows taller on a tall terminal
 - **WHEN** the create-key or edit-key dialog opens on a terminal tall enough to exceed the Value
-  field's minimum height plus the dialog's other fixed rows
+  field's minimum height plus the dialog's other fixed rows (including the Payload Type row)
 - **THEN** the Value field renders taller than the dialog's previous fixed 10-row height, up to
   its maximum height cap
 
@@ -514,6 +539,11 @@ cap the dialog SHALL still fit within the terminal.
 #### Scenario: Name field height is unaffected
 - **WHEN** the create-key or edit-key dialog opens on any terminal size
 - **THEN** the Name field remains a single line of input, unchanged from today
+
+#### Scenario: Payload Type row is a fixed height
+- **WHEN** the create-key or edit-key dialog opens on any terminal size
+- **THEN** the Payload Type selector renders as a single-line dropdown row, unaffected by the
+  terminal's height or width
 
 ### Requirement: Delete Key
 The system SHALL allow the user to delete the highlighted key from the key-level list via D.
