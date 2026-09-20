@@ -10,9 +10,16 @@
 
   <!--
   No Terminal.Gui / NATS.Client package references here by design - this assembly holds the
-  framework-independent, unit-testable core (currently: Payloads/) shared across UI tabs, so it
-  can be exercised by lazynats.Core.Tests without constructing UI or network state.
+  framework-independent, unit-testable core (currently: Payloads/, AsyncExtensions' pure-Rx half)
+  shared across UI tabs, so it can be exercised by lazynats.Core.Tests without constructing UI or
+  network state. System.Reactive is the one exception to "no package references": Rx itself is
+  generic, not a UI or NATS dependency - only the Terminal.Gui-IApplication-dispatching half of
+  AsyncExtensions stays in the app project.
   -->
+
+  <ItemGroup>
+    <PackageReference Include="System.Reactive" Version="7.0.0" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="lazynats" />
