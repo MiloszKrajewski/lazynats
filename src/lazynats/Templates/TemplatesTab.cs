@@ -139,14 +139,22 @@ internal sealed class TemplatesTab: View, IShortcutSource
         if (dialog.Result is { } template) _ = WriteAsync(template, isEdit: false);
     }
 
+    // A fresh E on a highlighted template - unlike the retry-reopen-after-failure path below,
+    // this seeds the dialog by re-rendering the template's stored payload from bytes (per
+    // PayloadEditSection.SeedFromBytes), not from `template.Payload` verbatim - see
+    // openspec/changes/extract-payload-edit-section/design.md.
     private void OpenEditDialog()
     {
-        if (_listView.SelectedTemplate is { } template) OpenEditDialog(template);
+        if (_listView.SelectedTemplate is { } template)
+            OpenEditDialog(template, PayloadEncoding.ToBytes(template.PayloadType, template.Payload));
     }
 
-    private void OpenEditDialog(Template original)
+    // `seedBytes`, given, seeds the dialog's Payload field from those raw bytes instead of
+    // `original.Payload` verbatim - omitted by WriteAsync's retry-reopen-after-failure call below,
+    // since `original` there is already-valid typed text that must round-trip unchanged.
+    private void OpenEditDialog(Template original, byte[]? seedBytes = null)
     {
-        var dialog = new TemplateDialog(original, isEdit: true);
+        var dialog = new TemplateDialog(original, isEdit: true, seedBytes);
         App!.Run(dialog);
         if (dialog.Result is { } template) _ = WriteAsync(template, isEdit: true);
     }

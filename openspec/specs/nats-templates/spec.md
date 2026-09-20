@@ -242,13 +242,15 @@ The system SHALL allow the user to edit the highlighted template via E, opening 
 modal dialog used for "Create Template" in edit mode: the title and confirm action read "Edit
 Template"/"Save", Name is shown but disabled (immutable once the template exists, since it is the
 KV key), and Subject, Headers, Payload Type, and Payload are seeded with the template's current
-values and remain editable. When Payload Type is `Hex` or `Base64`, the Payload field SHALL be
-seeded not with the stored payload text verbatim but with that text rendered for display (the same
-rendering `payload-presentation` uses for the read-only Message Detail view), at the dialog's
-Payload field width, so the field starts wrapped/grouped for readability rather than as one
-unbroken string; for `Json`/`Text`, the Payload field SHALL be seeded with the stored text
-unchanged. On confirmation the system SHALL overwrite the entry in the `lazynats-templates` bucket
-and refresh the template list so the updated template's row reflects any changed content.
+values and remain editable. The Payload field SHALL be seeded by rendering the stored payload as
+bytes for display, per the `payload-edit-section` capability's seeding-from-bytes rule: `Json`,
+`Hex`, and `Base64` SHALL be rendered for display (the same rendering `payload-presentation` uses
+for the read-only Message Detail view), at the dialog's Payload field width, so the field starts
+formatted for readability (pretty-printed for `Json`, wrapped/grouped for `Hex`/`Base64`) rather
+than as whatever was last stored; `Text` SHALL be seeded by decoding the stored payload's bytes as
+plain UTF-8 text, not rendered through that fixed-width line wrapping. On confirmation the system
+SHALL overwrite the entry in the `lazynats-templates` bucket and refresh the template list so the
+updated template's row reflects any changed content.
 
 #### Scenario: E opens the edit-template dialog
 - **WHEN** the user presses E while the Templates list holds focus and a template is
@@ -273,12 +275,20 @@ and refresh the template list so the updated template's row reflects any changed
 - **WHEN** the user confirms the dialog and the write to the bucket fails
 - **THEN** the system shows a modal error dialog whose message is the failure's error text, and
   after the user dismisses it the edit-template dialog reopens with the previously entered values
-  still filled in
+  still filled in verbatim (per `payload-edit-section`'s seeding-from-already-typed-text rule, not
+  re-rendered from bytes)
 
 #### Scenario: E with no template highlighted does nothing
 - **WHEN** the user presses E while the Templates list holds focus and the list is empty (no
   template highlighted)
 - **THEN** no edit-template dialog opens
+
+#### Scenario: Opening a Json template for editing shows it pretty-printed
+- **WHEN** the user presses E on a template with Payload Type `Json` whose stored Payload is
+  minified (no insignificant whitespace)
+- **THEN** the edit-template dialog's Payload field shows that payload re-serialized with
+  indentation (matching the Message Detail view's Json rendering) rather than the minified stored
+  string
 
 #### Scenario: Opening a Hex template for editing shows it formatted for readability
 - **WHEN** the user presses E on a template with Payload Type `Hex` whose stored Payload is the

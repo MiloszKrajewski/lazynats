@@ -26,13 +26,15 @@ internal sealed class TemplateDialog: Dialog<Template>
     private readonly TextField _nameField;
     private readonly TextField _subjectField;
     private readonly ObservableCollection<HeaderPair> _headers;
-    private readonly DropDownList<PayloadType> _payloadTypeDropDown;
-#pragma warning disable CS0618 // TextView is obsolete in favor of Terminal.Gui.Editor - see PublishDialog's identical suppression.
-    private readonly TextView _payloadView;
-#pragma warning restore CS0618
+    private readonly PayloadEditSection _payloadSection;
     private readonly Button _commitButton;
 
-    public TemplateDialog(Template? initial = null, bool isEdit = false)
+    // `seedBytes`, given, seeds the Payload field by rendering these raw bytes per
+    // PayloadEditSection.SeedFromBytes - used when opening Edit from a template's current stored
+    // value (see TemplatesTab.OpenEditDialog). Omitted (null) for a blank Create and for reopening
+    // pre-filled with exactly what the user last typed after a failed save (`initial`'s own
+    // Payload, seeded verbatim) - see PayloadEditSection's "Two seeding entry points" decision.
+    public TemplateDialog(Template? initial = null, bool isEdit = false, byte[]? seedBytes = null)
     {
         Title = isEdit ? " Edit Template " : " New Template ";
         Padding.Thickness = new Thickness(1, 1, 1, 0);
@@ -63,23 +65,14 @@ internal sealed class TemplateDialog: Dialog<Template>
         var headerEditor = new HeaderEditorView(_headers) { Background = subjectBackground };
         var headerFrame = WrapField(headerEditor, 9, 8);
 
-        var payloadTypeLabel = new Label { Text = "Payload Type", X = 0, Y = 17 };
-        _payloadTypeDropDown = new DropDownList<PayloadType> { Value = initial?.PayloadType ?? PayloadType.Text };
-        Theme.ApplyEditableScheme(_payloadTypeDropDown);
-        _payloadTypeDropDown.ValueChanged += (_, _) => UpdateValidity();
-        var payloadTypeFrame = WrapField(_payloadTypeDropDown, 18, 3);
+        // Rows 17-32 (16 total: 1 type label + 3 type frame + 1 payload label + 11 payload frame) -
+        // matches the region the standalone dropdown/TextView used to occupy exactly.
+        _payloadSection = new PayloadEditSection("Payload", initial?.PayloadType ?? PayloadType.Text, initial?.Payload ?? string.Empty) {
+            X = 0, Y = 17, Width = FieldWidth, Height = 16,
+        };
+        _payloadSection.Changed += UpdateValidity;
 
-        var payloadLabel = new Label { Text = "Payload", X = 0, Y = 21 };
-#pragma warning disable CS0618
-        _payloadView = new TextView { Text = SeedPayloadText(initial), TabKeyAddsTab = false };
-#pragma warning restore CS0618
-        _payloadView.ContentsChanged += (_, _) => UpdateValidity();
-        _payloadView.FixPasteRedraw();
-        var payloadFrame = WrapField(_payloadView, 22, 11);
-
-        Add(
-            nameLabel, nameFrame, subjectLabel, subjectFrame, headersLabel, headerFrame,
-            payloadTypeLabel, payloadTypeFrame, payloadLabel, payloadFrame);
+        Add(nameLabel, nameFrame, subjectLabel, subjectFrame, headersLabel, headerFrame, _payloadSection);
 
         // Result is left unset, matching Esc's own cancellation convention - added before
         // Create/Save so it, not Cancel, stays the last-added, Enter-activated default button.
@@ -95,6 +88,18 @@ internal sealed class TemplateDialog: Dialog<Template>
         _commitButton.Accepting += (_, e) => { e.Handled = true; Commit(); };
         AddButton(_commitButton);
 
+        if (seedBytes is not null) {
+            // Forces an immediate layout pass so the section's payload TextView Viewport - and
+            // therefore SeedFromBytes' resolved render width - is known synchronously, without
+            // waiting for this dialog's eventual app.Run to render it. Safe to call before app.Run
+            // - mirrors ValueDetailDialog's identical Layout()-before-MeasureAndRender sequence.
+            // Deferred until after _commitButton exists - SeedFromBytes synchronously raises the
+            // section's Changed event, which UpdateValidity below reads _commitButton to answer, so
+            // seeding any earlier would run UpdateValidity against a not-yet-constructed button.
+            Layout();
+            _payloadSection.SeedFromBytes(seedBytes, initial!.PayloadType);
+        }
+
         UpdateValidity();
 
         // See CreateKeyDialog's identical block for why: in edit mode Name has CanFocus=false, and
@@ -108,20 +113,6 @@ internal sealed class TemplateDialog: Dialog<Template>
     // CreateKeyDialog/PublishDialog's identical override for the full rationale. Enter inside
     // Payload is consumed by TextView itself (inserts a newline) and never reaches here.
     protected override bool OnAccepting(CommandEventArgs args) => true;
-
-    // Hex/Base64 render through PayloadPresentation.Render (the same rendering the read-only
-    // Message Detail view uses) rather than the stored text verbatim, so the field opens
-    // wrapped/grouped for readability instead of as one unbroken string - see design.md's
-    // "Templates store the normalized form; editing re-renders from bytes" decision. Json/Text are
-    // seeded unchanged.
-    private static string SeedPayloadText(Template? initial)
-    {
-        if (initial is null) return string.Empty;
-        if (initial.PayloadType is not (PayloadType.Hex or PayloadType.Base64)) return initial.Payload;
-
-        var bytes = PayloadEncoding.ToBytes(initial.PayloadType, initial.Payload);
-        return PayloadPresentation.Render(bytes, initial.PayloadType, FieldWidth);
-    }
 
     private static EditFrame WrapField(View field, int y, int height)
     {
@@ -152,7 +143,7 @@ internal sealed class TemplateDialog: Dialog<Template>
 
         Result = new Template(
             _nameField.Text.Trim(), _subjectField.Text.Trim(), headers,
-            _payloadTypeDropDown.Value ?? PayloadType.Text, _payloadView.Text);
+            _payloadSection.Type, _payloadSection.PayloadText);
         RequestStop();
     }
 
@@ -160,18 +151,11 @@ internal sealed class TemplateDialog: Dialog<Template>
     {
         var nameValid = _nameField.Text.Trim().Length > 0;
         var subjectValid = _subjectField.Text.Trim().Length > 0;
-        var payloadType = _payloadTypeDropDown.Value ?? PayloadType.Text;
-        var payloadValid = PayloadValidation.IsValid(payloadType, _payloadView.Text);
-
-        // See PublishDialog.UpdateValidity's identical line - same "wrap off only for Json" rule,
-        // folded into the handler both the constructor and the dropdown's ValueChanged already call.
-        _payloadView.WordWrap = payloadType != PayloadType.Json;
 
         SetFieldValidity(_nameField, nameValid);
         SetFieldValidity(_subjectField, subjectValid);
-        SetFieldValidity(_payloadView, payloadValid);
 
-        _commitButton.Enabled = nameValid && subjectValid && payloadValid;
+        _commitButton.Enabled = nameValid && subjectValid && _payloadSection.IsValid;
     }
 
     private static void SetFieldValidity(View field, bool valid) =>

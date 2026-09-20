@@ -4,10 +4,8 @@ using System.Text;
 using lazynats.Components;
 using lazynats.Core;
 using lazynats.Core.Payloads;
-using Microsoft.Extensions.DependencyInjection;
 using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
-using Terminal.Gui.App;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -504,23 +502,6 @@ internal sealed class ValuesTab: View, IShortcutSource
         _ = TryOpenEditKeyDialogAsync(bucket, key);
     }
 
-    // Only Text is seeded with the plain decoded string rather than PayloadPresentation.Render:
-    // CreateKeyDialog's TextView turns WordWrap on for every type but Json (see UpdateValidity),
-    // and Render's fixed-width chop (ChunkFixedWidth) cuts mid-word wherever `width` lands, with
-    // no regard for word boundaries. Feeding that into a TextView that *does* wrap on word
-    // boundaries double-wraps it - the TextView disagrees with the chop and pushes each trailing
-    // partial word down onto its own line. Hex/Base64 don't hit this: their fixed-width rows have
-    // no partial "words" (each row is sized in this dialog CreateKeyDialog.SeedValueWidth uses,
-    // so WordWrap's own reflow is a no-op). Json is unaffected too - its WordWrap is off, so its
-    // real indentation newlines (from PayloadPresentation.Render's own re-serialization) render as
-    // typed. Saving compounds the Text case further: PayloadEncoding.ToBytes writes Text back as
-    // raw UTF-8 with no whitespace stripping (unlike Hex/Base64's whitespace-tolerant decode), so
-    // an unmodified save would have literally persisted the chop-point newlines into the value.
-    private static string SeedValueText(byte[] bytes, PayloadType type) => type switch {
-        PayloadType.Text => Encoding.UTF8.GetString(bytes),
-        _ => PayloadPresentation.Render(bytes, type, CreateKeyDialog.SeedValueWidth(Services.Root.GetRequiredService<IApplication>())),
-    };
-
     private async Task TryOpenEditKeyDialogAsync(string bucket, string key)
     {
         try {
@@ -535,10 +516,9 @@ internal sealed class ValuesTab: View, IShortcutSource
             var kind = PayloadContentProbe.Classify(bytes);
             var type = PayloadPresentation.DefaultType(kind);
 
-            App?.Invoke(() => {
-                var text = SeedValueText(bytes, type);
-                OpenEditKeyDialog(bucket, key, new NewKeyOptions(key, type, text));
-            });
+            // Value is left blank here - CreateKeyDialog's PayloadEditSection.SeedFromBytes
+            // (driven by `seedBytes` below) renders the field's actual initial text from `bytes`.
+            App?.Invoke(() => OpenEditKeyDialog(bucket, key, new NewKeyOptions(key, type, string.Empty), bytes));
         } catch (Exception ex) {
             App?.Invoke(() => StatusChanged?.Invoke($"Values: {ex.Message}"));
         }
@@ -546,10 +526,13 @@ internal sealed class ValuesTab: View, IShortcutSource
 
     // `options` reopens with the previously-entered Value after a failed edit (mirrors
     // OpenEditBucketDialog(status, original, seed)) - never re-fetches or re-checks
-    // printability on a retry, since `options` is already known-good typed text.
-    private void OpenEditKeyDialog(string bucket, string key, NewKeyOptions options)
+    // printability on a retry, since `options` is already known-good typed text. `seedBytes`,
+    // given (only by TryOpenEditKeyDialogAsync's fresh-fetch path above), seeds the dialog's
+    // Value field by rendering these raw bytes instead of `options.Value` verbatim - see
+    // CreateKeyDialog's own `seedBytes` parameter.
+    private void OpenEditKeyDialog(string bucket, string key, NewKeyOptions options, byte[]? seedBytes = null)
     {
-        var dialog = new CreateKeyDialog(options, isEdit: true);
+        var dialog = new CreateKeyDialog(options, isEdit: true, seedBytes);
         App!.Run(dialog);
         if (dialog.Result is { } edited) _ = TryEditKeyAsync(bucket, key, edited);
     }

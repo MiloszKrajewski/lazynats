@@ -36,13 +36,15 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
     private static readonly Attribute InvalidAttribute = new(ColorName16.Red, Theme.EditableBackground);
 
     private readonly TextField _nameField;
-    private readonly DropDownList<PayloadType> _payloadTypeDropDown;
-#pragma warning disable CS0618 // TextView is obsolete in favor of Terminal.Gui.Editor - see PublishDialog's identical suppression.
-    private readonly TextView _valueView;
-#pragma warning restore CS0618
+    private readonly PayloadEditSection _payloadSection;
     private readonly Button _createButton;
 
-    public CreateKeyDialog(NewKeyOptions? initial = null, bool isEdit = false)
+    // `seedBytes`, given, seeds the Value field by rendering these raw bytes per
+    // PayloadEditSection.SeedFromBytes - used when opening Edit from a freshly-fetched server
+    // entry (see ValuesTab.TryOpenEditKeyDialogAsync). Omitted (null) for a blank Create and for
+    // reopening pre-filled with exactly what the user last typed after a failed save (`initial`'s
+    // own Value, seeded verbatim) - see PayloadEditSection's "Two seeding entry points" decision.
+    public CreateKeyDialog(NewKeyOptions? initial = null, bool isEdit = false, byte[]? seedBytes = null)
     {
         // IApplication.Screen, not the obsolete static Application.Screen - see CLAUDE.md's DI
         // convention (Services.Root.GetRequiredService<T>(), not a static/ambient accessor).
@@ -63,20 +65,14 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
         _nameField.FixPasteRedraw();
         var nameFrame = WrapField(_nameField, 1, 3);
 
-        var payloadTypeLabel = new Label { Text = "Payload Type", X = 0, Y = 4 };
-        _payloadTypeDropDown = new DropDownList<PayloadType> { Value = initial?.PayloadType ?? PayloadType.Text };
-        Theme.ApplyEditableScheme(_payloadTypeDropDown);
-        _payloadTypeDropDown.ValueChanged += (_, _) => UpdateValidity();
-        var payloadTypeFrame = WrapField(_payloadTypeDropDown, 5, 3);
+        // Rows 4.. (1 type label + 3 type frame + 1 value label + valueHeight value frame) -
+        // matches the region the standalone Payload Type dropdown + Value TextView used to occupy.
+        _payloadSection = new PayloadEditSection("Value", initial?.PayloadType ?? PayloadType.Text, initial?.Value ?? string.Empty) {
+            X = 0, Y = 4, Width = Dim.Fill(), Height = valueHeight + 5,
+        };
+        _payloadSection.Changed += UpdateValidity;
 
-        var valueLabel = new Label { Text = "Value", X = 0, Y = 8 };
-#pragma warning disable CS0618
-        _valueView = new TextView { Text = initial?.Value ?? string.Empty, TabKeyAddsTab = false };
-#pragma warning restore CS0618
-        _valueView.FixPasteRedraw();
-        var valueFrame = WrapField(_valueView, 9, valueHeight);
-
-        Add(nameLabel, nameFrame, payloadTypeLabel, payloadTypeFrame, valueLabel, valueFrame);
+        Add(nameLabel, nameFrame, _payloadSection);
 
         // Result is left unset (null), matching Esc's own cancellation convention. Added before
         // Create so Create - not Cancel - stays the last-added, Enter-activated default button.
@@ -92,11 +88,24 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
         _createButton.Accepting += (_, e) => { e.Handled = true; Commit(); };
         AddButton(_createButton);
 
+        if (seedBytes is not null) {
+            // Forces an immediate layout pass so the section's payload TextView Viewport - and
+            // therefore SeedFromBytes' resolved render width - is known synchronously, without
+            // waiting for this dialog's eventual app.Run to render it. Safe to call before app.Run
+            // - mirrors ValueDetailDialog's identical Layout()-before-MeasureAndRender sequence.
+            // Deferred until after _createButton exists (unlike ValueDetailDialog's simpler
+            // read-only case) - SeedFromBytes synchronously raises the section's Changed event,
+            // which UpdateValidity below reads _createButton to answer, so seeding any earlier
+            // would run UpdateValidity against a not-yet-constructed button.
+            Layout();
+            _payloadSection.SeedFromBytes(seedBytes, initial!.PayloadType);
+        }
+
         UpdateValidity();
 
         // See CreateBucketDialog's identical block for why: in edit mode Name has CanFocus=false,
         // and nothing would otherwise be focused until the user's first Tab.
-        if (isEdit) _valueView.SetFocus();
+        if (isEdit) _payloadSection.FocusPayload();
     }
 
     // Enter pressed on the Name field isn't consumed by it, so it bubbles up as an unhandled
@@ -122,35 +131,20 @@ internal sealed class CreateKeyDialog: Dialog<NewKeyOptions>
         };
     }
 
-    // The Value field's current inner width, per design.md's "Render width for the Edit seed"
-    // decision - dialogWidth minus Padding(2) and EditFrame's own border+content-start margin(3).
-    // Called by ValuesTab before constructing the dialog, so the Edit seed's Hex/Base64 rendering
-    // groups bytes into rows sized to what the field will actually show, without ValuesTab having
-    // to duplicate this dialog's own width-clamping math.
-    public static int SeedValueWidth(IApplication app) =>
-        Math.Min(PreferredDialogWidth, app.Screen.Width - TerminalWidthMargin) - 5;
-
     private void Commit()
     {
         if (!_createButton.Enabled) return;
 
-        Result = new NewKeyOptions(_nameField.Text.Trim(), _payloadTypeDropDown.Value ?? PayloadType.Text, _valueView.Text);
+        Result = new NewKeyOptions(_nameField.Text.Trim(), _payloadSection.Type, _payloadSection.PayloadText);
         RequestStop();
     }
 
     private void UpdateValidity()
     {
         var nameValid = _nameField.Text.Trim().Length > 0;
-        var payloadType = _payloadTypeDropDown.Value ?? PayloadType.Text;
-        var valueValid = PayloadValidation.IsValid(payloadType, _valueView.Text);
-
-        // See PublishDialog/TemplateDialog's identical line - same "wrap off only for Json" rule,
-        // folded into the handler both the constructor and the dropdown's ValueChanged already call.
-        _valueView.WordWrap = payloadType != PayloadType.Json;
 
         SetFieldValidity(_nameField, nameValid);
-        SetFieldValidity(_valueView, valueValid);
-        _createButton.Enabled = nameValid && valueValid;
+        _createButton.Enabled = nameValid && _payloadSection.IsValid;
     }
 
     private static void SetFieldValidity(View field, bool valid) =>

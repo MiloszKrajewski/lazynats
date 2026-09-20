@@ -25,10 +25,7 @@ internal sealed class PublishDialog: Dialog
     private readonly NatsConnection _connection;
     private readonly ObservableCollection<HeaderPair> _headers = [];
     private readonly TextField _subjectField;
-    private readonly DropDownList<PayloadType> _payloadTypeDropDown;
-#pragma warning disable CS0618 // TextView is obsolete in favor of Terminal.Gui.Editor - see PublishTab's identical (now removed) suppression.
-    private readonly TextView _payloadView;
-#pragma warning restore CS0618
+    private readonly PayloadEditSection _payloadSection;
     private readonly Label _statusLabel;
     private readonly Button _sendButton;
 
@@ -53,32 +50,20 @@ internal sealed class PublishDialog: Dialog
         var headerEditor = new HeaderEditorView(_headers) { Background = subjectBackground };
         var headerFrame = WrapField(headerEditor, 5, 8);
 
-        var payloadTypeLabel = new Label { Text = "Payload Type", X = 0, Y = 13 };
-        _payloadTypeDropDown = new DropDownList<PayloadType> { Value = PayloadType.Text };
-        Theme.ApplyEditableScheme(_payloadTypeDropDown);
-        _payloadTypeDropDown.ValueChanged += (_, _) => UpdateValidity();
-        var payloadTypeFrame = WrapField(_payloadTypeDropDown, 14, 3);
-
-        var payloadLabel = new Label { Text = "Payload", X = 0, Y = 17 };
-        // TabKeyAddsTab = false stops TextView from consuming Tab at all (mirroring
-        // CreateKeyDialog's Value field), so Tab reaches normal focus-advance handling with no
-        // Navigate/Edit mode needed - see design.md's "Payload uses TabKeyAddsTab = false" decision.
-#pragma warning disable CS0618
-        _payloadView = new TextView { TabKeyAddsTab = false };
-        _payloadView.ContentsChanged += (_, _) => UpdateValidity();
-        _payloadView.FixPasteRedraw();
-#pragma warning restore CS0618
-        // Height 11 -> 9 visible rows, room for a multi-line JSON/text payload.
-        var payloadFrame = WrapField(_payloadView, 18, 11);
+        // Rows 13-28 (16 total: 1 type label + 3 type frame + 1 payload label + 11 payload frame) -
+        // matches the region the standalone dropdown/TextView used to occupy exactly, so
+        // _statusLabel's Y=29 below still starts right after it.
+        _payloadSection = new PayloadEditSection("Payload", PayloadType.Text, string.Empty) {
+            X = 0, Y = 13, Width = FieldWidth, Height = 16,
+        };
+        _payloadSection.Changed += UpdateValidity;
 
         // HotKeySpecifier disabled - this later shows a server error message verbatim (e.g. one
         // referencing a subject/bucket name), which routinely contains '_'. See ValuesTab's
         // identical comment.
         _statusLabel = new Label { HotKeySpecifier = (Rune)0xffff, Text = string.Empty, X = 0, Y = 29 };
 
-        Add(
-            subjectLabel, subjectFrame, headersLabel, headerFrame, payloadTypeLabel, payloadTypeFrame,
-            payloadLabel, payloadFrame, _statusLabel);
+        Add(subjectLabel, subjectFrame, headersLabel, headerFrame, _payloadSection, _statusLabel);
 
         // A modal Dialog is its own top-level with no SuperView link back to MainWindow, so
         // MainWindow's global `?` KeyDown handler never sees a keypress made while this dialog is
@@ -133,30 +118,19 @@ internal sealed class PublishDialog: Dialog
     private void UpdateValidity()
     {
         var subjectValid = _subjectField.Text.Trim().Length > 0;
-        var payloadType = _payloadTypeDropDown.Value ?? PayloadType.Text;
-        var payloadValid = PayloadValidation.IsValid(payloadType, _payloadView.Text);
 
-        // Json's own pretty-printed indentation has deliberate line structure that an added
-        // soft-wrap would visually clash with - see design.md's "Wrap is on for Hex/Base64/Text,
-        // off for Json" decision. Folded into UpdateValidity (rather than a separate handler) since
-        // that's what both the constructor and the dropdown's ValueChanged already call.
-        _payloadView.WordWrap = payloadType != PayloadType.Json;
-
-        _sendButton.Enabled = subjectValid && payloadValid;
+        _sendButton.Enabled = subjectValid && _payloadSection.IsValid;
         // new Scheme(Attribute)'s single-value constructor derives Editable independently and
         // silently drops our background (defaults it to Black) - re-set Editable explicitly so
         // invalid state only changes the foreground, never the background (EditFrame's own
         // background is never touched here either, for the same reason).
         _subjectField.SetScheme(subjectValid ? null : new Scheme(InvalidAttribute) { Editable = InvalidAttribute });
-        _payloadView.SetScheme(payloadValid ? null : new Scheme(InvalidAttribute) { Editable = InvalidAttribute });
     }
 
     private void Send()
     {
         var subject = _subjectField.Text.Trim();
-        var payloadType = _payloadTypeDropDown.Value ?? PayloadType.Text;
-        var payload = _payloadView.Text;
-        if (subject.Length == 0 || !PayloadValidation.IsValid(payloadType, payload)) return;
+        if (subject.Length == 0 || !_payloadSection.IsValid) return;
 
         NatsHeaders? headers = null;
         if (_headers.Count > 0) {
@@ -164,14 +138,13 @@ internal sealed class PublishDialog: Dialog
             foreach (var pair in _headers) headers.Add(pair.Key, pair.Value);
         }
 
-        _ = PublishAsync(subject, headers, payloadType, payload);
+        _ = PublishAsync(subject, headers, _payloadSection.Bytes);
     }
 
-    private async Task PublishAsync(string subject, NatsHeaders? headers, PayloadType payloadType, string payload)
+    private async Task PublishAsync(string subject, NatsHeaders? headers, byte[] payload)
     {
         try {
-            var bytes = PayloadEncoding.ToBytes(payloadType, payload);
-            await _connection.PublishAsync(subject, bytes, headers: headers);
+            await _connection.PublishAsync(subject, payload, headers: headers);
             App?.Invoke(RequestStop);
         } catch (Exception ex) {
             App?.Invoke(() => _statusLabel.Text = $"Publish failed: {ex.Message}");
