@@ -1,0 +1,8 @@
+{product}
+
+Version: {version}
+Author: {author}
+
+{description}
+
+{url}

@@ -52,6 +52,7 @@ class Program: NukeBuild
 	static readonly AbsolutePath NukeDirectory = RootDirectory / ".nuke";
 	static readonly AbsolutePath OutputDirectory = RootDirectory / ".output";
 	static readonly AbsolutePath DockerDirectory = RootDirectory / "docker";
+	static readonly AbsolutePath AboutDirectory = RootDirectory / "src" / "lazynats" / "About";
 
 	AbsolutePath PackageArtifactsPattern => OutputDirectory / $"*.{PackageVersion}.nupkg";
 	AbsolutePath PlatformArtifactsPattern => OutputDirectory / $"*-{PackageVersion}-*.zip";
@@ -140,8 +141,23 @@ class Program: NukeBuild
 			DotNetRestore(s => s.SetProjectFile(Solution));
 		});
 
+	Target GenerateAbout => _ => _
+		.DependsOn(Restore)
+		.Executes(() =>
+		{
+			var project = Projects(IsApplication).Single();
+			var rendered = (AboutDirectory / "About.template.txt").ReadAllText()
+				.Replace("{product}", project.GetProperty<string>("Product"))
+				.Replace("{version}", PackageVersion.ToString())
+				.Replace("{author}", project.GetProperty<string>("Company"))
+				.Replace("{description}", project.GetProperty<string>("Description"))
+				.Replace("{url}", project.GetProperty<string>("RepositoryUrl"));
+			(AboutDirectory / "About.txt").WriteAllText(rendered);
+		});
+
 	Target Build => _ => _
 		.DependsOn(Restore)
+		.DependsOn(GenerateAbout)
 		.Executes(() =>
 		{
 			DotNetBuild(s => s

@@ -67,24 +67,28 @@ application assembly, not hardcoded as a C# string literal.
 - **THEN** the text it displays is read from the embedded resource text file bundled in the
   assembly
 
-### Requirement: About text supports literal token replacement
-The About dialog SHALL support replacing literal `{token}` placeholders in the embedded text with
-runtime values via plain string substitution, before displaying it.
+### Requirement: About text template is rendered at build time
+`About.template.txt` (holding the literal `{product}`/`{version}`/`{author}`/`{description}`/
+`{url}` placeholders) SHALL be rendered into `About.txt` - the file embedded as a resource and
+displayed by the About dialog - by a Nuke build target, substituting each token with its
+build-time value (from `PublicAssembly.props`' MSBuild properties, and the release version),
+rather than at runtime when the dialog opens.
 
-#### Scenario: {version} token is replaced with the running assembly's version
-- **WHEN** the embedded About text contains the literal token `{version}`
-- **THEN** the displayed text has that token replaced with the application's version, as reported
-  by the running assembly's version/product metadata
+#### Scenario: Nuke Build target renders the template
+- **WHEN** the Nuke `Build` target (or any target depending on it, e.g. `Release`) runs
+- **THEN** `About.txt` is regenerated from `About.template.txt` with all five tokens substituted
+  with their current build-time values
 
-#### Scenario: {product}/{author}/{description} tokens are replaced from assembly metadata
-- **WHEN** the embedded About text contains the literal tokens `{product}`, `{author}`, or
-  `{description}`
-- **THEN** each is replaced with the running assembly's `AssemblyProductAttribute`,
-  `AssemblyCompanyAttribute`, or `AssemblyDescriptionAttribute` value respectively - all generated
-  at build time from `PublicAssembly.props`' `Product`/`Company`/`Description` MSBuild properties,
-  not hand-maintained constants
+#### Scenario: Plain dotnet build does not re-render the template
+- **WHEN** the application is built or run via a plain `dotnet build`/`dotnet run` outside Nuke
+- **THEN** `About.txt` is not regenerated, and the About dialog displays whichever values were
+  baked in by the most recently run Nuke build
 
-#### Scenario: Unrecognized tokens are left as-is
-- **WHEN** the embedded About text contains a `{...}`-shaped token that the dialog does not
-  recognize
-- **THEN** that token is displayed verbatim, unmodified
+### Requirement: About dialog displays the embedded resource verbatim
+The About dialog SHALL display the embedded `About.txt` resource's text exactly as read, with no
+runtime token substitution or other transformation applied.
+
+#### Scenario: Dialog shows pre-rendered text unchanged
+- **WHEN** the About dialog is opened
+- **THEN** the displayed text is identical to the embedded resource's contents, with no further
+  substitution performed at display time

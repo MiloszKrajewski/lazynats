@@ -26,6 +26,7 @@
       "enum": [
         "Build",
         "Clean",
+        "GenerateAbout",
         "PublishToGitHub",
         "PublishToNuget",
         "Rebuild",

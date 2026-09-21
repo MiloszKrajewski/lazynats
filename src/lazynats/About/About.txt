@@ -1,6 +1,8 @@
-{product}
+lazynats
 
-Version: {version}
-Author: {author}
+Version: 0.0.5
+Author: Milosz Krajewski
 
-{description}
+A fast, keyboard-driven terminal UI for NATS
+
+https://github.com/MiloszKrajewski/lazynats
