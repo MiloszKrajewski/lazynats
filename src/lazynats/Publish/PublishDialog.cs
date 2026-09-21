@@ -29,19 +29,21 @@ internal sealed class PublishDialog: Dialog
     private readonly Label _statusLabel;
     private readonly Button _sendButton;
 
-    public PublishDialog(NatsConnection connection)
+    public PublishDialog(NatsConnection connection, PublishSeed? seed = null)
     {
         _connection = connection;
         Title = " Publish ";
         Padding.Thickness = new Thickness(1, 1, 1, 0);
 
         var subjectLabel = new Label { Text = "Subject", X = 0, Y = 0 };
-        _subjectField = new TextField();
+        _subjectField = new TextField { Text = seed?.Subject ?? string.Empty };
         _subjectField.ValueChanged += (_, _) => UpdateValidity();
         _subjectField.FixPasteRedraw();
         var subjectFrame = WrapField(_subjectField, 1, 3);
 
         var headersLabel = new Label { Text = "Headers", X = 0, Y = 4 };
+        if (seed is { } seedValue)
+            _headers = new ObservableCollection<HeaderPair>(seedValue.Headers.Select(pair => new HeaderPair(pair.Key, pair.Value)));
         var subjectBackground = _subjectField.GetAttributeForRole(VisualRole.Editable).Background;
         // No FilterBox - HeaderEditorView never offers filter/search (see its own comment); the
         // frame starts right where the label ends instead. Height 8 -> 6 visible rows inside
@@ -53,7 +55,7 @@ internal sealed class PublishDialog: Dialog
         // Rows 13-28 (16 total: 1 type label + 3 type frame + 1 payload label + 11 payload frame) -
         // matches the region the standalone dropdown/TextView used to occupy exactly, so
         // _statusLabel's Y=29 below still starts right after it.
-        _payloadSection = new PayloadEditSection("Payload", PayloadType.Text, string.Empty) {
+        _payloadSection = new PayloadEditSection("Payload", seed?.PayloadType ?? PayloadType.Text, string.Empty) {
             X = 0, Y = 13, Width = FieldWidth, Height = 16,
         };
         _payloadSection.Changed += UpdateValidity;
@@ -87,6 +89,18 @@ internal sealed class PublishDialog: Dialog
         _sendButton = new Button { Text = "_Send" };
         _sendButton.Accepting += (_, e) => { e.Handled = true; Send(); };
         AddButton(_sendButton);
+
+        if (seed is { } seedForPayload) {
+            // Forces an immediate layout pass so the section's payload TextView Viewport - and
+            // therefore SeedFromBytes' resolved render width - is known synchronously, without
+            // waiting for this dialog's eventual app.Run to render it - same sequencing
+            // TemplateDialog's own seedBytes branch uses, for the same reason (SeedFromBytes
+            // synchronously raises Changed, which UpdateValidity below reads _sendButton to
+            // answer, so seeding any earlier would run UpdateValidity against a not-yet-
+            // constructed button).
+            Layout();
+            _payloadSection.SeedFromBytes(seedForPayload.PayloadBytes, seedForPayload.PayloadType);
+        }
 
         UpdateValidity();
     }

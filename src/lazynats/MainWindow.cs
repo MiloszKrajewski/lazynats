@@ -43,7 +43,7 @@ internal sealed class MainWindow: Runnable
         var streamsTab = new StreamsTab(jetStream) { Padding = { Thickness = new Thickness(1) } };
         var valuesTab = new ValuesTab(kvContext) { Padding = { Thickness = new Thickness(1) } };
         var objectsTab = new ObjectsTab(jetStream, objContext) { Padding = { Thickness = new Thickness(1) } };
-        var templatesTab = new TemplatesTab(kvContext) { Padding = { Thickness = new Thickness(1) } };
+        var templatesTab = new TemplatesTab(kvContext, connection) { Padding = { Thickness = new Thickness(1) } };
         var tabs = new ManagementTabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Percent(75) };
         tabs.Add(" 1:Subscribe ", subscribeTab);
         tabs.Add(" 2:Streams ", streamsTab);

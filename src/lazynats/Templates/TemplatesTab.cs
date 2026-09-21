@@ -3,6 +3,8 @@ using System.Text.Json;
 using lazynats.Components;
 using lazynats.Core;
 using lazynats.Core.Payloads;
+using lazynats.Publish;
+using NATS.Client.Core;
 using NATS.Client.KeyValueStore;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -24,6 +26,7 @@ internal sealed class TemplatesTab: View, IShortcutSource
     private static readonly NatsKVConfig BucketConfig = new(BucketName) { Storage = NatsKVStorageType.File, LimitMarkerTTL = MarkerTtl };
 
     private readonly INatsKVContext _kv;
+    private readonly NatsConnection _connection;
 
     private readonly ObservableCollection<Template> _items = [];
     private readonly TemplateListView _listView;
@@ -53,10 +56,11 @@ internal sealed class TemplatesTab: View, IShortcutSource
 
     public event Action<string>? StatusChanged;
 
-    public TemplatesTab(INatsKVContext kv)
+    public TemplatesTab(INatsKVContext kv, NatsConnection connection)
     {
         CanFocus = true;
         _kv = kv;
+        _connection = connection;
 
         var listLabel = new Label { Text = "Templates", X = 0, Y = 0 };
         _filterBox = new FilterBox { X = 0, Y = 1, Width = Dim.Percent(40) };
@@ -78,6 +82,7 @@ internal sealed class TemplatesTab: View, IShortcutSource
         _extraOperations = [
             new ShortcutHint(Key.X, "Export", Export, Group: ExtraOperationsGroup),
             new ShortcutHint(Key.O, "Import", Import, Group: ExtraOperationsGroup),
+            new ShortcutHint(Key.P, "Publish", OpenPublishDialog, Group: ExtraOperationsGroup),
         ];
 
         // Add()-order matches spatial top-down layout so Tab/Shift+Tab cycles in reading order -
@@ -162,6 +167,20 @@ internal sealed class TemplatesTab: View, IShortcutSource
         var dialog = new TemplateDialog(original, isEdit: true, seedBytes);
         App!.Run(dialog);
         if (dialog.Result is { } template) _ = WriteAsync(template, isEdit: true);
+    }
+
+    // Bare P on a highlighted template - opens a pre-populated Publish dialog without touching the
+    // template itself (Send/Cancel from that dialog only ever calls PublishAsync, never WriteAsync -
+    // see openspec/changes/publish-from-template/design.md). No-op on an empty list, same guard
+    // OpenEditDialog() above uses for E.
+    private void OpenPublishDialog()
+    {
+        if (_listView.SelectedTemplate is not { } template) return;
+
+        var seed = new PublishSeed(
+            template.Subject, template.Headers, template.PayloadType,
+            PayloadEncoding.ToBytes(template.PayloadType, template.Payload));
+        App!.Run(new PublishDialog(_connection, seed));
     }
 
     private async Task WriteAsync(Template template, bool isEdit)
