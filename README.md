@@ -28,6 +28,15 @@ subscriptions on top, all reachable with a handful of keystrokes and no mouse re
 
 See [`doc/UI.md`](./doc/UI.md) for the fuller design write-up.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Subscribe tab with live feed](./res/1.sub+feed.png) Subscribe tab: pattern list on top, live feed of matching messages below | ![Streams tab](./res/2.streams+consumers.png) Streams tab: stream list with live details (limits, message/consumer counts) |
+| ![Values (KV) tab](./res/3.kv-bucket.png) Values tab: keys in a KV bucket with the selected key's details and JSON value | ![Edit Key dialog](./res/3.kv-editor.png) Editing a KV entry's value in place |
+| ![Message detail dialog](./res/4.feed-peek.png) Drilling into a single feed message's subject, headers and payload | ![Objects tab](./res/4.obj-bucket.png) Objects tab: entries in an object store bucket with size/digest details |
+| ![Publish dialog](./res/5.publish.png) Publish dialog: subject, headers and payload, reachable from anywhere via Alt+P | |
+
 ## Installing
 
 Prebuilt, self-contained (no .NET runtime needed) binaries for Windows, Linux (x64/arm64) and
@@ -62,7 +71,8 @@ context-sensitive - a status bar at the bottom always shows what's available). A
 
 | Key | Action |
 |---|---|
-| `Alt+1` .. `Alt+4` | Switch management tab (Subscribe / Streams / Values / Objects) |
+| `Alt+1` .. `Alt+5` | Switch management tab (Subscribe / Streams / Values / Objects / Templates) |
+| `Alt+0` | Jump to the Live Feed |
 | `Alt+P` | Open the Publish dialog |
 | `F10` | About (build/version info) |
 | `Ctrl+R` | Refresh the current list |
