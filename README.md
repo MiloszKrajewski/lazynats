@@ -71,6 +71,7 @@ context-sensitive - a status bar at the bottom always shows what's available). A
 
 | Key | Action |
 |---|---|
+| `?` | Show all keyboard shortcuts |
 | `Alt+1` .. `Alt+5` | Switch management tab (Subscribe / Streams / Values / Objects / Templates) |
 | `Alt+0` | Jump to the Live Feed |
 | `Alt+P` | Open the Publish dialog |

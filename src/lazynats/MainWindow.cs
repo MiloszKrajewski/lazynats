@@ -54,6 +54,8 @@ internal sealed class MainWindow: Runnable
 
         var liveUpdates = new LiveUpdatesView(feed, dedup) { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         liveUpdates.ItemSelected += envelope => App!.Run(new MessageDetailDialog(envelope));
+        liveUpdates.SaveAsTemplateRequested += envelope =>
+            templatesTab.OpenCreateDialogFromMessage(envelope.Message.Subject, envelope.Message.Headers, envelope.Message.Data ?? []);
 
         // Dim.Fill(1) leaves the bottom row free for the StatusBar, which sits outside this frame.
         // FocusView (not a plain FrameView) turns the border bright yellow while focus

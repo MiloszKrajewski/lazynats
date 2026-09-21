@@ -149,6 +149,27 @@ internal sealed class TemplatesTab: View, IShortcutSource
         if (dialog.Result is { } template) _ = WriteAsync(template, isEdit: false);
     }
 
+    // Entry point for the Live Feed's `T` "Save as Template" shortcut - takes the primitive NATS
+    // Core types MainWindow already reaches into FeedEnvelope.Message for today, not a
+    // FeedEnvelope/NatsMsg<byte[]> parameter, so this tab gains no dependency on LiveFeed's own
+    // types. See design.md Decision 3.
+    public void OpenCreateDialogFromMessage(string subject, NatsHeaders? headers, byte[] payloadBytes)
+    {
+        var headerDict = headers is { Count: > 0 }
+            ? headers.ToDictionary(header => header.Key, header => header.Value.ToString())
+            : new Dictionary<string, string>();
+
+        var payloadType = payloadBytes.Length > 0
+            ? PayloadPresentation.DefaultType(PayloadContentProbe.Classify(payloadBytes))
+            : PayloadType.Text;
+
+        var seed = new Template(string.Empty, subject, headerDict, payloadType, string.Empty);
+
+        var dialog = new TemplateDialog(seed, isEdit: false, seedBytes: payloadBytes);
+        App!.Run(dialog);
+        if (dialog.Result is { } template) _ = WriteAsync(template, isEdit: false);
+    }
+
     // A fresh E on a highlighted template - unlike the retry-reopen-after-failure path below,
     // this seeds the dialog by re-rendering the template's stored payload from bytes (per
     // PayloadEditSection.SeedFromBytes), not from `template.Payload` verbatim - see

@@ -26,6 +26,7 @@ internal sealed class LiveUpdatesView: View, IShortcutSource
     private bool _suppressValueChanged;
 
     public event Action<FeedEnvelope>? ItemSelected;
+    public event Action<FeedEnvelope>? SaveAsTemplateRequested;
     public event Action<LiveFeedStatus>? StatusChanged;
 
     // App resolves via the SuperView chain, so it's unavailable during the constructor (this
@@ -65,6 +66,12 @@ internal sealed class LiveUpdatesView: View, IShortcutSource
         AddCommand(Command.DeleteAll, () => { Clear(); return true; });
         KeyBindings.Add(Key.C, Command.DeleteAll);
 
+        // Command.Save - same semantically-close-Command-reuse convention as Command.DeleteAll
+        // above (and ObjectListView's bare-S download) - repurposed here for "Save as Template".
+        // Same highlighted-row guard OnAccepted uses for Enter; no-op on an empty/unselected feed.
+        AddCommand(Command.Save, () => { RaiseSaveAsTemplateRequested(); return true; });
+        KeyBindings.Add(Key.T, Command.Save);
+
         // Space is already bound to Command.Toggle by View's own default key bindings - just
         // supply the handler, don't re-bind the key (KeyBindings.Add throws if the key is already
         // bound - confirmed empirically against the running app). Belt-and-suspenders alongside
@@ -92,7 +99,8 @@ internal sealed class LiveUpdatesView: View, IShortcutSource
 
     public IEnumerable<ShortcutHint> Shortcuts => [
         new(Key.C, "Clear", Clear),
-        new(Key.Space, "Follow/Pause", ToggleFollow)
+        new(Key.Space, "Follow/Pause", ToggleFollow),
+        new(Key.T, "Save as Template", RaiseSaveAsTemplateRequested)
     ];
 
     private void ToggleFollow()
@@ -144,6 +152,14 @@ internal sealed class LiveUpdatesView: View, IShortcutSource
     {
         if (_listView.SelectedItem is { } index and >= 0 && index < _events.Count)
             ItemSelected?.Invoke(_events[index]);
+    }
+
+    // Same highlighted-row lookup OnAccepted uses for Enter - no-op when nothing is selected (e.g.
+    // an empty feed).
+    private void RaiseSaveAsTemplateRequested()
+    {
+        if (_listView.SelectedItem is { } index and >= 0 && index < _events.Count)
+            SaveAsTemplateRequested?.Invoke(_events[index]);
     }
 
     protected override void Dispose(bool disposing)
