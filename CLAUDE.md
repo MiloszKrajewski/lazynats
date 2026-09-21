@@ -19,6 +19,10 @@ exists today.
 - `NATS.Client.Core` / `.JetStream` / `.KeyValueStore` / `.ObjectStore` for the NATS side.
 - `Microsoft.Extensions.DependencyInjection` via the static `Services` provider in
   `Services.cs` (`Services.Root.GetRequiredService<T>()`), not constructor-injected app-wide.
+- `src/lazynats.Core` is a separate, framework-independent assembly (no Terminal.Gui or
+  NATS.Client references, `IsAotCompatible`) holding the logic worth unit-testing in isolation —
+  currently `Payloads/` and the pure-Rx half of `AsyncExtensions`. `src/lazynats.Core.Tests`
+  (xunit) tests it directly, without constructing UI or network state.
 - For API surface not already covered by `doc/terminal-gui-howto.md` (exact method signatures,
   event args, optional params), check the context7 MCP server first —
   [`nats-io/nats.net`](https://context7.com/nats-io/nats.net) and
@@ -102,10 +106,16 @@ exists today.
   New/Edit/Delete, generalizing the shape shared by `SubscriptionsView` and `PublishTab`'s header
   editor; row creation/edit is delegated to abstract callbacks, row formatting to an injected
   `IValuePresenter<T>`).
-- `src/lazynats/Payloads/` holds the payload-type concept shared across features (`PayloadType`,
-  `PayloadValidation`, `PayloadEncoding`), reused by both Templates (`TemplateDialog`) and Publish
-  (`PublishDialog`) rather than owned by either — mirrors `Components/`'s role for cross-tab UI
-  pieces, but for this non-UI concept.
+- `src/lazynats.Core/Payloads/` holds the payload-type concept shared across features
+  (`PayloadType`, `PayloadValidation`, `PayloadEncoding`), reused by both Templates
+  (`TemplateDialog`) and Publish (`PublishDialog`) rather than owned by either — mirrors
+  `Components/`'s role for cross-tab UI pieces, but for this non-UI concept. It lives in
+  `lazynats.Core` rather than the app project specifically so it's unit-testable without UI/NATS
+  scaffolding.
+- `AsyncExtensions` is split across the two projects by dependency, not by feature:
+  `lazynats.Core`'s copy holds `SelectAsync`/`ToObservable` (pure Rx, unit-tested); the app
+  project's copy (`src/lazynats/Core/AsyncExtensions.cs`) holds `ObserveOnApp`, which needs
+  Terminal.Gui's `IApplication` and can't be exercised without it running.
 - Status-bar shortcuts are discovered, not hardcoded: a view opts in via `IShortcutSource`,
   `ShortcutAggregator` walks the focused-view ancestor chain collecting hints, and
   `ShortcutTracker` (`ShortcutAggregator.cs`) recomputes them on every focus change (or on
@@ -119,17 +129,23 @@ exists today.
   that a package/pattern (NATS, DI, Rx, ...) actually trims/AOT-publishes cleanly before it's
   relied on in the main app. `test-aot.ps1` in that folder builds it, publishes it
   `PublishAot`, and runs it against a throwaway dockerized `nats-server` on port 14442.
+- `src/lazynats.FeedLoadGen` is another standalone console app (same "not in `lazynats.sln`"
+  precedent as `AotProbe`), a throwaway load generator that blasts messages at a NATS server
+  (`dotnet run --project src/lazynats.FeedLoadGen -- [options]`) for stress-testing the live feed
+  pipeline's behavior under sustained high throughput.
 
 ## Build / run
 
 ```bash
 dotnet run --project src/lazynats     # launch the app (needs a NATS server at nats://localhost:4222)
 dotnet build src/lazynats.sln         # compile only
+dotnet test src/lazynats.sln          # run lazynats.Core.Tests (xunit)
 ```
 
-There is no automated test project yet. `.nuke/build/Program.cs` defines the CI/release
-pipeline (`Clean`, `Restore`, `Build`, `Test`, `Release`, `ReleaseDocker`, ...), invoked via
-`./build.ps1 <target>`; day-to-day development uses the plain `dotnet` commands above instead.
+To run a single test: `dotnet test src/lazynats.sln --filter "FullyQualifiedName~PayloadBinaryTextTests"`.
+`.nuke/build/Program.cs` defines the CI/release pipeline (`Clean`, `Restore`, `Build`, `Test`,
+`Release`, `ReleaseDocker`, ...), invoked via `./build.ps1 <target>`; day-to-day development uses
+the plain `dotnet` commands above instead.
 
 For verifying keyboard-driven UI changes without asking for manual testing, `tmux` can drive the
 app non-interactively: launch it in a detached session (`tmux new-session -d -s <name>
