@@ -13,6 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="About\About.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="ConsoleAppFramework" Version="5.7.13" />
     <PackageReference Include="NATS.Client.JetStream" Version="3.2.0" />
     <PackageReference Include="NATS.Client.KeyValueStore" Version="3.2.0" />
@@ -22,5 +26,7 @@
     <PackageReference Include="Terminal.Gui" Version="2.4.17" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
   </ItemGroup>
+
+  <Import Project="$(PublicAssemblyProps)" />
 
 </Project>

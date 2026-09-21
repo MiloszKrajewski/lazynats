@@ -2,9 +2,12 @@
 
   <PropertyGroup>
     <Product>lazynats</Product>
-    <Description>...</Description>
-    <PackageTags>... ... ...</PackageTags>
+    <Description>A fast, keyboard-driven terminal UI for NATS</Description>
+    <PackageTags>nats terminal tui cli</PackageTags>
     <Authors>Milosz Krajewski</Authors>
+    <!-- Company (unlike Authors) becomes AssemblyCompanyAttribute at build time - the About
+         dialog reads it via reflection to show an author line. -->
+    <Company>$(Authors)</Company>
     <Copyright>Milosz Krajewski</Copyright>
   </PropertyGroup>
 
@@ -18,7 +21,7 @@
     <PackageId>$(AssemblyName)</PackageId>
     <RepositoryUrl>https://github.com/$(RepositoryOwner)/$(RepositoryName)</RepositoryUrl>
     <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
-    <PackageLicenseUrl>$(RepositoryUrl)/blob/master/LICENSE?raw=true</PackageLicenseUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIconUrl Condition=" Exists('$(RepositoryRoot)/icon.png') ">$(RepositoryUrl)/blob/master/icon.png?raw=true</PackageIconUrl>
   </PropertyGroup>
 
@@ -33,10 +36,6 @@
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
   </PropertyGroup>
   
-  <ItemGroup Condition=" $(Configuration) == 'Release' ">
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All"/>
-  </ItemGroup>
-
   <PropertyGroup Condition=" '$(SignAssembly)' == 'true' ">
     <!-- 
     SignAssembly and InternalsVisibleTo are not playing nice together, 

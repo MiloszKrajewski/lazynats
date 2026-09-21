@@ -1,4 +1,5 @@
-﻿using lazynats.Components;
+﻿using lazynats.About;
+using lazynats.Components;
 using lazynats.LiveFeed;
 using lazynats.Objects;
 using lazynats.Publish;
@@ -131,6 +132,15 @@ internal sealed class MainWindow: Runnable
                 Key.P.WithAlt, "Publish", () => App!.AddTimeout(
                     TimeSpan.Zero, () => {
                         App!.Run(new PublishDialog(connection));
+                        return false;
+                    })));
+        // Same deferred-AddTimeout re-entrancy dodge as Publish above - F10 is still mid-dispatch
+        // when this Action runs.
+        topLevelShortcuts.Add(
+            new ShortcutHint(
+                Key.F10, "About", () => App!.AddTimeout(
+                    TimeSpan.Zero, () => {
+                        App!.Run(new AboutDialog());
                         return false;
                     })));
         // Key is bare `?`, not Ctrl-/, Alt-/, F1, or the originally-shipped Alt-K: the first two
