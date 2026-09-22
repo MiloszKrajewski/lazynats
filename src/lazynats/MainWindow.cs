@@ -12,6 +12,7 @@ using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.KeyValueStore;
 using NATS.Client.ObjectStore;
+using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -198,6 +199,12 @@ internal sealed class MainWindow: Runnable
         var jumpWidget = new Shortcut { Text = "Jump" };
         jumpWidget.KeyView.Text = $"Alt{Key.Separator}#";
 
+        // The quit key (Esc by default) is bound to Command.Quit at the Application level, which
+        // only runs after the top runnable (this window) declines the key - so swallowing it here
+        // stops an over-pressed "back" Esc from quitting the app. Depth-first dispatch means any
+        // Esc that arrives here was already passed on by everything more specific (drill-down
+        // ascend, filter clear, dialogs). Alt+Q above stays the only way to quit.
+        // See openspec/specs/quit-key/spec.md.
         KeyDown += (_, key) => {
             foreach (var hint in jumpShortcuts.Concat(globalShortcuts))
                 if (key == hint.Key)
@@ -206,6 +213,8 @@ internal sealed class MainWindow: Runnable
                     key.Handled = true;
                     return;
                 }
+
+            if (IsQuitKey(key)) key.Handled = true;
         };
 
         var streamsStatusShortcut = new Shortcut { Text = string.Empty, Visible = false };
@@ -241,4 +250,6 @@ internal sealed class MainWindow: Runnable
 
         Add(tabs, feedFrame, feedStatusLabel, _statusBar);
     }
+
+    private static bool IsQuitKey(Key key) => Application.GetDefaultKeys(Command.Quit).Contains(key);
 }
