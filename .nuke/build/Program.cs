@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using NuGet.Versioning;
 using Nuke.Common;
 using Nuke.Common.ChangeLog;
@@ -94,10 +95,20 @@ class Program: NukeBuild
 	static void RemoveDebugSymbols(AbsolutePath publishDirectory) =>
 		publishDirectory.GlobFiles("*.pdb", "*.dbg").ForEach(f => File.Delete(f));
 
+	static AbsolutePath ChecksumFileFor(AbsolutePath artifact) => artifact.Parent / $"{artifact.Name}.sha256";
+
+	static void WriteSha256File(AbsolutePath file)
+	{
+		using var stream = File.OpenRead(file);
+		var hash = Convert.ToHexStringLower(SHA256.HashData(stream));
+		File.WriteAllText(ChecksumFileFor(file), $"{hash}  {file.Name}\n");
+	}
+
 	static void CompressToFresh(AbsolutePath sourceDirectory, AbsolutePath zipFile)
 	{
 		if (File.Exists(zipFile)) File.Delete(zipFile);
 		sourceDirectory.CompressTo(zipFile);
+		WriteSha256File(zipFile);
 	}
 
     static void RestoreSecretFile(string secretFile, string exampleFile)
@@ -369,8 +380,16 @@ class Program: NukeBuild
 		.After(ReleaseWindowsX64).After(ReleaseLinuxX64).After(ReleaseLinuxArm64).After(ReleaseMacosArm64)
 		.Executes(() =>
 		{
-			if (!PlatformArtifactsPattern.GlobFiles().Any())
+			var artifacts = PlatformArtifactsPattern.GlobFiles();
+			if (!artifacts.Any())
 				throw new FileNotFoundException($"No artifacts found for {PlatformArtifactsPattern}");
+
+			foreach (var artifact in artifacts)
+			{
+				var checksumFile = ChecksumFileFor(artifact);
+				if (!File.Exists(checksumFile))
+					throw new FileNotFoundException($"No checksum found for {artifact}", checksumFile);
+			}
 		});
 
 	Target PublishToNuget => _ => _
@@ -397,7 +416,8 @@ class Program: NukeBuild
 		.Executes(async () =>
 		{
 			var token = GetGitHubApiKey();
-			var artifacts = PlatformArtifactsPattern.GlobFiles().ToArray();
+			var zipArtifacts = PlatformArtifactsPattern.GlobFiles();
+			var artifacts = zipArtifacts.Concat(zipArtifacts.Select(ChecksumFileFor)).ToArray();
 			var api = new GitHubApi(token);
 			await api.Release(
 				PackageVersion,

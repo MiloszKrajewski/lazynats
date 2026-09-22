@@ -1,6 +1,6 @@
 lazynats
 
-Version: 0.0.5
+Version: 0.0.6
 Author: Milosz Krajewski
 
 A fast, keyboard-driven terminal UI for NATS
