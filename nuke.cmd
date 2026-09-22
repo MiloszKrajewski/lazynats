@@ -1,1 +1,1 @@
-@call build.cmd %*
+@call "%~dp0build.cmd" %*

@@ -110,7 +110,7 @@ internal sealed class StreamsTab: View, IShortcutSource
 
     private void SetShortcutSource(ITabOperationsSource source) => _shortcutSource = source;
 
-    // No KeyBindings/AddCommand for Ctrl+R/N/D/E here - that would hardcode which keys this tab
+    // No KeyBindings/AddCommand for R/N/D/E here - that would hardcode which keys this tab
     // forwards. Instead this fires once Terminal.Gui has already tried the focused view (and its own
     // ancestors, including whichever list is focused) and found no handler, at which point it's
     // this tab's turn; whatever key the currently active list's own TabOperations happens to expose

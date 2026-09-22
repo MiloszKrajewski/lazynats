@@ -12,7 +12,7 @@ namespace lazynats.Components;
 
 // Shared plumbing behind StreamListView/ConsumerListView (and the future KV/OBJ key/file lists):
 // PresenterListDataSource/ListView wiring, empty-hint mechanics, Background, identity-preserving
-// ReplaceItems, and the Ctrl+R -> RefreshRequested binding. Level-specific navigation (Enter ->
+// ReplaceItems, and the R -> RefreshRequested binding. Level-specific navigation (Enter ->
 // descend, Esc/Backspace -> ascend, ...) is deliberately left to each subclass - list behavior is
 // driven by list type, not item type. See
 // openspec/changes/extract-drillable-list-base/design.md.
@@ -110,7 +110,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
 
     // Exposed so a subclass can bind its own level-specific commands beyond the three shared
     // shapes below directly on the inner ListView, the same way those shapes bind Esc/Backspace/
-    // Ctrl+N/Ctrl+D on this component itself via the inherited AddCommand/KeyBindings.
+    // N/D on this component itself via the inherited AddCommand/KeyBindings.
     protected ListView ListView => _listView;
 
     // Opt-in shared navigation shapes, called from a subclass constructor to activate exactly the
@@ -251,7 +251,7 @@ internal abstract class DrillableListView<T>: View, IShortcutSource, ITabOperati
     public T? SelectedItem =>
         _listView.SelectedItem is { } index and >= 0 && index < _filtered.Count ? _filtered[index] : default;
 
-    // Re-fetched contents from a Ctrl+R (or the initial load) replace the master set wholesale,
+    // Re-fetched contents from an R refresh (or the initial load) replace the master set wholesale,
     // sorted ascending by GetIdentity (Ordinal) - every subclass gets alphabetical order for free.
     // Any active search text is reset to empty (so a create/edit/refresh always leaves its result
     // visible regardless of what was previously typed), then the filtered projection is

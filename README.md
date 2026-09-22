@@ -76,7 +76,7 @@ context-sensitive - a status bar at the bottom always shows what's available). A
 | `Alt+0` | Jump to the Live Feed |
 | `Alt+P` | Open the Publish dialog |
 | `F10` | About (build/version info) |
-| `Ctrl+R` | Refresh the current list |
+| `R` | Refresh the current list |
 | `Esc` | Back / close |
 
 ## Building from source

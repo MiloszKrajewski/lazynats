@@ -90,7 +90,7 @@ exists today.
   registers it with `ManagementTabs` — see `openspec/specs/tab-content-structure/spec.md`.
 - `StreamsTab`/`ValuesTab`/`ObjectsTab` share the same LHS-list/RHS-details, drill-down shape (e.g.
   stream → its consumers, KV bucket → its keys), built on two more `Components/` base classes:
-  `DrillableListView<T>` (list wiring, empty-hint, identity-preserving `ReplaceItems`, Ctrl+R
+  `DrillableListView<T>` (list wiring, empty-hint, identity-preserving `ReplaceItems`, `R`
   refresh — level-specific navigation like Enter-to-descend/Esc-to-ascend is left to each
   subclass) and `PollingDetailsView<TTarget, TInfo>` (the RHS pane's active-gated poll-on-timer +
   debounced fetch-on-target-change pipeline, built on Rx). A tab keeps both levels' views alive

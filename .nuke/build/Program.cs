@@ -313,6 +313,7 @@ class Program: NukeBuild
 	Target ReleaseWindowsX64 => _ => _
 		.After(Release)
 		.DependsOn(Restore)
+		.DependsOn(GenerateAbout)
 		.Executes(() =>
 		{
 			if (!OperatingSystem.IsWindows())
@@ -327,6 +328,7 @@ class Program: NukeBuild
 	Target ReleaseLinuxX64 => _ => _
 		.After(Release)
 		.DependsOn(Restore)
+		.DependsOn(GenerateAbout)
 		.Executes(() =>
 		{
 			var project = Projects(IsApplication).Single();
@@ -341,6 +343,7 @@ class Program: NukeBuild
 	Target ReleaseLinuxArm64 => _ => _
 		.After(Release)
 		.DependsOn(Restore)
+		.DependsOn(GenerateAbout)
 		.Executes(() =>
 		{
 			var project = Projects(IsApplication).Single();
@@ -355,6 +358,7 @@ class Program: NukeBuild
 	Target ReleaseMacosArm64 => _ => _
 		.After(Release)
 		.DependsOn(Restore)
+		.DependsOn(GenerateAbout)
 		.Executes(() =>
 		{
 			// Native AOT for macOS can only be produced on macOS hardware - there is no
