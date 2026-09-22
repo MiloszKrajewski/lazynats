@@ -24,7 +24,7 @@ Consumers don't get their own tab. JetStream itself never addresses a consumer w
 parent stream (`consumer info`/`consumer ls` both require a stream), so the UI mirrors that:
 there's no flat, cross-stream consumer list to show.
 
-An About dialog, showing build/version/author info, is reachable from anywhere via `F10`: a
+An About dialog, showing build/version/author info, is reachable from anywhere via `Alt+A`: a
 fixed-width, read-only modal whose content scrolls if it's taller than the dialog's visible area.
 Esc closes it.
 

@@ -110,12 +110,14 @@ internal sealed class MainWindow: Runnable
             ? $" {status.Count} {FollowingGlyph} "
             : $" {status.SelectedIndex + 1}/{status.Count} {StickyGlyph} ";
 
-        // The single source of truth for the app's fixed, always-available shortcuts - both the
-        // StatusBar widgets below and ShortcutPickerDialog's hardcoded half are built from this
-        // same list, per openspec/changes/add-shortcut-picker/design.md, so there's one place to
-        // edit rather than two lists drifting apart.
-        var topLevelShortcuts = new List<ShortcutHint> {
-            new(Key.Q.WithAlt, "Quit", () => App!.RequestStop()),
+        // The app's fixed, always-available shortcuts, split by role. Every binding appears
+        // exactly once across the two lists, and both feed the KeyDown loop below. They differ
+        // only in how the status bar shows them: jumpShortcuts get no per-digit hints (each
+        // window title's `N:` prefix already says where a digit goes) and are advertised by a
+        // single display-only "Alt-# Jump" widget instead, while globalShortcuts each get their
+        // own hint. ShortcutPickerDialog reads neither list - see the `?` comment below.
+        // See openspec/changes/compact-status-bar/design.md.
+        var jumpShortcuts = new List<ShortcutHint> {
             new(Key.D1.WithAlt, "Subscribe", () => tabs.SelectTab(subscribeTab)),
             new(Key.D2.WithAlt, "Streams", () => tabs.SelectTab(streamsTab)),
             new(Key.D3.WithAlt, "Values", () => tabs.SelectTab(valuesTab)),
@@ -123,24 +125,27 @@ internal sealed class MainWindow: Runnable
             new(Key.D5.WithAlt, "Templates", () => tabs.SelectTab(templatesTab)),
             new(Key.D0.WithAlt, "Live Feed", () => liveUpdates.SetFocus()),
         };
+        var globalShortcuts = new List<ShortcutHint> {
+            new(Key.Q.WithAlt, "Quit", () => App!.RequestStop()),
+        };
         // Deferred via AddTimeout(Zero, ...) rather than calling App!.Run directly: this Action
         // runs from inside the very same Alt+P key dispatch that's still unwinding, and Run()
         // pumps a nested loop that re-observes that same in-flight keypress as unhandled, feeding
         // it back into this global binding and recursively stacking PublishDialog instances.
         // Deferring to the next main-loop iteration runs it after that dispatch has fully
         // unwound, breaking the re-entrancy.
-        topLevelShortcuts.Add(
+        globalShortcuts.Add(
             new ShortcutHint(
                 Key.P.WithAlt, "Publish", () => App!.AddTimeout(
                     TimeSpan.Zero, () => {
                         App!.Run(new PublishDialog(connection));
                         return false;
                     })));
-        // Same deferred-AddTimeout re-entrancy dodge as Publish above - F10 is still mid-dispatch
-        // when this Action runs.
-        topLevelShortcuts.Add(
+        // Same deferred-AddTimeout re-entrancy dodge as Publish above - Alt+A is still
+        // mid-dispatch when this Action runs.
+        globalShortcuts.Add(
             new ShortcutHint(
-                Key.F10, "About", () => App!.AddTimeout(
+                Key.A.WithAlt, "About", () => App!.AddTimeout(
                     TimeSpan.Zero, () => {
                         App!.Run(new AboutDialog());
                         return false;
@@ -162,10 +167,10 @@ internal sealed class MainWindow: Runnable
         // App!.TopRunnableView?.MostFocused - not App! itself or any fixed view - is the actual
         // app-wide keyboard focus, wherever it is (several levels deep inside whichever tab is
         // active); MainWindow itself never implements IShortcutSource, so its own hardcoded
-        // topLevelShortcuts are structurally excluded from Collect's upward walk rather than
-        // filtered out after the fact. Re-evaluated lazily by MakeAction each time the picker
+        // jumpShortcuts/globalShortcuts are structurally excluded from Collect's upward walk rather
+        // than filtered out after the fact. Re-evaluated lazily by MakeAction each time the picker
         // opens, not once here - see ShortcutPickerLauncher's own comment on why.
-        topLevelShortcuts.Add(
+        globalShortcuts.Add(
             new ShortcutHint(
                 ShortcutPickerLauncher.Key, "Shortcuts",
                 ShortcutPickerLauncher.MakeAction(this, () => App!.TopRunnableView?.MostFocused)));
@@ -179,15 +184,22 @@ internal sealed class MainWindow: Runnable
         // with no SuperView link back here) is running - the same way ListEditorView's Ctrl+N/E/D
         // already work "from anywhere in this component" without needing BindKeyToApplication.
         // The widgets below stay for status-bar display and mouse-click support only.
-        var topLevelWidgets = topLevelShortcuts.Select(
+        var globalWidgets = globalShortcuts.Select(
             hint => {
                 var shortcut = new Shortcut { Text = hint.Text, Key = hint.Key };
                 shortcut.Action = hint.Action;
                 return shortcut;
             }).ToArray();
 
+        // Display-only: Key stays empty so Shortcut registers no binding at all (a real
+        // `new Key('#').WithAlt` could swallow the keystroke), and KeyView.Text is set directly -
+        // Shortcut still shows its key column when KeyView has text even with no Key. Built with
+        // Key.Separator so it renders like its neighbours' Key.ToString() output.
+        var jumpWidget = new Shortcut { Text = "Jump" };
+        jumpWidget.KeyView.Text = $"Alt{Key.Separator}#";
+
         KeyDown += (_, key) => {
-            foreach (var hint in topLevelShortcuts)
+            foreach (var hint in jumpShortcuts.Concat(globalShortcuts))
                 if (key == hint.Key)
                 {
                     hint.Action();
@@ -222,7 +234,8 @@ internal sealed class MainWindow: Runnable
 
         _statusBar = new StatusBar(
         [
-            ..topLevelWidgets,
+            jumpWidget,
+            ..globalWidgets,
             streamsStatusShortcut, valuesStatusShortcut, objectsStatusShortcut, templatesStatusShortcut,
         ]);
 

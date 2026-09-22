@@ -7,9 +7,10 @@ namespace lazynats.Components;
 
 // Lists every shortcut the focused view (and its ancestors) currently advertises via
 // IShortcutSource, grouped and ordered per ShortcutAggregator.Collect/ShortcutHint.Group -
-// deliberately excludes MainWindow's hardcoded top-level shortcuts (Alt-1..4, Alt-P, Alt-Q, this
-// dialog's own trigger key), since those are
-// already permanently visible in the status bar and would just be redundant here; see the
+// deliberately excludes MainWindow's hardcoded top-level shortcuts (Alt-1..5/Alt-0, Alt-P, Alt-Q,
+// Alt-A, this dialog's own trigger key), since those are
+// already permanently advertised in the status bar (the digits via its single "Alt-# Jump"
+// hint plus each window title's `N:` prefix) and would just be redundant here; see the
 // caller in MainWindow. No buttons: Enter on the highlighted row sets Result and closes, Esc
 // cancels via Dialog<T>'s own inherited behavior (Result stays null), same compact "commits on
 // Enter" shape as PatternDialog/HeaderDialog. The caller invokes Result?.Action only after this

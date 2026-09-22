@@ -75,7 +75,7 @@ context-sensitive - a status bar at the bottom always shows what's available). A
 | `Alt+1` .. `Alt+5` | Switch management tab (Subscribe / Streams / Values / Objects / Templates) |
 | `Alt+0` | Jump to the Live Feed |
 | `Alt+P` | Open the Publish dialog |
-| `F10` | About (build/version info) |
+| `Alt+A` | About (build/version info) |
 | `R` | Refresh the current list |
 | `Esc` | Back / close |
 
