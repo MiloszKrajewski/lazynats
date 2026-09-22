@@ -24,7 +24,10 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: release-noarch
-          path: .output/*.zip
+          path: |
+            .output/*.zip
+            .output/*.tgz
+            .output/*.sha256
           include-hidden-files: true
 
 
@@ -48,7 +51,10 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: release-windows-x64
-          path: .output/*.zip
+          path: |
+            .output/*.zip
+            .output/*.tgz
+            .output/*.sha256
           include-hidden-files: true
 
   linux-x64:
@@ -73,7 +79,10 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: release-linux-x64
-          path: .output/*.zip
+          path: |
+            .output/*.zip
+            .output/*.tgz
+            .output/*.sha256
           include-hidden-files: true
 
   linux-arm64:
@@ -98,7 +107,10 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: release-linux-arm64
-          path: .output/*.zip
+          path: |
+            .output/*.zip
+            .output/*.tgz
+            .output/*.sha256
           include-hidden-files: true
 
   macos-arm64:
@@ -121,7 +133,10 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: release-macos-arm64
-          path: .output/*.zip
+          path: |
+            .output/*.zip
+            .output/*.tgz
+            .output/*.sha256
           include-hidden-files: true
 
   publish:
