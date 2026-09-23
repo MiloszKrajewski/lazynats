@@ -1,3 +1,6 @@
+## 0.0.8 (2026/09/23)
+* BREAKING: Linux and macOS release assets are now `.tgz` (binary stays executable after extraction)
+
 ## 0.0.7 (2026/09/23)
 * FEAT: Esc no longer quits the app (use Alt+Q)
 * FEAT: Compact status bar (single Alt-# "Jump" hint)

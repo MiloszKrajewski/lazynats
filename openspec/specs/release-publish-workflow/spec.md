@@ -48,13 +48,15 @@ target or build script installing system packages itself.
 - **THEN** `clang` and `zlib1g-dev` are installed via an explicit workflow step
 - **AND** that installation happens before the Nuke release target is invoked
 
-### Requirement: Each platform job publishes its zip as a build artifact
-Each of the four platform jobs in `publish.yml` SHALL upload the zip produced by its Nuke target
-as a GitHub Actions build artifact, for the `publish` job to consume.
+### Requirement: Each platform job publishes its archive as a build artifact
+Each of the four platform jobs in `publish.yml` SHALL upload the release archive produced by its
+Nuke target (`.zip` or `.tgz`, whichever the target emits) together with its `.sha256` sidecar as a
+GitHub Actions build artifact, for the `publish` job to consume.
 
 #### Scenario: A platform job completes successfully
-- **WHEN** a platform job's Nuke target finishes producing its zip
-- **THEN** the job uploads that zip file as a build artifact before completing
+- **WHEN** a platform job's Nuke target finishes producing its archive
+- **THEN** the job uploads that archive file and its `.sha256` sidecar as a build artifact before
+  completing
 
 ### Requirement: A single publish job creates one GitHub Release with all platform zips
 `publish.yml` SHALL define a `publish` job that depends on all four platform jobs, downloads each
@@ -73,16 +75,22 @@ SHALL NOT run, and no GitHub Release SHALL be created for that workflow run.
 - **THEN** the `publish` job does not run
 - **AND** no GitHub Release is created for that workflow run
 
-### Requirement: PublishToGitHub uploads platform release zips
-The `PublishToGitHub` Nuke target SHALL select the platform release zips
-(`lazynats-<version>-<system>-<arch>.zip` in the collected output directory, matching the version
-resolved from `CHANGES.md`) as the assets to attach to the GitHub Release, rather than the
-`*.nupkg` glob it previously used.
+### Requirement: PublishToGitHub uploads platform release archives
+The `PublishToGitHub` Nuke target SHALL select the platform release archives
+(`lazynats-<version>-<system>-<arch>.zip` and `lazynats-<version>-<system>-<arch>.tgz` in the
+collected output directory, matching the version resolved from `CHANGES.md`), plus each archive's
+`.sha256` sidecar, as the assets to attach to the GitHub Release. `VerifyPlatformArtifacts` SHALL
+apply the same selection when checking that archives and their checksums are present.
 
-#### Scenario: PublishToGitHub runs with platform zips present
-- **WHEN** `PublishToGitHub` runs with the four platform zips present in its collected output
-  directory
-- **THEN** all four zips are attached as assets to the created GitHub Release
+#### Scenario: PublishToGitHub runs with platform archives present
+- **WHEN** `PublishToGitHub` runs with the Windows `.zip` and the Linux/macOS `.tgz` archives
+  present in its collected output directory
+- **THEN** all of them, and their `.sha256` sidecars, are attached as assets to the created GitHub
+  Release
+
+#### Scenario: A tarball is missing its checksum
+- **WHEN** `VerifyPlatformArtifacts` finds a `.tgz` release archive with no matching `.sha256`
+- **THEN** it fails, the same as it does for a `.zip` without one
 
 #### Scenario: Re-running for a version that already has a release
 - **WHEN** `PublishToGitHub` runs for a version whose GitHub Release already exists

@@ -1,14 +1,52 @@
-# platform-release-builds Specification
+## ADDED Requirements
 
-## Purpose
-Defines the Nuke build targets that produce release artifacts for `lazynats`: the
-framework-dependent default `Release` build, plus OS/arch-specific native-AOT release archives
-(Windows x64, Linux x64 via Docker, Linux arm64 via emulated Docker) and an explicit placeholder
-target for the combination not yet supported (macOS arm64), each following the
-`lazynats-<version>-<system>-<arch>.<ext>` naming convention in `.output/`, where `<ext>` is `zip`
-for Windows and noarch, and `tgz` for Linux and macOS.
+### Requirement: Archive format follows the target platform
+Each release target SHALL pick its archive format by platform: `Release` (noarch) and
+`release-windows-x64` SHALL produce a `.zip`; `release-linux-x64`, `release-linux-arm64` and
+`release-macos-arm64` SHALL produce a gzip-compressed tar archive with the `.tgz` extension. Both
+formats SHALL be written through the build's existing archiving dependency (Nuke's
+`AbsolutePath.CompressTo`), without adding a new compression library or a hand-written archiver.
 
-## Requirements
+#### Scenario: Windows and noarch archives are zips
+- **WHEN** `Release` or `release-windows-x64` completes
+- **THEN** its archive in `.output/` has the `.zip` extension and is a valid zip file
+
+#### Scenario: Linux and macOS archives are tarballs
+- **WHEN** `release-linux-x64`, `release-linux-arm64` or `release-macos-arm64` completes
+- **THEN** its archive in `.output/` has the `.tgz` extension and is a valid gzip-compressed tar
+  file (readable by `tar xzf`)
+- **AND** no `.zip` archive is produced by that target
+
+#### Scenario: Archive layout is the same in both formats
+- **WHEN** a release archive is extracted, in either format
+- **THEN** the published files sit at the archive root, with no wrapping top-level directory
+
+### Requirement: Tarball preserves the executable bit
+In a `.tgz` release archive, the `lazynats` application binary SHALL carry Unix permissions that
+include the owner execute bit, regardless of the OS of the host that built the archive, so the
+user who extracts it can run it without a `chmod`.
+
+#### Scenario: Built natively on Linux or macOS
+- **WHEN** `release-linux-x64`, `release-linux-arm64` or `release-macos-arm64` builds natively on
+  a matching host and the archive is extracted with `tar xzf`
+- **THEN** the extracted `lazynats` binary can be executed directly, without a `chmod`
+
+#### Scenario: Built via the Docker fallback on a Windows host
+- **WHEN** `release-linux-x64` or `release-linux-arm64` takes the Docker fallback path on a Windows
+  host and the archive is extracted on Linux with `tar xzf`
+- **THEN** the extracted `lazynats` binary can be executed directly, without a `chmod`
+
+### Requirement: Every release archive has a checksum sidecar
+Each release target SHALL write a `<archive-file-name>.sha256` file next to its archive, in either
+format, containing the lowercase hex SHA-256 of the archive followed by two spaces and the archive
+file name.
+
+#### Scenario: Checksum for a tarball
+- **WHEN** `release-linux-x64` produces `lazynats-<version>-linux-x64.tgz`
+- **THEN** `lazynats-<version>-linux-x64.tgz.sha256` exists alongside it and verifies with
+  `sha256sum -c`
+
+## MODIFIED Requirements
 
 ### Requirement: Framework-dependent Release build
 The `Release` target SHALL publish `lazynats` as a framework-dependent, non-self-contained build
@@ -19,22 +57,6 @@ The `Release` target SHALL publish `lazynats` as a framework-dependent, non-self
 - **THEN** the published output is framework-dependent (requires a matching .NET runtime to run,
   is not self-contained, and is not a Native AOT binary)
 - **AND** the zip artifact is named `lazynats-<version>-noarch.zip`
-
-### Requirement: Windows x64 native release archive
-A `release-windows-x64` target SHALL produce a self-contained, Native AOT `win-x64` build of
-`lazynats`, zipped as `lazynats-<version>-windows-x64.zip` in `.output/`, and SHALL only run on a
-Windows host.
-
-#### Scenario: Building on Windows
-- **WHEN** `release-windows-x64` is executed on a Windows host
-- **THEN** `lazynats` is published self-contained for `win-x64` with Native AOT enabled
-- **AND** the result is zipped to `.output/lazynats-<version>-windows-x64.zip`
-
-#### Scenario: Attempted on a non-Windows host
-- **WHEN** `release-windows-x64` is executed on a non-Windows host
-- **THEN** the target fails immediately with a message explaining that Windows AOT builds require
-  a Windows host
-- **AND** no partial or incorrect artifact is produced
 
 ### Requirement: Linux x64 native release archive via Docker
 A `release-linux-x64` target SHALL produce a self-contained, Native AOT `linux-x64` build of
@@ -118,52 +140,6 @@ silently absent or appearing to succeed.
 - **THEN** it fails immediately with a message noting that a macOS Native AOT build requires a
   macOS arm64 host
 
-### Requirement: Archive format follows the target platform
-Each release target SHALL pick its archive format by platform: `Release` (noarch) and
-`release-windows-x64` SHALL produce a `.zip`; `release-linux-x64`, `release-linux-arm64` and
-`release-macos-arm64` SHALL produce a gzip-compressed tar archive with the `.tgz` extension. Both
-formats SHALL be written through the build's existing archiving dependency (Nuke's
-`AbsolutePath.CompressTo`), without adding a new compression library or a hand-written archiver.
-
-#### Scenario: Windows and noarch archives are zips
-- **WHEN** `Release` or `release-windows-x64` completes
-- **THEN** its archive in `.output/` has the `.zip` extension and is a valid zip file
-
-#### Scenario: Linux and macOS archives are tarballs
-- **WHEN** `release-linux-x64`, `release-linux-arm64` or `release-macos-arm64` completes
-- **THEN** its archive in `.output/` has the `.tgz` extension and is a valid gzip-compressed tar
-  file (readable by `tar xzf`)
-- **AND** no `.zip` archive is produced by that target
-
-#### Scenario: Archive layout is the same in both formats
-- **WHEN** a release archive is extracted, in either format
-- **THEN** the published files sit at the archive root, with no wrapping top-level directory
-
-### Requirement: Tarball preserves the executable bit
-In a `.tgz` release archive, the `lazynats` application binary SHALL carry Unix permissions that
-include the owner execute bit, regardless of the OS of the host that built the archive, so the
-user who extracts it can run it without a `chmod`.
-
-#### Scenario: Built natively on Linux or macOS
-- **WHEN** `release-linux-x64`, `release-linux-arm64` or `release-macos-arm64` builds natively on
-  a matching host and the archive is extracted with `tar xzf`
-- **THEN** the extracted `lazynats` binary can be executed directly, without a `chmod`
-
-#### Scenario: Built via the Docker fallback on a Windows host
-- **WHEN** `release-linux-x64` or `release-linux-arm64` takes the Docker fallback path on a Windows
-  host and the archive is extracted on Linux with `tar xzf`
-- **THEN** the extracted `lazynats` binary can be executed directly, without a `chmod`
-
-### Requirement: Every release archive has a checksum sidecar
-Each release target SHALL write a `<archive-file-name>.sha256` file next to its archive, in either
-format, containing the lowercase hex SHA-256 of the archive followed by two spaces and the archive
-file name.
-
-#### Scenario: Checksum for a tarball
-- **WHEN** `release-linux-x64` produces `lazynats-<version>-linux-x64.tgz`
-- **THEN** `lazynats-<version>-linux-x64.tgz.sha256` exists alongside it and verifies with
-  `sha256sum -c`
-
 ### Requirement: Release archives exclude debug symbol files
 `Release`, `release-windows-x64`, `release-linux-x64`, `release-linux-arm64`, and
 `release-macos-arm64` SHALL each strip debug symbol files (`*.pdb` on Windows, `*.dbg` on Linux
@@ -175,7 +151,7 @@ and macOS) from the published output before archiving, so the resulting archive 
   `release-macos-arm64` archives its published output
 - **THEN** the resulting archive contains no `.pdb` or `.dbg` files
 
-### Requirement: Re-running a release target overwrites its archive
+### Requirement: Re-running a release target overwrites its zip
 `Release`, `release-windows-x64`, `release-linux-x64`, `release-linux-arm64`, and
 `release-macos-arm64` SHALL each overwrite their destination archive (`.zip` or `.tgz`) and its
 `.sha256` sidecar if they already exist from a previous run, rather than failing or appending to
@@ -186,24 +162,3 @@ them.
   `release-macos-arm64` is run again while its destination archive already exists in `.output/`
 - **THEN** the target completes successfully and the archive is replaced with the new output
 - **AND** the `.sha256` sidecar matches the new archive
-
-### Requirement: Release targets are independently invoked
-`release-windows-x64`, `release-linux-x64`, `release-linux-arm64`, and `release-macos-arm64`
-SHALL each be invocable on their own and SHALL NOT be added as a dependency of the `Release`
-target or of each other. Each SHALL be ordered to run after `Release` (via an ordering hint, not
-a dependency) so that when both are scheduled in the same invocation, `Release` runs first.
-
-#### Scenario: Running Release does not trigger the platform targets
-- **WHEN** the `Release` target is executed
-- **THEN** none of `release-windows-x64`, `release-linux-x64`, `release-linux-arm64`, or
-  `release-macos-arm64` are executed as a side effect
-
-#### Scenario: Invoking a platform target alone does not trigger Release
-- **WHEN** `release-windows-x64`, `release-linux-x64`, `release-linux-arm64`, or
-  `release-macos-arm64` is executed on its own
-- **THEN** `Release` is not executed as a side effect
-
-#### Scenario: Scheduling Release together with a platform target orders Release first
-- **WHEN** `Release` and one of `release-windows-x64`, `release-linux-x64`,
-  `release-linux-arm64`, or `release-macos-arm64` are both requested in the same invocation
-- **THEN** `Release` executes before the platform target

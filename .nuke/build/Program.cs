@@ -56,7 +56,11 @@ class Program: NukeBuild
 	static readonly AbsolutePath AboutDirectory = RootDirectory / "src" / "lazynats" / "About";
 
 	AbsolutePath PackageArtifactsPattern => OutputDirectory / $"*.{PackageVersion}.nupkg";
-	AbsolutePath PlatformArtifactsPattern => OutputDirectory / $"*-{PackageVersion}-*.zip";
+	string[] PlatformArtifactsPatterns =>
+		Enum.GetValues<ArchiveFormat>().Select(f => $"*-{PackageVersion}-*{f.Extension()}").ToArray();
+
+	IReadOnlyCollection<AbsolutePath> PlatformArtifacts() =>
+		OutputDirectory.GlobFiles(PlatformArtifactsPatterns);
 
 	readonly ReleaseNotes[] ReleaseNotes = ChangelogTasks
 		.ReadReleaseNotes(RootDirectory / "CHANGES.md")
@@ -104,11 +108,15 @@ class Program: NukeBuild
 		File.WriteAllText(ChecksumFileFor(file), $"{hash}  {file.Name}\n");
 	}
 
-	static void CompressToFresh(AbsolutePath sourceDirectory, AbsolutePath zipFile)
+	static AbsolutePath CompressToFresh(
+		AbsolutePath sourceDirectory, AbsolutePath outputDirectory, string baseName, ArchiveFormat format)
 	{
-		if (File.Exists(zipFile)) File.Delete(zipFile);
-		sourceDirectory.CompressTo(zipFile);
-		WriteSha256File(zipFile);
+		var archiveFile = outputDirectory / $"{baseName}{format.Extension()}";
+		Log.Information("Compressing {ArchiveName}...", archiveFile.Name);
+		if (File.Exists(archiveFile)) File.Delete(archiveFile);
+		sourceDirectory.CompressTo(archiveFile);
+		WriteSha256File(archiveFile);
+		return archiveFile;
 	}
 
     static void RestoreSecretFile(string secretFile, string exampleFile)
@@ -208,9 +216,9 @@ class Program: NukeBuild
 					.SetOutput(OutputDirectory / a.Name)
 				);
 				RemoveDebugSymbols(OutputDirectory / a.Name);
-				var zipName = $"{a.Name}-{PackageVersion}-noarch.zip";
-				Log.Information("Compressing {Application}...", zipName);
-				CompressToFresh(OutputDirectory / a.Name, OutputDirectory / zipName);
+				CompressToFresh(
+					OutputDirectory / a.Name, OutputDirectory,
+					$"{a.Name}-{PackageVersion}-noarch", ArchiveFormat.Zip);
 			}
 		});
 	
@@ -287,12 +295,12 @@ class Program: NukeBuild
 
 		RemoveDebugSymbols(publishDirectory);
 
-		var zipName = $"{project.Name}-{PackageVersion}-linux-{archSuffix}.zip";
-		Log.Information("Compressing {ZipName}...", zipName);
-		CompressToFresh(publishDirectory, OutputDirectory / zipName);
+		CompressToFresh(
+			publishDirectory, OutputDirectory,
+			$"{project.Name}-{PackageVersion}-linux-{archSuffix}", ArchiveFormat.Tgz);
 	}
 
-	void PublishNative(Project project, string rid, string archSuffix)
+	void PublishNative(Project project, string rid, string archSuffix, ArchiveFormat format)
 	{
 		var publishDirectory = OutputDirectory / $"{project.Name}-{archSuffix}";
 
@@ -305,9 +313,9 @@ class Program: NukeBuild
 			.SetOutput(publishDirectory));
 		RemoveDebugSymbols(publishDirectory);
 
-		var zipName = $"{project.Name}-{PackageVersion}-{archSuffix}.zip";
-		Log.Information("Compressing {ZipName}...", zipName);
-		CompressToFresh(publishDirectory, OutputDirectory / zipName);
+		CompressToFresh(
+			publishDirectory, OutputDirectory,
+			$"{project.Name}-{PackageVersion}-{archSuffix}", format);
 	}
 
 	Target ReleaseWindowsX64 => _ => _
@@ -322,7 +330,7 @@ class Program: NukeBuild
 					"cross-compilation story from Linux or macOS.");
 
 			var project = Projects(IsApplication).Single();
-			PublishNative(project, rid: "win-x64", archSuffix: "windows-x64");
+			PublishNative(project, rid: "win-x64", archSuffix: "windows-x64", ArchiveFormat.Zip);
 		});
 
 	Target ReleaseLinuxX64 => _ => _
@@ -333,7 +341,7 @@ class Program: NukeBuild
 		{
 			var project = Projects(IsApplication).Single();
 			if (HostMatchesRid("linux-x64"))
-				PublishNative(project, rid: "linux-x64", archSuffix: "linux-x64");
+				PublishNative(project, rid: "linux-x64", archSuffix: "linux-x64", ArchiveFormat.Tgz);
 			else
 				PublishLinuxViaDocker(
 					project, OutputDirectory / $"{project.Name}-linux-x64",
@@ -348,7 +356,7 @@ class Program: NukeBuild
 		{
 			var project = Projects(IsApplication).Single();
 			if (HostMatchesRid("linux-arm64"))
-				PublishNative(project, rid: "linux-arm64", archSuffix: "linux-arm64");
+				PublishNative(project, rid: "linux-arm64", archSuffix: "linux-arm64", ArchiveFormat.Tgz);
 			else
 				PublishLinuxViaDocker(
 					project, OutputDirectory / $"{project.Name}-linux-arm64",
@@ -369,7 +377,7 @@ class Program: NukeBuild
 					"actual macOS build host, which is not available to this pipeline.");
 
 			var project = Projects(IsApplication).Single();
-			PublishNative(project, rid: "osx-arm64", archSuffix: "macos-arm64");
+			PublishNative(project, rid: "osx-arm64", archSuffix: "macos-arm64", ArchiveFormat.Tgz);
 		});
 
 	Target VerifyArtifacts => _ => _
@@ -384,9 +392,10 @@ class Program: NukeBuild
 		.After(ReleaseWindowsX64).After(ReleaseLinuxX64).After(ReleaseLinuxArm64).After(ReleaseMacosArm64)
 		.Executes(() =>
 		{
-			var artifacts = PlatformArtifactsPattern.GlobFiles();
+			var artifacts = PlatformArtifacts();
 			if (!artifacts.Any())
-				throw new FileNotFoundException($"No artifacts found for {PlatformArtifactsPattern}");
+				throw new FileNotFoundException(
+					$"No artifacts found in {OutputDirectory} for {PlatformArtifactsPatterns.Join(", ")}");
 
 			foreach (var artifact in artifacts)
 			{
@@ -420,8 +429,8 @@ class Program: NukeBuild
 		.Executes(async () =>
 		{
 			var token = GetGitHubApiKey();
-			var zipArtifacts = PlatformArtifactsPattern.GlobFiles();
-			var artifacts = zipArtifacts.Concat(zipArtifacts.Select(ChecksumFileFor)).ToArray();
+			var archives = PlatformArtifacts();
+			var artifacts = archives.Concat(archives.Select(ChecksumFileFor)).ToArray();
 			var api = new GitHubApi(token);
 			await api.Release(
 				PackageVersion,
