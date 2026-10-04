@@ -15,6 +15,10 @@ internal static class ShortcutPickerLauncher
     // openspec/changes/add-shortcut-picker/design.md for why those were rejected.
     public static readonly Key Key = new('?');
 
+    // Matches `?` however the terminal reports it. herdr delivers it as `Shift+?` (code '?' with the
+    // Shift flag set; confirmed from a key log), which a plain `key == Key` comparison misses.
+    public static bool IsPickerKey(Key key) => key == Key || key.NoShift == Key;
+
     // Deferred via AddTimeout(Zero, ...): this Action normally runs from inside a still-unwinding
     // KeyDown dispatch, and App.Run() pumps a nested loop that re-observes that same in-flight
     // keypress as unhandled, feeding it back into the caller's binding and potentially
@@ -63,7 +67,7 @@ internal static class ShortcutPickerLauncher
     {
         var action = MakeAction(owner, startView ?? (() => ResolveStartView(owner)));
         owner.KeyDown += (_, key) => {
-            if (key != Key) return;
+            if (!IsPickerKey(key)) return;
             key.Handled = true;
             action();
         };

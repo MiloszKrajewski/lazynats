@@ -209,7 +209,8 @@ internal sealed class MainWindow: Runnable
         // See openspec/specs/quit-key/spec.md.
         KeyDown += (_, key) => {
             foreach (var hint in jumpShortcuts.Concat(globalShortcuts))
-                if (key == hint.Key)
+                if (key == hint.Key
+                    || (hint.Key == ShortcutPickerLauncher.Key && ShortcutPickerLauncher.IsPickerKey(key)))
                 {
                     hint.Action();
                     key.Handled = true;

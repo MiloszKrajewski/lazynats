@@ -11,3 +11,5 @@
 - do NATS accept su*>bject?
 - subscriptions: don't delete failed, just show as broken, try restart every now and then
 - OPTIONAL: delete subscription does not ask for permission
+- rename of template (part of edit? with extra check for everwrite?)
+- template duplicate (C for clone?)
