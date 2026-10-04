@@ -44,6 +44,15 @@ macOS (arm64) are published on the
 [Releases page](https://github.com/MiloszKrajewski/lazynats/releases). Download the zip for your
 platform, extract it, and run the `lazynats` executable.
 
+On Linux (x64/arm64, glibc-based distributions) a script can do that for you. It installs the latest
+release into `~/.local/share/lazynats/<version>/` and symlinks it as `~/.local/bin/lazynats`:
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/MiloszKrajewski/lazynats/main/install/linux.sh | sh
+```
+
+Set `LAZYNATS_VERSION` to install a specific version instead of the latest.
+
 Alternatively, build from source (see below).
 
 ## Usage
