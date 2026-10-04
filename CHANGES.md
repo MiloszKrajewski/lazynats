@@ -1,3 +1,6 @@
+## 0.0.9 (2026/10/01)
+* FIX: swallowing `?` on `herdr`
+
 ## 0.0.8 (2026/09/23)
 * BREAKING: Linux and macOS release assets are now `.tgz` (binary stays executable after extraction)
 
