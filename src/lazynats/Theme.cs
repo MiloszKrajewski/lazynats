@@ -60,6 +60,12 @@ internal static class Theme
     // convention (see EditFrameEdgeAccentFocused vs. SubjectColor).
     public static readonly Color LiveFeedFocusAccentColor = new(ColorName16.BrightYellow);
 
+    // Subscribe tab's exclusion-filter input text while it holds a valid but not-yet-applied edit
+    // (openspec/specs/nats-subscriptions/spec.md) - between the red "invalid" and the default
+    // "applied" look. Same value as the BrightYellow accents above, kept as its own constant per
+    // this file's one-constant-per-usage-site convention.
+    public static readonly Color PendingEditColor = new(ColorName16.BrightYellow);
+
     private static readonly Attribute EditableAttribute = new(ColorName16.White, EditableBackground);
 
     // Dimmed foreground, same EditableBackground - explicit rather than left to derive from

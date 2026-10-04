@@ -28,6 +28,17 @@ An About dialog, showing build/version/author info, is reachable from anywhere v
 fixed-width, read-only modal whose content scrolls if it's taller than the dialog's visible area.
 Esc closes it.
 
+## Subscribe tab
+
+A list of active subject-pattern subscriptions (N/E/D to add/edit/delete) feeding the live feed,
+and below it a single subject exclusion regex applied to every subscription's incoming messages
+(default `^(\$|_INBOX\.)`, hiding system and inbox traffic; combine rules with `|`, carve out
+exceptions with a lookahead such as `^(\$(?!SYS\.)|_INBOX\.)`, clear it to hide nothing). Edits
+take effect only when applied (Enter in the field, or the Apply button); until then the field
+shows its state - red: doesn't compile, yellow plus a `*` on the label: valid but not applied,
+default: in effect. Esc in the field reverts to the applied expression. Applying affects newly
+received messages only; rows already in the feed stay.
+
 ## Streams tab
 
 Layout is the familiar LHS list / RHS info split. LHS starts as a list of streams; RHS shows

@@ -206,6 +206,13 @@ internal class TabbedView : View
         content.Width = Dim.Fill();
         content.Height = Dim.Fill();
         content.Visible = false;
+        // Tab/Shift+Tab cycle within this tab's own content, never out through the header. As a
+        // plain TabStop, Tab from content's last stop left for the header, and Tab from the header
+        // re-entered content at its most recently focused SubView - with two or more permanent
+        // stops (e.g. SubscribeTab's list + exclusion field) that stranded every earlier stop. The
+        // header stays reachable via Up (tab-navigation spec). Set here, not per tab, so any tab
+        // gets it by default.
+        content.TabStop = TabBehavior.TabGroup;
         Add(content);
 
         var index = _tabs.Count;

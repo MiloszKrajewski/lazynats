@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Reactive.Subjects;
 using lazynats;
 using lazynats.Core;
+using lazynats.Core.Subjects;
 using lazynats.LiveFeed;
 using lazynats.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,7 +42,8 @@ static async Task RunAppAsync(
     // register this synchronized instance below (never the raw Subject type) so producers/consumers
     // can't accidentally bypass the serialization.
     var feed = Subject.Synchronize(new Subject<FeedEnvelope>());
-    var registry = new SubscriptionRegistry(connection, feed);
+    var exclusion = new SubjectExclusionFilter();
+    var registry = new SubscriptionRegistry(connection, feed, exclusion);
     
     var jetStream = connection.CreateJetStreamContext();
     var kv = jetStream.CreateKeyValueStoreContext();
@@ -83,6 +85,7 @@ static async Task RunAppAsync(
     var services = new ServiceCollection();
     services.AddSingleton(connection);
     services.AddSingleton(registry);
+    services.AddSingleton(exclusion);
     services.AddSingleton(jetStream);
     services.AddSingleton(kv);
     services.AddSingleton(obj);

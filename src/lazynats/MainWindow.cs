@@ -1,5 +1,6 @@
 ﻿using lazynats.About;
 using lazynats.Components;
+using lazynats.Core.Subjects;
 using lazynats.LiveFeed;
 using lazynats.Objects;
 using lazynats.Publish;
@@ -33,6 +34,7 @@ internal sealed class MainWindow: Runnable
     public MainWindow()
     {
         var registry = Services.Root.GetRequiredService<SubscriptionRegistry>();
+        var exclusion = Services.Root.GetRequiredService<SubjectExclusionFilter>();
         var connection = Services.Root.GetRequiredService<NatsConnection>();
         var jetStream = Services.Root.GetRequiredService<INatsJSContext>();
         var kvContext = Services.Root.GetRequiredService<INatsKVContext>();
@@ -40,7 +42,7 @@ internal sealed class MainWindow: Runnable
         var feed = Services.Root.GetRequiredService<IObservable<FeedEnvelope>>();
         var dedup = Services.Root.GetRequiredService<MessageDeduplicator>();
 
-        var subscribeTab = new SubscribeTab(registry) { Padding = { Thickness = new Thickness(1) } };
+        var subscribeTab = new SubscribeTab(registry, exclusion) { Padding = { Thickness = new Thickness(1) } };
         var streamsTab = new StreamsTab(jetStream) { Padding = { Thickness = new Thickness(1) } };
         var valuesTab = new ValuesTab(kvContext) { Padding = { Thickness = new Thickness(1) } };
         var objectsTab = new ObjectsTab(jetStream, objContext) { Padding = { Thickness = new Thickness(1) } };
