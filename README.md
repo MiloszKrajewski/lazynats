@@ -53,6 +53,15 @@ curl -fsSL https://raw.githubusercontent.com/MiloszKrajewski/lazynats/main/insta
 
 Set `LAZYNATS_VERSION` to install a specific version instead of the latest.
 
+On Windows (x64), run this in PowerShell. It installs into `%LOCALAPPDATA%\Programs\lazynats\<version>\`,
+generates a small `lazynats.exe` launcher (with [stubgen](https://github.com/MiloszKrajewski/stubgen))
+in `%USERPROFILE%\.local\bin`, and adds that folder to your user `PATH` only if it isn't there already.
+It prints every location it touched, since there is no uninstaller (delete those two locations):
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/MiloszKrajewski/lazynats/main/install/windows.ps1 | iex
+```
+
 Alternatively, build from source (see below).
 
 ## Usage
